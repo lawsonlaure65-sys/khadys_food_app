@@ -1,11 +1,27 @@
-<div align="center">
+# KHADY'S FOOD & EVENT - App Mobile (PWA)
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Une application professionnelle moderne pour le restaurant **Khady's Food & Event** à Niamey.
 
-  <h1>Built with AI Studio</h2>
+## ✨ Points forts
+- **Interface Mobile-First** : Expérience fluide type application native.
+- **Salutations Chaleureuses** : Système "Salam 👋🏾" et "Bonjour 👋🏾" dynamique.
+- **IA Khady** : Assistante culinaire intelligente intégrée.
+- **PWA Ready** : Installable sur Android et iOS.
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## 🚀 Comment mettre à jour GitHub ?
+1. Allez sur votre dépôt GitHub.
+2. Cliquez sur **Add file** > **Upload files**.
+3. Glissez-déposez le fichier `App.tsx` (et les autres si besoin).
+4. Cliquez sur **Commit changes** en bas.
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## ⚠️ Sécurité
+NE JAMAIS mettre votre fichier `.env.local` sur GitHub. Si vous l'avez fait, supprimez-le immédiatement de l'interface GitHub.
 
-</div>
+## ⚙️ Configuration Supabase
+Assurez-vous d'avoir exécuté le fichier `db_schema.sql` dans votre éditeur SQL Supabase pour activer les fonctionnalités dynamiques.
+
+## 📦 Déploiement Vercel
+Connectez votre dépôt GitHub à Vercel. Ajoutez vos clés API dans les **Environment Variables** de Vercel :
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `API_KEY` (pour l'IA)
