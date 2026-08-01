@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'khadys-food-v3-elite';
+const CACHE_NAME = 'khadys-food-v4-auto-sync';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -11,6 +11,12 @@ const ASSETS_TO_CACHE = [
   'https://cdn.tailwindcss.com',
   'https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Great+Vibes&display=swap'
 ];
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -26,6 +32,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
+            console.log('[SW] Suppression de l\'ancien cache:', cacheName);
             return caches.delete(cacheName);
           }
         })

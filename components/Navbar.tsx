@@ -34,8 +34,8 @@ const Navbar: React.FC<NavbarProps> = ({ currentPage, setPage, cartCount }) => {
   ];
 
   return (
-    <div className="fixed bottom-6 left-0 right-0 z-50 px-4 flex justify-center">
-      <nav className="bg-white/90 backdrop-blur-2xl border border-gray-100 shadow-[0_20px_50px_rgba(0,0,0,0.12)] flex justify-between items-center h-20 px-3 rounded-[2.5rem] w-full max-w-md">
+    <div className="fixed bottom-3 sm:bottom-6 left-0 right-0 z-50 px-2 sm:px-4 flex justify-center pointer-events-none">
+      <nav className="pointer-events-auto bg-white/95 backdrop-blur-2xl border border-gray-100 shadow-[0_20px_50px_rgba(0,0,0,0.15)] flex justify-around items-center h-16 sm:h-20 px-1.5 sm:px-3 rounded-[2rem] sm:rounded-[2.5rem] w-full max-w-[96%] xs:max-w-md sm:max-w-lg">
           {navItems.map((item) => {
             const isActive = currentPage === item.page;
             const isCart = item.page === Page.CART;
@@ -45,19 +45,19 @@ const Navbar: React.FC<NavbarProps> = ({ currentPage, setPage, cartCount }) => {
               <button 
                 key={item.label} 
                 onClick={() => { playSound('pop'); setPage(item.page); }} 
-                className="relative flex flex-col items-center justify-center flex-1 h-full group"
+                className="relative flex flex-col items-center justify-center flex-1 h-full group py-1"
                 title={item.label}
               >
-                <div className={`relative p-2.5 sm:p-3 rounded-2xl transition-all duration-300 ${isActive ? 'bg-brand-brown text-brand-gold shadow-lg shadow-brand-brown/20 scale-105' : 'text-gray-300 group-hover:text-brand-brown'} ${isCart && isBouncing ? 'animate-bounce-subtle' : ''}`}>
-                  <Icon size={18} strokeWidth={isActive ? 2 : 1.2} />
+                <div className={`relative p-1.5 sm:p-2.5 rounded-xl sm:rounded-2xl transition-all duration-300 ${isActive ? 'bg-brand-brown text-brand-gold shadow-md shadow-brand-brown/20 scale-105' : 'text-gray-400 group-hover:text-brand-brown'} ${isCart && isBouncing ? 'animate-bounce-subtle' : ''}`}>
+                  <Icon size={16} className="sm:w-[18px] sm:h-[18px]" strokeWidth={isActive ? 2 : 1.5} />
                   
                   {item.badge ? (
-                    <span className={`absolute -top-1 -right-1 bg-brand-orange text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-white shadow-md transition-transform ${isBouncing && isCart ? 'scale-150' : 'scale-100'}`}>
+                    <span className={`absolute -top-1 -right-1 bg-brand-orange text-white text-[7px] sm:text-[8px] font-black w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full flex items-center justify-center border-2 border-white shadow-md transition-transform ${isBouncing && isCart ? 'scale-150' : 'scale-100'}`}>
                       {item.badge}
                     </span>
                   ) : null}
                 </div>
-                <span className={`text-[7px] font-black uppercase tracking-tight mt-0.5 ${isActive ? 'text-brand-brown font-black' : 'text-gray-300'}`}>
+                <span className={`text-[6.5px] sm:text-[7.5px] font-black uppercase tracking-tight mt-0.5 truncate max-w-full ${isActive ? 'text-brand-brown' : 'text-gray-400'}`}>
                   {item.label}
                 </span>
               </button>

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { GalleryItem, MenuItem } from '../types';
 import { 
-  Camera, Plus, Trash2, Edit3, Sparkles, Image as ImageIcon, Check
+  Camera, Plus, Trash2, Edit3, Sparkles, Image as ImageIcon, Check, X
 } from 'lucide-react';
 import { playSound } from '../utils/audio';
 
@@ -13,6 +13,19 @@ interface GalleryMgmtViewProps {
 
 export const GalleryMgmtView: React.FC<GalleryMgmtViewProps> = ({ items, setItems, menuItems }) => {
   const [showAddModal, setShowAddModal] = useState(false);
+  const galleryPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleGalleryPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewItem(prev => ({ ...prev, image: reader.result as string }));
+        playSound('pop');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
   const [newItem, setNewItem] = useState<Partial<GalleryItem>>({
     title: '',
     category: 'Plat Africain',
@@ -156,15 +169,49 @@ export const GalleryMgmtView: React.FC<GalleryMgmtViewProps> = ({ items, setItem
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase text-white/50">URL Image HD</label>
-                <input
-                  type="text"
-                  required
-                  value={newItem.image || ''}
-                  onChange={(e) => setNewItem({ ...newItem, image: e.target.value })}
-                  className="w-full p-4 bg-black/40 rounded-2xl text-xs font-bold text-white border border-white/10 outline-none focus:border-brand-gold"
-                />
+              <input 
+                type="file" 
+                ref={galleryPhotoInputRef} 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handleGalleryPhotoChange}
+              />
+
+              <div className="space-y-2">
+                <label className="text-[9px] font-black uppercase text-white/50">Photo Galerie (Appareil / Galerie)</label>
+                
+                {newItem.image ? (
+                  <div className="relative w-full h-32 rounded-2xl overflow-hidden border border-white/10 group bg-black/40">
+                    <img src={newItem.image} alt="Aperçu" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 sm:opacity-0 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => galleryPhotoInputRef.current?.click()}
+                        className="bg-brand-orange text-white px-3 py-1.5 rounded-xl text-[9px] font-black uppercase flex items-center gap-1 shadow-lg"
+                      >
+                        <Camera size={13} /> Changer
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => galleryPhotoInputRef.current?.click()}
+                  className="w-full bg-white/10 hover:bg-white/20 text-brand-gold py-3 rounded-2xl text-[10px] font-black uppercase italic flex items-center justify-center gap-2 border border-white/10 active:scale-95 transition-all"
+                >
+                  <Camera size={15} /> Choisir dans vos Photos / Prendre une Photo
+                </button>
+
+                <details className="text-[8px] text-white/40 pt-0.5">
+                  <summary className="cursor-pointer hover:text-white/60">Ou coller un lien Web URL (optionnel)</summary>
+                  <input
+                    type="text"
+                    value={newItem.image || ''}
+                    onChange={(e) => setNewItem({ ...newItem, image: e.target.value })}
+                    className="w-full mt-1 p-3 bg-black/40 rounded-xl text-xs font-bold text-white border border-white/10 outline-none focus:border-brand-gold"
+                  />
+                </details>
               </div>
 
               <div className="space-y-1">

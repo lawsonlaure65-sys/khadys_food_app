@@ -20,6 +20,7 @@ import { VideoDemoModal } from './components/VideoDemoModal';
 import { AIGourmandeWidget } from './components/AIGourmandeWidget';
 import { InstallGuideModal } from './components/InstallGuideModal';
 import { ShareModal } from './components/ShareModal';
+import FAQSection from './components/FAQSection';
 import { Page, MenuItem, Order, Review, CartItem, UserProfile, BlogPost, GalleryItem, ClientUser } from './types';
 import { MENU_ITEMS, REVIEWS, LOGO_URL, POINTS_PER_1000, INITIAL_BLOG_POSTS, INITIAL_GALLERY_ITEMS, INITIAL_CLIENTS } from './constants';
 import { playSound } from './utils/audio';
@@ -176,7 +177,7 @@ const App: React.FC = () => {
     switch (currentPage) {
       case Page.HOME:
         return (
-          <div className="pb-40 animate-fade-in w-full max-w-2xl mx-auto space-y-6">
+          <div className="pb-36 sm:pb-40 animate-fade-in w-full max-w-4xl lg:max-w-5xl mx-auto space-y-6">
             {/* Live Ticker Bar */}
             <div className="px-4 sm:px-6">
               <div className="bg-brand-brown text-brand-gold py-2.5 px-4 rounded-full text-[9px] font-black uppercase italic tracking-wider flex items-center justify-between border border-brand-gold/30 shadow-md">
@@ -199,37 +200,37 @@ const App: React.FC = () => {
             )}
 
             {/* Header Elite */}
-            <header className="sticky top-0 z-50 px-4 sm:px-6 py-4 glass-card flex justify-between items-center rounded-b-[2.5rem] shadow-lg">
-              <div className="flex items-center gap-3">
+            <header className="sticky top-0 z-50 px-3 sm:px-6 py-3 sm:py-4 glass-card flex justify-between items-center rounded-b-[2rem] sm:rounded-b-[2.5rem] shadow-lg">
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                 <div className="relative">
-                  <img src={LOGO_URL} alt="Logo" className="w-11 h-11 rounded-full border-2 border-brand-brown/10 shadow-md object-cover" />
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
+                  <img src={LOGO_URL} alt="Logo" className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 border-brand-brown/10 shadow-md object-cover" />
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
                 </div>
                 <div className="flex flex-col">
-                  <h1 className="text-[13px] font-black italic text-brand-brown uppercase tracking-tighter leading-none">Khady's</h1>
-                  <span className="text-[8px] font-black text-brand-orange uppercase tracking-[0.2em] leading-none mt-1">Food & Event</span>
+                  <h1 className="text-xs sm:text-[13px] font-black italic text-brand-brown uppercase tracking-tighter leading-none">Khady's</h1>
+                  <span className="text-[7px] sm:text-[8px] font-black text-brand-orange uppercase tracking-[0.15em] sm:tracking-[0.2em] leading-none mt-0.5 sm:mt-1">Food & Event</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <button
                   onClick={() => { playSound('pop'); setIsInstallModalOpen(true); }}
-                  className="w-9 h-9 bg-brand-brown text-brand-gold hover:bg-brand-orange hover:text-white rounded-xl flex items-center justify-center shadow-md active:scale-90 transition-all"
+                  className="w-8 h-8 sm:w-9 sm:h-9 bg-brand-brown text-brand-gold hover:bg-brand-orange hover:text-white rounded-xl flex items-center justify-center shadow-md active:scale-90 transition-all shrink-0"
                   title="Installer l'application"
                 >
-                  <Download size={16} />
+                  <Download size={15} className="sm:w-4 sm:h-4" />
                 </button>
 
                 <button
                   onClick={() => { playSound('pop'); setShareModalItem(null); setIsShareModalOpen(true); }}
-                  className="w-9 h-9 bg-brand-orange text-white rounded-xl flex items-center justify-center shadow-md active:scale-90 transition-all"
+                  className="w-8 h-8 sm:w-9 sm:h-9 bg-brand-orange text-white rounded-xl flex items-center justify-center shadow-md active:scale-90 transition-all shrink-0"
                   title="Partager l'application"
                 >
-                  <Share2 size={16} />
+                  <Share2 size={15} className="sm:w-4 sm:h-4" />
                 </button>
 
-                <div className="flex bg-brand-brown/5 px-2.5 py-1.5 rounded-xl items-center justify-center min-w-[90px] border border-brand-brown/10">
-                  <span className="text-[9px] font-black text-brand-brown uppercase italic tracking-wider animate-fade-in" key={greetingIndex}>
+                <div className="hidden xs:flex sm:flex bg-brand-brown/5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl items-center justify-center min-w-[70px] sm:min-w-[90px] border border-brand-brown/10">
+                  <span className="text-[8px] sm:text-[9px] font-black text-brand-brown uppercase italic tracking-wider animate-fade-in truncate" key={greetingIndex}>
                     {greetings[greetingIndex]}
                   </span>
                 </div>
@@ -240,16 +241,16 @@ const App: React.FC = () => {
                     setIsSoundEnabled(!isSoundEnabled);
                     playSound('pop');
                   }}
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
+                  className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all shrink-0 ${
                     isSoundEnabled ? 'bg-brand-orange/10 text-brand-orange border border-brand-orange/20' : 'bg-gray-100 text-gray-400'
                   }`}
                   title={isSoundEnabled ? "Sons & Notifications Actifs" : "Sons Désactivés"}
                 >
-                  {isSoundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                  {isSoundEnabled ? <Volume2 size={15} className="sm:w-4 sm:h-4" /> : <VolumeX size={15} className="sm:w-4 sm:h-4" />}
                 </button>
 
-                <button onClick={() => { playSound('pop'); setCurrentPage(Page.COMPTE); }} className="w-9 h-9 bg-brand-brown text-brand-gold rounded-xl flex items-center justify-center shadow-lg active:scale-90 transition-transform">
-                  <UserIcon size={16}/>
+                <button onClick={() => { playSound('pop'); setCurrentPage(Page.COMPTE); }} className="w-8 h-8 sm:w-9 sm:h-9 bg-brand-brown text-brand-gold rounded-xl flex items-center justify-center shadow-lg active:scale-90 transition-transform shrink-0">
+                  <UserIcon size={15} className="sm:w-4 sm:h-4"/>
                 </button>
               </div>
             </header>
@@ -354,6 +355,8 @@ const App: React.FC = () => {
             <div className="px-4 sm:px-6">
               <ReviewsSection reviews={reviews} />
             </div>
+
+            <FAQSection />
           </div>
         );
       case Page.MENU:

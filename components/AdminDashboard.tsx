@@ -59,6 +59,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [aiStrategy, setAiStrategy] = useState('');
   const [isRestaurantOpen, setIsRestaurantOpen] = useState(true);
   const adminPhotoInputRef = useRef<HTMLInputElement>(null);
+  const dishPhotoInputRef = useRef<HTMLInputElement>(null);
   const [adminAvatar, setAdminAvatar] = useState(() => localStorage.getItem('khadys_admin_avatar') || '');
 
   const handleAdminPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -70,6 +71,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         setAdminAvatar(base64String);
         localStorage.setItem('khadys_admin_avatar', base64String);
         playSound('success');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDishPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && editingItem) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setEditingItem(prev => prev ? { ...prev, image: base64String } : null);
+        playSound('pop');
       };
       reader.readAsDataURL(file);
     }
@@ -511,8 +525,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const navList = [
+    { v: AdminView.DASHBOARD, i: LayoutDashboard, l: 'Accueil' },
+    { v: AdminView.WHATSAPP_AUTOMATION, i: Bot, l: 'WhatsApp 24/7' },
+    { v: AdminView.ORDERS, i: ShoppingBag, l: 'Commandes' },
+    { v: AdminView.MENU_MGMT, i: Utensils, l: 'Carte' },
+    { v: AdminView.BLOG_MGMT, i: BookOpen, l: 'Blog' },
+    { v: AdminView.GALLERY_MGMT, i: Camera, l: 'Galerie' },
+    { v: AdminView.DELIVERY, i: Bike, l: 'Livreurs' },
+    { v: AdminView.CLIENTS, i: Users, l: 'Clients' },
+    { v: AdminView.AI_MARKETING, i: Zap, l: 'Marketing' },
+    { v: AdminView.SETTINGS, i: Settings, l: 'Paramètres' }
+  ];
+
   return (
-    <div className="min-h-screen bg-[#0F0807] text-white flex overflow-hidden font-sans">
+    <div className="min-h-screen w-full bg-[#0F0807] text-white flex flex-col md:flex-row font-sans overflow-x-hidden">
       <input 
         type="file" 
         ref={adminPhotoInputRef} 
@@ -521,45 +548,105 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         onChange={handleAdminPhotoChange}
       />
 
-      {/* Sidebar Admin Premium */}
-      <div className="w-24 bg-black/40 border-r border-white/5 flex flex-col items-center py-10 gap-6 overflow-y-auto no-scrollbar">
-        <KhadyLogo variant="light" className="scale-75 mb-6" />
-        {[
-          { v: AdminView.DASHBOARD, i: LayoutDashboard, l: 'Home' },
-          { v: AdminView.WHATSAPP_AUTOMATION, i: Bot, l: 'WhatsApp 24/7' },
-          { v: AdminView.MENU_MGMT, i: Utensils, l: 'Carte' },
-          { v: AdminView.BLOG_MGMT, i: BookOpen, l: 'Blog' },
-          { v: AdminView.GALLERY_MGMT, i: Camera, l: 'Galerie' },
-          { v: AdminView.ORDERS, i: ShoppingBag, l: 'Orders' },
-          { v: AdminView.DELIVERY, i: Bike, l: 'Livreurs' },
-          { v: AdminView.CLIENTS, i: Users, l: 'Clients' },
-          { v: AdminView.AI_MARKETING, i: Zap, l: 'Marketing' },
-          { v: AdminView.EVENT, i: Calendar, l: 'Évents' },
-          { v: AdminView.BUFFET, i: ChefHat, l: 'Buffet' },
-          { v: AdminView.SETTINGS, i: Settings, l: 'Settings' }
-        ].map(n => (
-          <button key={n.l} onClick={() => { setCurrentView(n.v); playSound('pop'); }} className={`flex flex-col items-center transition-all duration-300 ${currentView === n.v ? 'scale-110 opacity-100' : 'opacity-20 hover:opacity-100'}`}>
-             <div className={`p-3 rounded-2xl ${currentView === n.v ? 'bg-brand-orange text-white shadow-xl' : 'bg-white/5'}`}><n.i size={20} /></div>
-             <span className="text-[6px] mt-2 font-black tracking-widest uppercase text-center w-20 leading-tight">{n.l}</span>
+      {/* Sidebar Desktop (PC / Tablettes) */}
+      <div className="hidden md:flex md:w-28 bg-black/40 border-r border-white/5 flex-col items-center py-8 gap-5 overflow-y-auto no-scrollbar shrink-0">
+        <KhadyLogo variant="light" className="scale-75 mb-4" />
+        {navList.map(n => (
+          <button 
+            key={n.l} 
+            onClick={() => { setCurrentView(n.v); playSound('pop'); }} 
+            className={`flex flex-col items-center transition-all duration-300 w-full px-2 ${currentView === n.v ? 'scale-105 opacity-100' : 'opacity-30 hover:opacity-100'}`}
+          >
+             <div className={`p-3 rounded-2xl transition-colors ${currentView === n.v ? 'bg-brand-orange text-white shadow-xl' : 'bg-white/5'}`}>
+               <n.i size={20} />
+             </div>
+             <span className="text-[7px] mt-1.5 font-black tracking-widest uppercase text-center w-full leading-tight truncate">{n.l}</span>
           </button>
         ))}
-        <button onClick={onExit} className="mt-auto p-4 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all active:scale-90"><Power size={22}/></button>
+        <button 
+          onClick={onExit} 
+          className="mt-auto p-3.5 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all active:scale-90"
+          title="Quitter le mode Admin"
+        >
+          <Power size={20}/>
+        </button>
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="p-8 flex justify-between items-center border-b border-white/5 bg-black/20 backdrop-blur-md relative z-20">
-           <div><h2 className="text-sm font-black italic uppercase text-brand-gold tracking-[0.3em] leading-none">Console Admin Elite</h2><p className="text-[8px] text-white/20 font-black uppercase mt-1">Terminal de Contrôle Niamey</p></div>
-           <div 
-                onClick={() => adminPhotoInputRef.current?.click()}
-                className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center relative group cursor-pointer overflow-hidden shadow-2xl hover:border-brand-orange transition-all"
+      {/* Top Header & Navigation Mobile */}
+      <div className="md:hidden bg-black/80 border-b border-white/10 flex flex-col shrink-0 sticky top-0 z-40 backdrop-blur-xl">
+        <div className="p-3.5 flex justify-between items-center border-b border-white/5">
+          <div className="flex items-center gap-2.5">
+            <KhadyLogo variant="light" className="scale-75" />
+            <div>
+              <h2 className="text-xs font-black italic uppercase text-brand-gold tracking-widest leading-none">Admin Console</h2>
+              <p className="text-[7px] text-white/40 font-black uppercase mt-0.5">Khady's Food Niamey</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => adminPhotoInputRef.current?.click()}
+              className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden cursor-pointer"
+              title="Changer la photo admin"
+            >
+              {adminAvatar ? <img src={adminAvatar} className="w-full h-full object-cover" /> : <Camera className="text-brand-gold opacity-40" size={15} />}
+            </button>
+            <button 
+              onClick={onExit} 
+              className="px-3 py-1.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl text-[9px] font-black uppercase italic flex items-center gap-1 active:scale-95"
+            >
+              <Power size={13} /> Quitter
+            </button>
+          </div>
+        </div>
+
+        {/* Barre de navigation horizontale défilable pour Mobile */}
+        <div className="flex overflow-x-auto p-2 gap-2 no-scrollbar bg-black/40 border-t border-white/5">
+          {navList.map(n => {
+            const isActive = currentView === n.v;
+            return (
+              <button
+                key={n.l}
+                onClick={() => { setCurrentView(n.v); playSound('pop'); }}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider whitespace-nowrap transition-all shrink-0 ${
+                  isActive 
+                    ? 'bg-brand-orange text-white shadow-lg border border-brand-orange/40 scale-105' 
+                    : 'bg-white/5 text-white/50 hover:bg-white/10 border border-white/5'
+                }`}
               >
-                 {adminAvatar ? <img src={adminAvatar} className="w-full h-full object-cover" /> : <Camera className="text-brand-gold opacity-20" size={24} />}
-                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
-                    <Camera size={16} className="text-white" />
-                 </div>
+                <n.i size={14} className={isActive ? 'text-white' : 'text-brand-gold'} />
+                <span>{n.l}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <header className="hidden md:flex p-6 md:p-8 justify-between items-center border-b border-white/5 bg-black/20 backdrop-blur-md relative z-20">
+           <div>
+             <h2 className="text-sm font-black italic uppercase text-brand-gold tracking-[0.3em] leading-none">Console Admin Elite</h2>
+             <p className="text-[8px] text-white/20 font-black uppercase mt-1">Terminal de Contrôle Niamey</p>
+           </div>
+           <div className="flex items-center gap-3">
+             <button onClick={onExit} className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-xl text-[10px] font-black uppercase italic transition-all flex items-center gap-1.5">
+               <Power size={14} /> Quitter Admin
+             </button>
+             <div 
+                  onClick={() => adminPhotoInputRef.current?.click()}
+                  className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center relative group cursor-pointer overflow-hidden shadow-2xl hover:border-brand-orange transition-all"
+                >
+                   {adminAvatar ? <img src={adminAvatar} className="w-full h-full object-cover" /> : <Camera className="text-brand-gold opacity-20" size={20} />}
+                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                      <Camera size={16} className="text-white" />
+                   </div>
+             </div>
            </div>
         </header>
-        <div className="flex-1 overflow-y-auto p-10 no-scrollbar bg-gradient-to-br from-transparent to-brand-orange/[0.02]">{renderContent()}</div>
+
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10 no-scrollbar bg-gradient-to-br from-transparent to-brand-orange/[0.02]">
+          {renderContent()}
+        </div>
       </div>
 
       {/* Modal d'édition/ajout de plat */}
@@ -590,9 +677,78 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                        </select>
                     </div>
                  </div>
-                 <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-white/30 ml-4">Image (Lien Unsplash)</label>
-                    <input value={editingItem.image || ''} onChange={e => setEditingItem({...editingItem, image: e.target.value})} className="w-full p-4 bg-white/5 rounded-2xl text-white text-[10px] border border-white/10" placeholder="https://..." />
+                 {/* Hidden input for dish photo upload */}
+                 <input 
+                   type="file" 
+                   ref={dishPhotoInputRef} 
+                   className="hidden" 
+                   accept="image/*" 
+                   onChange={handleDishPhotoChange}
+                 />
+
+                 <div className="space-y-2">
+                    <label className="text-[8px] font-black uppercase text-white/40 ml-4">Photo du Plat (Appareil / Galerie)</label>
+                    
+                    {editingItem.image ? (
+                      <div className="relative w-full h-36 rounded-2xl overflow-hidden border border-white/10 group bg-black/40">
+                        <img src={editingItem.image} alt="Aperçu du plat" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 sm:opacity-0 transition-opacity flex items-center justify-center gap-2 p-2">
+                          <button
+                            type="button"
+                            onClick={() => dishPhotoInputRef.current?.click()}
+                            className="bg-brand-orange text-white px-3 py-2 rounded-xl text-[9px] font-black uppercase flex items-center gap-1.5 shadow-lg active:scale-95"
+                          >
+                            <Camera size={14} /> Changer
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingItem({ ...editingItem, image: '' })}
+                            className="bg-red-500 text-white p-2 rounded-xl text-[9px] font-black active:scale-95"
+                            title="Effacer la photo"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <div className="absolute bottom-2 right-2 flex gap-1 sm:hidden">
+                          <button
+                            type="button"
+                            onClick={() => dishPhotoInputRef.current?.click()}
+                            className="bg-brand-orange text-white p-2 rounded-xl shadow-md active:scale-95 flex items-center gap-1 text-[8px] font-black uppercase"
+                          >
+                            <Camera size={12} /> Changer
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div 
+                        onClick={() => dishPhotoInputRef.current?.click()}
+                        className="w-full h-32 rounded-2xl border-2 border-dashed border-white/20 hover:border-brand-gold bg-white/5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all p-4 text-center active:scale-98"
+                      >
+                        <div className="p-3 bg-brand-orange/20 text-brand-orange rounded-xl">
+                          <Camera size={22} />
+                        </div>
+                        <span className="text-[10px] font-black uppercase text-brand-gold italic">Prendre une photo / Choisir dans Photos</span>
+                        <span className="text-[7.5px] text-white/40 font-medium">Touchez ici pour ouvrir directement votre appareil ou galerie</span>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => dishPhotoInputRef.current?.click()}
+                      className="w-full bg-white/10 hover:bg-white/20 text-brand-gold py-3 rounded-2xl text-[9px] font-black uppercase italic flex items-center justify-center gap-2 border border-white/10 active:scale-95 transition-all"
+                    >
+                      <Camera size={14} /> Ouvrir l'application Photos
+                    </button>
+
+                    <details className="text-[8px] text-white/40 pt-1">
+                      <summary className="cursor-pointer hover:text-white/60 select-none">Ou coller un lien Web URL (optionnel)</summary>
+                      <input 
+                        value={editingItem.image || ''} 
+                        onChange={e => setEditingItem({...editingItem, image: e.target.value})} 
+                        className="w-full mt-1.5 p-3 bg-white/5 rounded-xl text-white text-[9px] border border-white/10 outline-none focus:border-brand-gold" 
+                        placeholder="https://..." 
+                      />
+                    </details>
                  </div>
                  <div className="space-y-1">
                     <label className="text-[8px] font-black uppercase text-white/30 ml-4">Description</label>

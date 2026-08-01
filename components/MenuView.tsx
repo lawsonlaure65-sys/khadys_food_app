@@ -117,50 +117,50 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
       </header>
 
       {isLoading ? (
-        <div className="px-6 grid grid-cols-2 gap-5">
-          {[1, 2, 3, 4, 5, 6].map((idx) => (
+        <div className="px-4 sm:px-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 sm:gap-6">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((idx) => (
             <div 
               key={idx}
-              className="bg-white rounded-[2.5rem] p-4 shadow-sm border border-brand-brown/5 relative animate-pulse flex flex-col h-full"
+              className="bg-white rounded-[2rem] sm:rounded-[2.5rem] p-3.5 sm:p-4 shadow-sm border border-brand-brown/5 relative animate-pulse flex flex-col h-full"
             >
-              <div className="relative h-32 w-full mb-4 bg-gray-200/80 rounded-[1.8rem] flex-shrink-0" />
-              <div className="h-3.5 bg-gray-200/80 rounded-md w-3/4 mb-2" />
-              <div className="h-3 bg-gray-200/60 rounded-md w-1/2 mb-4" />
+              <div className="relative h-28 sm:h-36 w-full mb-3 bg-gray-200/80 rounded-[1.5rem] flex-shrink-0" />
+              <div className="h-3 bg-gray-200/80 rounded-md w-3/4 mb-2" />
+              <div className="h-2.5 bg-gray-200/60 rounded-md w-1/2 mb-3" />
               <div className="flex justify-between items-center mt-auto pt-2">
-                <div className="h-4 bg-gray-200/80 rounded-md w-14" />
-                <div className="w-8 h-8 bg-gray-200/80 rounded-xl" />
+                <div className="h-3.5 bg-gray-200/80 rounded-md w-12" />
+                <div className="w-7 h-7 bg-gray-200/80 rounded-xl" />
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="px-6 grid grid-cols-2 gap-5">
+        <div className="px-4 sm:px-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 sm:gap-6">
            {filteredItems.map(item => (
              <div 
                key={item.id} 
                onClick={() => { playSound('pop'); onSelectItem(item); }}
-               className="bg-white rounded-[2.5rem] p-4 shadow-sm border border-brand-brown/5 relative group cursor-pointer active:scale-95 transition-all h-full flex flex-col"
+               className="bg-white rounded-[2rem] sm:rounded-[2.5rem] p-3.5 sm:p-4 shadow-sm border border-brand-brown/5 relative group cursor-pointer active:scale-95 transition-all h-full flex flex-col hover:shadow-xl"
              >
-                <div className="relative h-32 w-full mb-4 overflow-hidden rounded-[1.8rem] flex-shrink-0">
+                <div className="relative h-28 sm:h-36 w-full mb-3 overflow-hidden rounded-[1.5rem] sm:rounded-[1.8rem] flex-shrink-0">
                    <img src={item.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={item.name} />
                    {item.isSpicy && (
-                     <div className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg border-2 border-white">
-                        <Flame size={12} fill="white" />
+                     <div className="absolute top-2 right-2 bg-red-500 text-white p-1 sm:p-1.5 rounded-full shadow-lg border-2 border-white">
+                        <Flame size={10} fill="white" className="sm:w-3 sm:h-3" />
                      </div>
                    )}
                    {item.rating === 5 && (
-                     <div className="absolute bottom-2 left-2 bg-brand-gold text-brand-brown px-2 py-1 rounded-lg text-[8px] font-black flex items-center gap-1 border border-white">
+                     <div className="absolute bottom-2 left-2 bg-brand-gold text-brand-brown px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-lg text-[7px] sm:text-[8px] font-black flex items-center gap-1 border border-white">
                         <Star size={8} fill="currentColor" /> BEST
                      </div>
                    )}
                 </div>
                 
-                <h4 className="text-[11px] font-black text-brand-brown uppercase italic leading-tight mb-2 line-clamp-2 flex-1">{item.name}</h4>
+                <h4 className="text-[10px] sm:text-[11px] font-black text-brand-brown uppercase italic leading-tight mb-2 line-clamp-2 flex-1">{item.name}</h4>
                 
                 <div className="flex justify-between items-center mt-2">
                    <span className="text-xs font-black text-brand-orange">{item.price} F</span>
-                   <div className="w-8 h-8 bg-brand-brown text-brand-gold rounded-xl flex items-center justify-center shadow-lg transition-transform active:scale-90">
-                      <Plus size={16} />
+                   <div className="w-7 h-7 sm:w-8 sm:h-8 bg-brand-brown text-brand-gold rounded-xl flex items-center justify-center shadow-lg transition-transform active:scale-90">
+                      <Plus size={14} className="sm:w-4 sm:h-4" />
                    </div>
                 </div>
              </div>

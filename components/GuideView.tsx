@@ -2,6 +2,7 @@
 import React from 'react';
 import { ChevronLeft, ShoppingBag, Zap, Sparkles, Award, Bike, MessageCircle, Star } from 'lucide-react';
 import { playSound } from '../utils/audio';
+import FAQSection from './FAQSection';
 
 interface GuideViewProps {
   onClose: () => void;
@@ -70,6 +71,10 @@ const GuideView: React.FC<GuideViewProps> = ({ onClose }) => {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="-mx-6">
+        <FAQSection />
       </div>
 
       <div className="mt-12 bg-brand-orange/10 p-8 rounded-[3rem] border border-brand-orange/20 text-center">

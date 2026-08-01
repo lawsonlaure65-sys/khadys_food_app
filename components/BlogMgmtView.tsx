@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { BlogPost, MenuItem } from '../types';
 import { 
   BookOpen, Plus, Trash2, Edit3, Sparkles, Check, RefreshCw, 
-  Eye, ToggleLeft, ToggleRight, Search, FileText
+  Eye, ToggleLeft, ToggleRight, Search, FileText, Camera, X
 } from 'lucide-react';
 import { playSound } from '../utils/audio';
 import { GoogleGenAI } from '@google/genai';
@@ -17,6 +17,19 @@ export const BlogMgmtView: React.FC<BlogMgmtViewProps> = ({ posts, setPosts, men
   const [isGenerating, setIsGenerating] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [aiTopic, setAiTopic] = useState('');
+  const postPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePostPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewPost(prev => ({ ...prev, image: reader.result as string }));
+        playSound('pop');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const [newPost, setNewPost] = useState<Partial<BlogPost>>({
     title: '',
@@ -275,14 +288,49 @@ Format de réponse JSON strict :
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase text-white/50">URL Image d'illustration</label>
-                <input
-                  type="text"
-                  value={newPost.image || ''}
-                  onChange={(e) => setNewPost({ ...newPost, image: e.target.value })}
-                  className="w-full p-4 bg-black/40 rounded-2xl text-xs font-bold text-white border border-white/10 outline-none focus:border-brand-gold"
-                />
+              <input 
+                type="file" 
+                ref={postPhotoInputRef} 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handlePostPhotoChange}
+              />
+
+              <div className="space-y-2">
+                <label className="text-[9px] font-black uppercase text-white/50">Image d'illustration (Appareil / Photos)</label>
+                
+                {newPost.image ? (
+                  <div className="relative w-full h-32 rounded-2xl overflow-hidden border border-white/10 group bg-black/40">
+                    <img src={newPost.image} alt="Aperçu" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 sm:opacity-0 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => postPhotoInputRef.current?.click()}
+                        className="bg-brand-orange text-white px-3 py-1.5 rounded-xl text-[9px] font-black uppercase flex items-center gap-1 shadow-lg"
+                      >
+                        <Camera size={13} /> Changer
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => postPhotoInputRef.current?.click()}
+                  className="w-full bg-white/10 hover:bg-white/20 text-brand-gold py-3 rounded-2xl text-[10px] font-black uppercase italic flex items-center justify-center gap-2 border border-white/10 active:scale-95 transition-all"
+                >
+                  <Camera size={15} /> Choisir dans vos Photos / Prendre une Photo
+                </button>
+
+                <details className="text-[8px] text-white/40 pt-0.5">
+                  <summary className="cursor-pointer hover:text-white/60">Ou coller une URL Web (optionnel)</summary>
+                  <input
+                    type="text"
+                    value={newPost.image || ''}
+                    onChange={(e) => setNewPost({ ...newPost, image: e.target.value })}
+                    className="w-full mt-1 p-3 bg-black/40 rounded-xl text-xs font-bold text-white border border-white/10 outline-none focus:border-brand-gold"
+                  />
+                </details>
               </div>
 
               <div className="space-y-1">
