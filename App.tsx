@@ -29,20 +29,125 @@ import { ShoppingBag, User as UserIcon, Heart, Utensils, Star, Sparkles, Navigat
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.HOME);
-  const [items, setItems] = useState<MenuItem[]>(MENU_ITEMS);
-  const [posts, setPosts] = useState<BlogPost[]>(INITIAL_BLOG_POSTS);
-  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>(INITIAL_GALLERY_ITEMS);
-  const [clients, setClients] = useState<ClientUser[]>(INITIAL_CLIENTS);
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [reviews, setReviews] = useState<Review[]>(REVIEWS);
-  const [userProfile, setUserProfile] = useState<UserProfile>({
-    name: 'Abdou R.',
-    phone: '+227 90 00 00 00',
-    points: 1250,
-    rank: 'Gold',
-    referralCode: 'KHADY-GOLD'
+  
+  // Charger depuis localStorage ou valeurs par défaut
+  const [items, setItems] = useState<MenuItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('khadys_menu_items');
+      return saved ? JSON.parse(saved) : MENU_ITEMS;
+    } catch {
+      return MENU_ITEMS;
+    }
   });
+
+  const [posts, setPosts] = useState<BlogPost[]>(() => {
+    try {
+      const saved = localStorage.getItem('khadys_blog_posts');
+      return saved ? JSON.parse(saved) : INITIAL_BLOG_POSTS;
+    } catch {
+      return INITIAL_BLOG_POSTS;
+    }
+  });
+
+  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('khadys_gallery_items');
+      return saved ? JSON.parse(saved) : INITIAL_GALLERY_ITEMS;
+    } catch {
+      return INITIAL_GALLERY_ITEMS;
+    }
+  });
+
+  const [clients, setClients] = useState<ClientUser[]>(() => {
+    try {
+      const saved = localStorage.getItem('khadys_clients');
+      return saved ? JSON.parse(saved) : INITIAL_CLIENTS;
+    } catch {
+      return INITIAL_CLIENTS;
+    }
+  });
+
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('khadys_cart');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [orders, setOrders] = useState<Order[]>(() => {
+    try {
+      const saved = localStorage.getItem('khadys_orders');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [reviews, setReviews] = useState<Review[]>(() => {
+    try {
+      const saved = localStorage.getItem('khadys_reviews');
+      return saved ? JSON.parse(saved) : REVIEWS;
+    } catch {
+      return REVIEWS;
+    }
+  });
+
+  const [userProfile, setUserProfile] = useState<UserProfile>(() => {
+    try {
+      const saved = localStorage.getItem('khadys_user_profile');
+      return saved ? JSON.parse(saved) : {
+        name: 'Abdou R.',
+        phone: '+227 90 00 00 00',
+        points: 1250,
+        rank: 'Gold',
+        referralCode: 'KHADY-GOLD'
+      };
+    } catch {
+      return {
+        name: 'Abdou R.',
+        phone: '+227 90 00 00 00',
+        points: 1250,
+        rank: 'Gold',
+        referralCode: 'KHADY-GOLD'
+      };
+    }
+  });
+
+  // Sauvegarde automatique dans localStorage dès qu'une modification survient
+  useEffect(() => {
+    try { localStorage.setItem('khadys_menu_items', JSON.stringify(items)); } catch {}
+  }, [items]);
+
+  useEffect(() => {
+    try { localStorage.setItem('khadys_blog_posts', JSON.stringify(posts)); } catch {}
+  }, [posts]);
+
+  useEffect(() => {
+    try { localStorage.setItem('khadys_gallery_items', JSON.stringify(galleryItems)); } catch {}
+  }, [galleryItems]);
+
+  useEffect(() => {
+    try { localStorage.setItem('khadys_clients', JSON.stringify(clients)); } catch {}
+  }, [clients]);
+
+  useEffect(() => {
+    try { localStorage.setItem('khadys_cart', JSON.stringify(cart)); } catch {}
+  }, [cart]);
+
+  useEffect(() => {
+    try { localStorage.setItem('khadys_orders', JSON.stringify(orders)); } catch {}
+  }, [orders]);
+
+  useEffect(() => {
+    try { localStorage.setItem('khadys_reviews', JSON.stringify(reviews)); } catch {}
+  }, [reviews]);
+
+  useEffect(() => {
+    try { localStorage.setItem('khadys_user_profile', JSON.stringify(userProfile)); } catch {}
+  }, [userProfile]);
+
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [isUpsellOpen, setIsUpsellOpen] = useState(false);

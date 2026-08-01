@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'khadys-food-v4-auto-sync';
+const CACHE_NAME = 'khadys-food-v5-sync-persistent';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

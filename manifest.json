@@ -35,9 +35,9 @@
       "purpose": "maskable"
     },
     {
-      "src": "https://i.ibb.co/h1rgJJMb/1766933626062.jpg",
+      "src": "/logo.png",
       "sizes": "512x512",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any"
     }
   ],
