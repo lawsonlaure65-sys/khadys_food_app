@@ -11,6 +11,9 @@ export const BILLO_LOGO_URL = "https://i.ibb.co/YFftbm2X/1765927283591.jpg";
 export const BILLO_INFO = {
   name: "Billo Express",
   slogan: "L'éclair de Niamey",
+  phone: "+227 92 08 08 22",
+  whatsapp: "+227 92 08 08 22",
+  whatsappUrl: "https://wa.me/22792080822",
   tarifs: {
     center: { day: 1000, night: 1500 },
     periphery: { day: 1500, night: 2000 }

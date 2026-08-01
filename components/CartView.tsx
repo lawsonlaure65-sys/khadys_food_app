@@ -5,7 +5,7 @@ import { CartItem, Order, PaymentMethod, UserProfile } from '../types';
 import { 
   Trash2, ShoppingBag, ArrowRight, MapPin, Smartphone, ChevronLeft, 
   ShieldCheck, Wallet, CreditCard, Banknote, Sparkles, Upload, Image as ImageIcon, 
-  CheckCircle2, AlertCircle, FileText, Check
+  CheckCircle2, AlertCircle, FileText, Check, MessageCircle, Send, Bike, Phone
 } from 'lucide-react';
 import { PhoneInput } from './PhoneInput';
 import { playSound } from '../utils/audio';
@@ -27,6 +27,7 @@ const CartView: React.FC<CartViewProps> = ({ cart, setCart, onOrderPlace, onClos
   const [isUploadingProof, setIsUploadingProof] = useState(false);
   const [usePoints, setUsePoints] = useState(false);
   const [payment, setPayment] = useState<PaymentMethod>('CASH');
+  const [submittedOrder, setSubmittedOrder] = useState<Order | null>(null);
   const [customer, setCustomer] = useState({
     name: userProfile.name || '',
     phone: userProfile.phone || '',
@@ -159,8 +160,28 @@ const CartView: React.FC<CartViewProps> = ({ cart, setCart, onOrderPlace, onClos
     }
 
     onOrderPlace(newOrder);
+    setSubmittedOrder(newOrder);
     setCart([]);
-    playSound('cash');
+    playSound('notification');
+  };
+
+  const getWhatsAppText = (order: Order) => {
+    const itemsText = order.items.map(i => `• ${i.quantity}x ${i.name} (${i.price * i.quantity} F CFA)`).join('\n');
+    const paymentInfo = order.paymentType === 'MOBILE_MONEY' 
+      ? `MOBILE MONEY (${order.paymentMethod}) - TRX: ${order.paymentTransactionId || 'Joint'}` 
+      : `ESPÈCES À LA LIVRAISON (${order.total + order.deliveryFee} F CFA)`;
+
+    return `👑 *KHADY'S FOOD - DOUBLE VALIDATION DE COMMANDE* 👑\n\n` +
+      `📋 *Code Commande :* ${order.id}\n` +
+      `👤 *Nom Client :* ${order.customerName}\n` +
+      `📞 *Téléphone :* ${order.phone}\n` +
+      `📍 *Quartier / Adresse :* ${order.district} ${order.address ? `(${order.address})` : ''}\n\n` +
+      `🥘 *DETAILS DU FESTIN :*\n${itemsText}\n\n` +
+      `💵 *Sous-total :* ${order.total} F CFA\n` +
+      `🛵 *Livraison Billo Express :* ${order.deliveryFee} F CFA\n` +
+      `💰 *TOTAL À PAYER :* ${order.total + order.deliveryFee} F CFA\n` +
+      `💳 *Mode de Règlement :* ${paymentInfo}\n\n` +
+      `⚡ *Commande déjà enregistrée en ligne. Merci de valider la réception !*`;
   };
 
   const paymentMethods = [
@@ -421,6 +442,92 @@ const CartView: React.FC<CartViewProps> = ({ cart, setCart, onOrderPlace, onClos
              <p className="text-center text-[8px] text-white/20 font-black uppercase tracking-widest mt-6">Sécurisé par Khady's Payment Terminal</p>
           </div>
         </form>
+      )}
+
+      {/* MODAL DOUBLE COMMANDE : EN LIGNE & WHATSAPP */}
+      {submittedOrder && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-fade-in">
+          <div className="bg-gradient-to-b from-[#2C1810] via-[#3E2723] to-[#1C0D08] rounded-[3.5rem] p-6 sm:p-10 max-w-lg w-full text-white border-2 border-brand-gold/50 shadow-2xl space-y-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-brand-gold/10 rounded-full blur-2xl pointer-events-none"></div>
+
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 bg-brand-gold/20 text-brand-gold rounded-3xl border border-brand-gold/40 flex items-center justify-center mx-auto shadow-inner text-3xl animate-bounce">
+                🎉
+              </div>
+              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-black uppercase px-4 py-1.5 rounded-full inline-block italic tracking-widest">
+                100% Enregistrée En Ligne
+              </span>
+              <h3 className="text-2xl font-black italic text-brand-gold uppercase tracking-tighter leading-none pt-1">
+                COMMANDE {submittedOrder.id}
+              </h3>
+              <p className="text-[10px] text-white/70 font-medium">
+                Votre festin a été sauvegardé dans le système central.
+              </p>
+            </div>
+
+            {/* Recap box */}
+            <div className="p-5 bg-white/5 rounded-3xl border border-white/10 space-y-2.5 text-xs font-bold">
+              <div className="flex justify-between text-brand-gold">
+                <span>Client :</span>
+                <span>{submittedOrder.customerName} ({submittedOrder.phone})</span>
+              </div>
+              <div className="flex justify-between text-white/80">
+                <span>Livraison Zone :</span>
+                <span>{submittedOrder.district}</span>
+              </div>
+              <div className="flex justify-between text-white/80">
+                <span>Total Festin + Billo :</span>
+                <span className="text-brand-gold font-black">{submittedOrder.total + submittedOrder.deliveryFee} F CFA</span>
+              </div>
+              <div className="flex justify-between text-emerald-400 text-[10px]">
+                <span>Paiement :</span>
+                <span className="uppercase font-mono">{submittedOrder.paymentType === 'MOBILE_MONEY' ? 'Mobile Money (Dépôt Ref)' : 'Espèces au livreur'}</span>
+              </div>
+            </div>
+
+            {/* Banner info double commande */}
+            <div className="p-4 bg-emerald-950/80 border border-emerald-500/40 rounded-2xl space-y-1">
+              <div className="flex items-center gap-2 text-emerald-400 text-[10px] font-black uppercase italic">
+                <MessageCircle size={16} /> Double Validation WhatsApp Immédiate
+              </div>
+              <p className="text-[10px] text-emerald-100/80 font-medium leading-relaxed">
+                Transmettez votre reçu directement sur WhatsApp pour une confirmation instantanée en cuisine et l'envoi immédiat de votre livreur !
+              </p>
+            </div>
+
+            {/* WhatsApp Buttons */}
+            <div className="space-y-3 pt-1">
+              <a
+                href={`https://wa.me/22796000000?text=${encodeURIComponent(getWhatsAppText(submittedOrder))}`}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white p-4.5 rounded-2xl font-black uppercase text-[10px] italic tracking-wider flex items-center justify-center gap-2.5 shadow-xl active:scale-95 transition-all text-center"
+              >
+                <MessageCircle size={18} /> 1. Transmettre au Restaurant Khady's Food
+              </a>
+
+              <a
+                href={`https://wa.me/22792080822?text=${encodeURIComponent(getWhatsAppText(submittedOrder))}`}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full bg-[#1A0F0D] hover:bg-black text-brand-gold p-4 rounded-2xl font-black uppercase text-[10px] italic tracking-wider flex items-center justify-center gap-2.5 border border-brand-gold/40 shadow-lg active:scale-95 transition-all text-center"
+              >
+                <Bike size={18} /> 2. Transmettre au Livreur Billo Express
+              </a>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSubmittedOrder(null);
+                  onClose();
+                }}
+                className="w-full bg-white/10 hover:bg-white/20 text-white p-3.5 rounded-2xl font-black uppercase text-[9px] italic tracking-widest text-center transition-all"
+              >
+                Suivre Ma Commande En Direct ➔
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

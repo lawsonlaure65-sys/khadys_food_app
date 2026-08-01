@@ -1,25 +1,73 @@
-
-import React, { useState, useRef } from 'react';
-import { 
-  LayoutDashboard, ShoppingBag, Utensils, X, TrendingUp, Star, 
-  Settings, Bike, Sparkles, Zap, Plus, Trash2, 
-  Edit3, Power, RefreshCw, Users, Package, 
-  Calendar, Smartphone, CheckCircle2, ChefHat, PackageCheck, Bell, Camera, 
-  MapPin, Clock, Heart, Sliders, DollarSign, MessageCircle, AlertCircle,
-  UserRound, Save, ToggleLeft as Toggle, Image as ImageIcon, Bot, PhoneOff, BookOpen
-} from 'lucide-react';
-import { MenuItem, AdminView, Order, Review, MenuCategory, OrderStatus, BlogPost, GalleryItem, ClientUser } from '../types';
-import { KhadyLogo } from './KhadyLogo';
-import { playSound } from '../utils/audio';
-import { sendOrderNotification } from '../utils/notifications';
+import React, { useState, useRef } from "react";
+import {
+  LayoutDashboard,
+  ShoppingBag,
+  Utensils,
+  X,
+  TrendingUp,
+  Star,
+  Settings,
+  Bike,
+  Sparkles,
+  Zap,
+  Plus,
+  Trash2,
+  Edit3,
+  Power,
+  RefreshCw,
+  Users,
+  Package,
+  Calendar,
+  Smartphone,
+  CheckCircle2,
+  ChefHat,
+  PackageCheck,
+  Bell,
+  Camera,
+  MapPin,
+  Clock,
+  Heart,
+  Sliders,
+  DollarSign,
+  MessageCircle,
+  AlertCircle,
+  UserRound,
+  Save,
+  ToggleLeft as Toggle,
+  Image as ImageIcon,
+  Bot,
+  PhoneOff,
+  BookOpen,
+  Phone,
+} from "lucide-react";
+import {
+  MenuItem,
+  AdminView,
+  Order,
+  Review,
+  MenuCategory,
+  OrderStatus,
+  BlogPost,
+  GalleryItem,
+  ClientUser,
+} from "../types";
+import { KhadyLogo } from "./KhadyLogo";
+import { playSound } from "../utils/audio";
+import { sendOrderNotification } from "../utils/notifications";
 import { GoogleGenAI } from "@google/genai";
-import { DISTRICTS, BILLO_INFO, INITIAL_BLOG_POSTS, INITIAL_GALLERY_ITEMS, INITIAL_CLIENTS } from '../constants';
-import { WhatsAppAutomationView } from './WhatsAppAutomationView';
-import { BlogMgmtView } from './BlogMgmtView';
-import { GalleryMgmtView } from './GalleryMgmtView';
-import { ClientsMgmtView } from './ClientsMgmtView';
-import { AIPromoGenerator } from './AIPromoGenerator';
-import { compressImage } from '../utils/image';
+import {
+  DISTRICTS,
+  BILLO_INFO,
+  INITIAL_BLOG_POSTS,
+  INITIAL_GALLERY_ITEMS,
+  INITIAL_CLIENTS,
+} from "../constants";
+import { WhatsAppAutomationView } from "./WhatsAppAutomationView";
+import { BlogMgmtView } from "./BlogMgmtView";
+import { GalleryMgmtView } from "./GalleryMgmtView";
+import { ClientsMgmtView } from "./ClientsMgmtView";
+import { AIPromoGenerator } from "./AIPromoGenerator";
+import { compressImage } from "../utils/image";
 
 interface AdminDashboardProps {
   items: MenuItem[];
@@ -37,15 +85,27 @@ interface AdminDashboardProps {
   onExit: () => void;
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-  items, setItems, onExit, setOrders, orders, reviews, setReviews,
-  posts: propPosts, setPosts: propSetPosts,
-  galleryItems: propGallery, setGalleryItems: propSetGallery,
-  clients: propClients, setClients: propSetClients
+const AdminDashboard: React.FC<AdminDashboardProps> = ({
+  items,
+  setItems,
+  onExit,
+  setOrders,
+  orders,
+  reviews,
+  setReviews,
+  posts: propPosts,
+  setPosts: propSetPosts,
+  galleryItems: propGallery,
+  setGalleryItems: propSetGallery,
+  clients: propClients,
+  setClients: propSetClients,
 }) => {
   const [localPosts, setLocalPosts] = useState<BlogPost[]>(INITIAL_BLOG_POSTS);
-  const [localGallery, setLocalGallery] = useState<GalleryItem[]>(INITIAL_GALLERY_ITEMS);
-  const [localClients, setLocalClients] = useState<ClientUser[]>(INITIAL_CLIENTS);
+  const [localGallery, setLocalGallery] = useState<GalleryItem[]>(
+    INITIAL_GALLERY_ITEMS,
+  );
+  const [localClients, setLocalClients] =
+    useState<ClientUser[]>(INITIAL_CLIENTS);
 
   const posts = propPosts || localPosts;
   const setPosts = propSetPosts || setLocalPosts;
@@ -54,49 +114,63 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const clients = propClients || localClients;
   const setClients = propSetClients || setLocalClients;
 
-  const [currentView, setCurrentView] = useState<AdminView>(AdminView.DASHBOARD);
-  const [editingItem, setEditingItem] = useState<Partial<MenuItem> | null>(null);
+  const [currentView, setCurrentView] = useState<AdminView>(
+    AdminView.DASHBOARD,
+  );
+  const [editingItem, setEditingItem] = useState<Partial<MenuItem> | null>(
+    null,
+  );
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const [aiStrategy, setAiStrategy] = useState('');
+  const [aiStrategy, setAiStrategy] = useState("");
   const [isRestaurantOpen, setIsRestaurantOpen] = useState(true);
   const adminPhotoInputRef = useRef<HTMLInputElement>(null);
   const dishPhotoInputRef = useRef<HTMLInputElement>(null);
-  const [adminAvatar, setAdminAvatar] = useState(() => localStorage.getItem('khadys_admin_avatar') || '');
+  const [adminAvatar, setAdminAvatar] = useState(
+    () => localStorage.getItem("khadys_admin_avatar") || "",
+  );
 
-  const handleAdminPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAdminPhotoChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0];
     if (file) {
       try {
         const compressed = await compressImage(file, 400, 400, 0.8);
         setAdminAvatar(compressed);
-        localStorage.setItem('khadys_admin_avatar', compressed);
-        playSound('success');
+        localStorage.setItem("khadys_admin_avatar", compressed);
+        playSound("success");
       } catch {
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64String = reader.result as string;
           setAdminAvatar(base64String);
-          localStorage.setItem('khadys_admin_avatar', base64String);
-          playSound('success');
+          localStorage.setItem("khadys_admin_avatar", base64String);
+          playSound("success");
         };
         reader.readAsDataURL(file);
       }
     }
   };
 
-  const handleDishPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDishPhotoChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0];
     if (file && editingItem) {
       try {
         const compressed = await compressImage(file, 600, 600, 0.75);
-        setEditingItem(prev => prev ? { ...prev, image: compressed } : null);
-        playSound('pop');
+        setEditingItem((prev) =>
+          prev ? { ...prev, image: compressed } : null,
+        );
+        playSound("pop");
       } catch {
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64String = reader.result as string;
-          setEditingItem(prev => prev ? { ...prev, image: base64String } : null);
-          playSound('pop');
+          setEditingItem((prev) =>
+            prev ? { ...prev, image: base64String } : null,
+          );
+          playSound("pop");
         };
         reader.readAsDataURL(file);
       }
@@ -112,30 +186,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       id: editingItem.id || `item-${Date.now()}`,
       rating: editingItem.rating || 5,
       isAvailable: editingItem.isAvailable ?? true,
-      category: editingItem.category || 'Plat Africain',
-      image: editingItem.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c'
+      category: editingItem.category || "Plat Africain",
+      image:
+        editingItem.image ||
+        "https://images.unsplash.com/photo-1546069901-ba9599a7e63c",
     } as MenuItem;
 
-    if (items.find(i => i.id === finalItem.id)) {
-      setItems(prev => prev.map(i => i.id === finalItem.id ? finalItem : i));
+    if (items.find((i) => i.id === finalItem.id)) {
+      setItems((prev) =>
+        prev.map((i) => (i.id === finalItem.id ? finalItem : i)),
+      );
     } else {
-      setItems(prev => [finalItem, ...prev]);
+      setItems((prev) => [finalItem, ...prev]);
     }
-    
+
     setEditingItem(null);
-    playSound('success');
+    playSound("success");
   };
 
   const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
-    setOrders(prev => prev.map(o => {
-      if (o.id === orderId) {
-        const updated = { ...o, status: newStatus };
-        sendOrderNotification(updated);
-        return updated;
-      }
-      return o;
-    }));
-    playSound('notification');
+    setOrders((prev) =>
+      prev.map((o) => {
+        if (o.id === orderId) {
+          const updated = { ...o, status: newStatus };
+          sendOrderNotification(updated);
+          return updated;
+        }
+        return o;
+      }),
+    );
+    playSound("notification");
   };
 
   const runAiStrategy = async () => {
@@ -143,9 +223,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const prompt = `Génère une stratégie marketing éclair pour booster les ventes de Tiep et Box Sauces à Niamey. 2 lignes maximum.`;
-      const response = await ai.models.generateContent({ model: 'gemini-3-flash-preview', contents: prompt });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+      });
       setAiStrategy(response.text || "");
-      playSound('success');
+      playSound("success");
     } catch (e) {
       setAiStrategy("Veuillez configurer votre clé API pour l'IA.");
     } finally {
@@ -154,13 +237,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const renderContent = () => {
-    switch(currentView) {
+    switch (currentView) {
       case AdminView.DASHBOARD:
         return (
           <div className="space-y-6 animate-fade-in">
             {/* Banner Vente Automatique WhatsApp 24/7 */}
-            <div 
-              onClick={() => { setCurrentView(AdminView.WHATSAPP_AUTOMATION); playSound('pop'); }}
+            <div
+              onClick={() => {
+                setCurrentView(AdminView.WHATSAPP_AUTOMATION);
+                playSound("pop");
+              }}
               className="bg-gradient-to-r from-brand-brown via-[#2A1510] to-[#1A0F0D] p-6 rounded-[2.5rem] border border-brand-gold/30 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer hover:border-brand-gold transition-all group"
             >
               <div className="flex items-center gap-4">
@@ -170,11 +256,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                    <h4 className="font-black text-sm uppercase italic text-brand-gold">WhatsApp Vente Automatique 24/7</h4>
-                    <span className="bg-green-500/20 text-green-400 border border-green-500/30 text-[8px] font-black uppercase px-2 py-0.5 rounded-full">Actif Cloud</span>
+                    <h4 className="font-black text-sm uppercase italic text-brand-gold">
+                      WhatsApp Vente Automatique 24/7
+                    </h4>
+                    <span className="bg-green-500/20 text-green-400 border border-green-500/30 text-[8px] font-black uppercase px-2 py-0.5 rounded-full">
+                      Actif Cloud
+                    </span>
                   </div>
                   <p className="text-[10px] text-white/60 font-bold uppercase mt-1">
-                    Le serveur répond & vend automatiquement sur WhatsApp même si votre téléphone est éteint
+                    Le serveur répond & vend automatiquement sur WhatsApp même
+                    si votre téléphone est éteint
                   </p>
                 </div>
               </div>
@@ -184,32 +275,72 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-               {[
-                 { label: 'Ventes Jour', val: '645.000 F', icon: DollarSign, col: 'text-brand-gold' },
-                 { label: 'En attente', val: orders.filter(o => o.status === 'RECEIVED').length, icon: ShoppingBag, col: 'text-brand-orange' },
-                 { label: 'Livreurs Live', val: '4 Actifs', icon: Bike, col: 'text-green-400' },
-                 { label: 'Points Club', val: '124.5k', icon: Sparkles, col: 'text-yellow-400' }
-               ].map((s, i) => (
-                 <div key={i} className="bg-white/5 p-6 rounded-[2rem] border border-white/5 shadow-2xl">
-                    <s.icon size={20} className={`${s.col} mb-3`} />
-                    <p className="text-[8px] text-white/30 uppercase font-black tracking-widest">{s.label}</p>
-                    <h4 className="text-xl font-black italic">{s.val}</h4>
-                 </div>
-               ))}
+              {[
+                {
+                  label: "Ventes Jour",
+                  val: "645.000 F",
+                  icon: DollarSign,
+                  col: "text-brand-gold",
+                },
+                {
+                  label: "En attente",
+                  val: orders.filter((o) => o.status === "RECEIVED").length,
+                  icon: ShoppingBag,
+                  col: "text-brand-orange",
+                },
+                {
+                  label: "Livreurs Live",
+                  val: "4 Actifs",
+                  icon: Bike,
+                  col: "text-green-400",
+                },
+                {
+                  label: "Points Club",
+                  val: "124.5k",
+                  icon: Sparkles,
+                  col: "text-yellow-400",
+                },
+              ].map((s, i) => (
+                <div
+                  key={i}
+                  className="bg-white/5 p-6 rounded-[2rem] border border-white/5 shadow-2xl"
+                >
+                  <s.icon size={20} className={`${s.col} mb-3`} />
+                  <p className="text-[8px] text-white/30 uppercase font-black tracking-widest">
+                    {s.label}
+                  </p>
+                  <h4 className="text-xl font-black italic">{s.val}</h4>
+                </div>
+              ))}
             </div>
             <div className="bg-white/5 p-8 rounded-[2.5rem] border border-white/5">
-               <h3 className="text-lg font-black italic uppercase text-brand-gold mb-6">Plats en vogue</h3>
-               <div className="space-y-4">
-                  {items.slice(0, 3).map((it, idx) => (
-                    <div key={idx} className="flex items-center gap-4 bg-black/20 p-4 rounded-2xl">
-                       <img src={it.image} className="w-12 h-12 rounded-xl object-cover" />
-                       <div className="flex-1">
-                          <p className="font-black text-[10px] uppercase tracking-tighter text-white/80">{it.name}</p>
-                          <div className="w-full bg-white/5 h-1.5 rounded-full mt-2"><div className="bg-brand-orange h-full rounded-full" style={{ width: `${95 - idx*10}%` }}></div></div>
-                       </div>
+              <h3 className="text-lg font-black italic uppercase text-brand-gold mb-6">
+                Plats en vogue
+              </h3>
+              <div className="space-y-4">
+                {items.slice(0, 3).map((it, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-4 bg-black/20 p-4 rounded-2xl"
+                  >
+                    <img
+                      src={it.image}
+                      className="w-12 h-12 rounded-xl object-cover"
+                    />
+                    <div className="flex-1">
+                      <p className="font-black text-[10px] uppercase tracking-tighter text-white/80">
+                        {it.name}
+                      </p>
+                      <div className="w-full bg-white/5 h-1.5 rounded-full mt-2">
+                        <div
+                          className="bg-brand-orange h-full rounded-full"
+                          style={{ width: `${95 - idx * 10}%` }}
+                        ></div>
+                      </div>
                     </div>
-                  ))}
-               </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         );
@@ -221,23 +352,51 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         return (
           <div className="space-y-6 animate-fade-in">
             <div className="flex justify-between items-center">
-               <h3 className="text-xl font-black italic uppercase text-brand-gold">Gestion de la Carte</h3>
-               <button onClick={() => setEditingItem({})} className="bg-brand-gold text-brand-brown px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 font-black text-[10px] uppercase italic active:scale-95 transition-all">
-                 <Plus size={18}/> Ajouter un Plat
-               </button>
+              <h3 className="text-xl font-black italic uppercase text-brand-gold">
+                Gestion de la Carte
+              </h3>
+              <button
+                onClick={() => setEditingItem({})}
+                className="bg-brand-gold text-brand-brown px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 font-black text-[10px] uppercase italic active:scale-95 transition-all"
+              >
+                <Plus size={18} /> Ajouter un Plat
+              </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-               {items.map(item => (
-                 <div key={item.id} className="bg-white/5 p-5 rounded-[2.5rem] border border-white/5 group relative overflow-hidden transition-all hover:bg-white/10">
-                    <img src={item.image} className="w-full h-32 rounded-[2rem] object-cover opacity-80 mb-4" />
-                    <h4 className="font-black text-xs italic text-brand-gold uppercase truncate mb-1">{item.name}</h4>
-                    <p className="text-xs font-black text-brand-orange mb-4">{item.price} F</p>
-                    <div className="flex gap-2">
-                       <button onClick={() => setEditingItem(item)} className="flex-1 bg-white/5 p-3 rounded-xl text-white/40 hover:text-white hover:bg-brand-gold/20 flex items-center justify-center transition-all"><Edit3 size={16}/></button>
-                       <button onClick={() => { if(confirm("Supprimer " + item.name + " ?")) setItems(items.filter(i => i.id !== item.id)) }} className="flex-1 bg-red-500/10 p-3 rounded-xl text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center transition-all"><Trash2 size={16}/></button>
-                    </div>
-                 </div>
-               ))}
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  className="bg-white/5 p-5 rounded-[2.5rem] border border-white/5 group relative overflow-hidden transition-all hover:bg-white/10"
+                >
+                  <img
+                    src={item.image}
+                    className="w-full h-32 rounded-[2rem] object-cover opacity-80 mb-4"
+                  />
+                  <h4 className="font-black text-xs italic text-brand-gold uppercase truncate mb-1">
+                    {item.name}
+                  </h4>
+                  <p className="text-xs font-black text-brand-orange mb-4">
+                    {item.price} F
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setEditingItem(item)}
+                      className="flex-1 bg-white/5 p-3 rounded-xl text-white/40 hover:text-white hover:bg-brand-gold/20 flex items-center justify-center transition-all"
+                    >
+                      <Edit3 size={16} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm("Supprimer " + item.name + " ?"))
+                          setItems(items.filter((i) => i.id !== item.id));
+                      }}
+                      className="flex-1 bg-red-500/10 p-3 rounded-xl text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         );
@@ -245,232 +404,533 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       case AdminView.ORDERS:
         return (
           <div className="space-y-6 animate-fade-in">
-             <div className="flex justify-between items-center">
-               <h3 className="text-xl font-black italic uppercase text-brand-gold">Commandes en Direct</h3>
-               <span className="text-[10px] font-black uppercase text-brand-orange bg-brand-orange/10 px-4 py-2 rounded-full border border-brand-orange/20">
-                 {orders.length} Commandes actives
-               </span>
-             </div>
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-black italic uppercase text-brand-gold">
+                Commandes en Direct
+              </h3>
+              <span className="text-[10px] font-black uppercase text-brand-orange bg-brand-orange/10 px-4 py-2 rounded-full border border-brand-orange/20">
+                {orders.length} Commandes actives
+              </span>
+            </div>
 
-             <div className="space-y-4">
-                {orders.length === 0 ? (
-                  <p className="text-center py-20 opacity-20 italic">Aucune commande aujourd'hui</p>
-                ) : (
-                  orders.map(o => (
-                    <div key={o.id} className="bg-white/5 p-6 sm:p-8 rounded-[2.5rem] border border-white/5 flex flex-col gap-6 relative group hover:border-white/10 transition-all">
-                       <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-white/5">
-                          <div className="flex items-center gap-3">
-                             <h4 className="font-black text-brand-gold italic text-base">{o.customerName}</h4>
-                             <span className="text-[9px] px-3 py-1 bg-white/10 rounded-full font-bold font-mono text-white/80">{o.id}</span>
-                             <span className="text-[9px] px-3 py-1 bg-brand-orange text-white rounded-full font-black uppercase italic">{o.status}</span>
-                          </div>
-                          <div className="text-[10px] font-mono text-brand-gold font-bold">
-                            Total: {o.total + o.deliveryFee} F (Frais: {o.deliveryFee} F)
-                          </div>
-                       </div>
-
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {/* Left Details & Items */}
-                          <div className="space-y-3">
-                             <div className="p-4 bg-black/30 rounded-2xl space-y-1.5">
-                                <p className="text-[9px] text-white/40 uppercase font-black">Livraison à ({o.district}) :</p>
-                                <p className="text-xs text-white/90 font-bold">{o.address || 'Adresse standard'}</p>
-                                <p className="text-xs text-brand-gold font-mono font-bold">Tél : {o.phone}</p>
-                             </div>
-
-                             <div className="space-y-1 bg-black/20 p-4 rounded-2xl">
-                                <p className="text-[9px] text-brand-orange font-black uppercase mb-1">Articles commandés :</p>
-                                {o.items.map((it, idx) => (
-                                  <p key={idx} className="text-xs text-white/80 font-medium flex justify-between">
-                                    <span>• {it.quantity} x {it.name}</span>
-                                    <span className="font-mono text-brand-gold/80">{it.price * it.quantity} F</span>
-                                  </p>
-                                ))}
-                             </div>
-                          </div>
-
-                          {/* Right Payment & Driver Controls */}
-                          <div className="space-y-4">
-                             {/* Mobile Money Proof Validation Box */}
-                             {o.paymentType === 'MOBILE_MONEY' ? (
-                               <div className={`p-4 rounded-2xl border-2 space-y-3 ${
-                                 o.paymentValidated ? 'bg-green-500/10 border-green-500/30' : 'bg-amber-500/10 border-amber-500/50'
-                               }`}>
-                                 <div className="flex justify-between items-center">
-                                   <span className="text-[9px] font-black uppercase tracking-wider text-amber-300 italic">
-                                     📱 Mobile Money ({o.paymentMethod})
-                                   </span>
-                                   <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${
-                                     o.paymentValidated ? 'bg-green-500 text-white' : 'bg-amber-500 text-black'
-                                   }`}>
-                                     {o.paymentValidated ? 'Dépôt Validé Admin' : 'En attente contrôle Admin'}
-                                   </span>
-                                 </div>
-
-                                 <p className="text-xs font-mono font-bold text-white">Ref TRX: <strong className="text-brand-gold">{o.paymentTransactionId || 'Non fourni'}</strong></p>
-
-                                 {o.paymentProofUrl && (
-                                   <div className="flex items-center gap-3">
-                                     <img src={o.paymentProofUrl} className="w-16 h-16 object-cover rounded-xl border border-white/20 shadow-md" alt="Reçu" />
-                                     <a href={o.paymentProofUrl} target="_blank" rel="noreferrer" className="text-[9px] font-bold text-brand-gold underline uppercase">
-                                       Agrandir Reçu
-                                     </a>
-                                   </div>
-                                 )}
-
-                                 <button
-                                   onClick={() => {
-                                     playSound('cash');
-                                     setOrders(orders.map(ord => ord.id === o.id ? { ...ord, paymentValidated: !ord.paymentValidated } : ord));
-                                   }}
-                                   className={`w-full py-2.5 rounded-xl text-[9px] font-black uppercase italic transition-all ${
-                                     o.paymentValidated 
-                                       ? 'bg-white/10 text-white/60 hover:bg-white/20' 
-                                       : 'bg-green-500 hover:bg-green-400 text-white shadow-lg'
-                                   }`}
-                                 >
-                                   {o.paymentValidated ? 'Révoquer Validation' : '✅ Valider Réception du Dépôt'}
-                                 </button>
-                               </div>
-                             ) : (
-                               <div className="p-4 bg-white/5 rounded-2xl border border-white/10 flex justify-between items-center">
-                                 <span className="text-xs font-black uppercase text-brand-gold italic">💵 Paiement en Espèces</span>
-                                 <span className="text-[8px] font-bold text-gray-400 uppercase bg-white/5 px-2.5 py-1 rounded-full">Au livreur</span>
-                               </div>
-                             )}
-
-                             {/* Driver Status / Alert */}
-                             {o.driverIssue && (
-                               <div className="p-3 bg-red-500/20 border border-red-500/40 rounded-xl text-red-200 text-xs font-bold">
-                                 ⚠️ Alerte Livreur : {o.driverIssue}
-                               </div>
-                             )}
-
-                             {/* Status Changers */}
-                             <div className="space-y-1.5">
-                                <label className="text-[8px] font-black uppercase text-white/40 tracking-widest">Changer Statut Commande :</label>
-                                <div className="grid grid-cols-3 gap-1.5">
-                                   {['CONFIRMED', 'PREPARING', 'READY', 'DELIVERING', 'DELIVERED', 'CANCELLED'].map(s => (
-                                     <button 
-                                       key={s} 
-                                       onClick={() => updateOrderStatus(o.id, s as OrderStatus)} 
-                                       className={`p-2 rounded-xl text-[8px] font-black uppercase transition-all ${
-                                         o.status === s ? 'bg-brand-orange text-white shadow-md' : 'bg-white/5 text-white/40 hover:bg-white/10'
-                                       }`}
-                                     >
-                                       {s}
-                                     </button>
-                                   ))}
-                                </div>
-                             </div>
-                          </div>
-                       </div>
+            <div className="space-y-4">
+              {orders.length === 0 ? (
+                <p className="text-center py-20 opacity-20 italic">
+                  Aucune commande aujourd'hui
+                </p>
+              ) : (
+                orders.map((o) => (
+                  <div
+                    key={o.id}
+                    className="bg-white/5 p-6 sm:p-8 rounded-[2.5rem] border border-white/5 flex flex-col gap-6 relative group hover:border-white/10 transition-all"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-white/5">
+                      <div className="flex items-center gap-3">
+                        <h4 className="font-black text-brand-gold italic text-base">
+                          {o.customerName}
+                        </h4>
+                        <span className="text-[9px] px-3 py-1 bg-white/10 rounded-full font-bold font-mono text-white/80">
+                          {o.id}
+                        </span>
+                        <span className="text-[9px] px-3 py-1 bg-brand-orange text-white rounded-full font-black uppercase italic">
+                          {o.status}
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-mono text-brand-gold font-bold">
+                        Total: {o.total + o.deliveryFee} F (Frais:{" "}
+                        {o.deliveryFee} F)
+                      </div>
                     </div>
-                  ))
-                )}
-             </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Left Details & Items */}
+                      <div className="space-y-3">
+                        <div className="p-4 bg-black/30 rounded-2xl space-y-1.5">
+                          <p className="text-[9px] text-white/40 uppercase font-black">
+                            Livraison à ({o.district}) :
+                          </p>
+                          <p className="text-xs text-white/90 font-bold">
+                            {o.address || "Adresse standard"}
+                          </p>
+                          <p className="text-xs text-brand-gold font-mono font-bold">
+                            Tél : {o.phone}
+                          </p>
+                        </div>
+
+                        <div className="space-y-1 bg-black/20 p-4 rounded-2xl">
+                          <p className="text-[9px] text-brand-orange font-black uppercase mb-1">
+                            Articles commandés :
+                          </p>
+                          {o.items.map((it, idx) => (
+                            <p
+                              key={idx}
+                              className="text-xs text-white/80 font-medium flex justify-between"
+                            >
+                              <span>
+                                • {it.quantity} x {it.name}
+                              </span>
+                              <span className="font-mono text-brand-gold/80">
+                                {it.price * it.quantity} F
+                              </span>
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Right Payment & Driver Controls */}
+                      <div className="space-y-4">
+                        {/* Mobile Money Proof Validation Box */}
+                        {o.paymentType === "MOBILE_MONEY" ? (
+                          <div
+                            className={`p-4 rounded-2xl border-2 space-y-3 ${
+                              o.paymentValidated
+                                ? "bg-green-500/10 border-green-500/30"
+                                : "bg-amber-500/10 border-amber-500/50"
+                            }`}
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className="text-[9px] font-black uppercase tracking-wider text-amber-300 italic">
+                                📱 Mobile Money ({o.paymentMethod})
+                              </span>
+                              <span
+                                className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                  o.paymentValidated
+                                    ? "bg-green-500 text-white"
+                                    : "bg-amber-500 text-black"
+                                }`}
+                              >
+                                {o.paymentValidated
+                                  ? "Dépôt Validé Admin"
+                                  : "En attente contrôle Admin"}
+                              </span>
+                            </div>
+
+                            <p className="text-xs font-mono font-bold text-white">
+                              Ref TRX:{" "}
+                              <strong className="text-brand-gold">
+                                {o.paymentTransactionId || "Non fourni"}
+                              </strong>
+                            </p>
+
+                            {o.paymentProofUrl && (
+                              <div className="flex items-center gap-3">
+                                <img
+                                  src={o.paymentProofUrl}
+                                  className="w-16 h-16 object-cover rounded-xl border border-white/20 shadow-md"
+                                  alt="Reçu"
+                                />
+                                <a
+                                  href={o.paymentProofUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[9px] font-bold text-brand-gold underline uppercase"
+                                >
+                                  Agrandir Reçu
+                                </a>
+                              </div>
+                            )}
+
+                            <button
+                              onClick={() => {
+                                playSound("cash");
+                                setOrders(
+                                  orders.map((ord) =>
+                                    ord.id === o.id
+                                      ? {
+                                          ...ord,
+                                          paymentValidated:
+                                            !ord.paymentValidated,
+                                        }
+                                      : ord,
+                                  ),
+                                );
+                              }}
+                              className={`w-full py-2.5 rounded-xl text-[9px] font-black uppercase italic transition-all ${
+                                o.paymentValidated
+                                  ? "bg-white/10 text-white/60 hover:bg-white/20"
+                                  : "bg-green-500 hover:bg-green-400 text-white shadow-lg"
+                              }`}
+                            >
+                              {o.paymentValidated
+                                ? "Révoquer Validation"
+                                : "✅ Valider Réception du Dépôt"}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="p-4 bg-white/5 rounded-2xl border border-white/10 flex justify-between items-center">
+                            <span className="text-xs font-black uppercase text-brand-gold italic">
+                              💵 Paiement en Espèces
+                            </span>
+                            <span className="text-[8px] font-bold text-gray-400 uppercase bg-white/5 px-2.5 py-1 rounded-full">
+                              Au livreur
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Driver Status / Alert */}
+                        {o.driverIssue && (
+                          <div className="p-3 bg-red-500/20 border border-red-500/40 rounded-xl text-red-200 text-xs font-bold">
+                            ⚠️ Alerte Livreur : {o.driverIssue}
+                          </div>
+                        )}
+
+                        {/* Dispatch Livreur Billo Express (+227 92 08 08 22) */}
+                        <div className="p-4 bg-[#2C1810] border border-brand-gold/30 rounded-2xl space-y-2.5">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <Bike className="text-brand-gold" size={16} />
+                              <span className="text-[10px] font-black uppercase text-brand-gold italic">
+                                Livreur Billo Express (+227 92 08 08 22)
+                              </span>
+                            </div>
+                            <span className="text-[8px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-black uppercase">
+                              Prêt
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                            <a
+                              href={`https://wa.me/22792080822?text=${encodeURIComponent(
+                                `🛵 *ORDRE DE MISSION LIVRAISON BILLO EXPRESS*\n` +
+                                  `📋 *Commande*: ${o.id}\n` +
+                                  `👤 *Client*: ${o.customerName}\n` +
+                                  `📞 *Tél Client*: ${o.phone}\n` +
+                                  `📍 *Quartier/Adresse*: ${o.district} - ${o.address || "Standard"}\n` +
+                                  `🍲 *Articles*: ${o.items.map((i) => `${i.quantity}x ${i.name}`).join(", ")}\n` +
+                                  `💰 *Total à encaisser*: ${o.total + o.deliveryFee} F CFA (${o.paymentType === "MOBILE_MONEY" ? "PAYÉ MOBILE MONEY" : "ESPÈCES AU LIVREUR"})\n\n` +
+                                  `📍 *Point de retrait*: Resto Khady's Food (Mosquée Khadafi)\n` +
+                                  `Merci de confirmer la prise en charge !`,
+                              )}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={() =>
+                                updateOrderStatus(
+                                  o.id,
+                                  "DELIVERING" as OrderStatus,
+                                )
+                              }
+                              className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white p-2.5 rounded-xl text-[9px] font-black uppercase italic flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all text-center"
+                            >
+                              <MessageCircle size={14} /> WhatsApp Livreur (+227 92 08 08 22)
+                            </a>
+
+                            <a
+                              href="tel:+22792080822"
+                              className="bg-white/10 hover:bg-white/20 text-brand-gold p-2.5 rounded-xl text-[9px] font-black uppercase italic flex items-center justify-center gap-1 border border-white/10 active:scale-95 transition-all"
+                            >
+                              <Phone size={14} /> Appeler
+                            </a>
+                          </div>
+                        </div>
+
+                        {/* Status Changers */}
+                        <div className="space-y-1.5">
+                          <label className="text-[8px] font-black uppercase text-white/40 tracking-widest">
+                            Changer Statut Commande :
+                          </label>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {[
+                              "CONFIRMED",
+                              "PREPARING",
+                              "READY",
+                              "DELIVERING",
+                              "DELIVERED",
+                              "CANCELLED",
+                            ].map((s) => (
+                              <button
+                                key={s}
+                                onClick={() =>
+                                  updateOrderStatus(o.id, s as OrderStatus)
+                                }
+                                className={`p-2 rounded-xl text-[8px] font-black uppercase transition-all ${
+                                  o.status === s
+                                    ? "bg-brand-orange text-white shadow-md"
+                                    : "bg-white/5 text-white/40 hover:bg-white/10"
+                                }`}
+                              >
+                                {s}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         );
 
       case AdminView.EVENT:
         return (
           <div className="space-y-6 animate-fade-in">
-             <h3 className="text-xl font-black italic uppercase text-brand-gold">Gestion Événements</h3>
-             <div className="bg-white/5 p-8 rounded-[3rem] border border-white/5 space-y-6">
-                <div className="p-6 bg-brand-orange/10 border border-brand-orange/20 rounded-3xl flex justify-between items-center transition-all hover:bg-brand-orange/20 cursor-pointer">
-                   <div>
-                      <h4 className="font-black text-white italic text-sm">Mariage Royal - Plateau</h4>
-                      <p className="text-[10px] text-white/40 uppercase font-bold">200 Invités • 20 Décembre • En attente de devis</p>
-                   </div>
-                   <button className="bg-brand-orange text-white px-5 py-2 rounded-xl text-[9px] font-black uppercase shadow-lg">Éditer</button>
+            <h3 className="text-xl font-black italic uppercase text-brand-gold">
+              Gestion Événements
+            </h3>
+            <div className="bg-white/5 p-8 rounded-[3rem] border border-white/5 space-y-6">
+              <div className="p-6 bg-brand-orange/10 border border-brand-orange/20 rounded-3xl flex justify-between items-center transition-all hover:bg-brand-orange/20 cursor-pointer">
+                <div>
+                  <h4 className="font-black text-white italic text-sm">
+                    Mariage Royal - Plateau
+                  </h4>
+                  <p className="text-[10px] text-white/40 uppercase font-bold">
+                    200 Invités • 20 Décembre • En attente de devis
+                  </p>
                 </div>
-                <div className="p-6 bg-white/5 border border-white/10 rounded-3xl flex justify-between items-center opacity-40">
-                   <div>
-                      <h4 className="font-black text-white italic text-sm">Cocktail Pro - Yantala</h4>
-                      <p className="text-[10px] text-white/40 uppercase font-bold">50 Personnes • Terminé</p>
-                   </div>
-                   <CheckCircle2 size={20} className="text-green-500" />
+                <button className="bg-brand-orange text-white px-5 py-2 rounded-xl text-[9px] font-black uppercase shadow-lg">
+                  Éditer
+                </button>
+              </div>
+              <div className="p-6 bg-white/5 border border-white/10 rounded-3xl flex justify-between items-center opacity-40">
+                <div>
+                  <h4 className="font-black text-white italic text-sm">
+                    Cocktail Pro - Yantala
+                  </h4>
+                  <p className="text-[10px] text-white/40 uppercase font-bold">
+                    50 Personnes • Terminé
+                  </p>
                 </div>
-             </div>
+                <CheckCircle2 size={20} className="text-green-500" />
+              </div>
+            </div>
           </div>
         );
 
       case AdminView.BUFFET:
         return (
           <div className="space-y-6 animate-fade-in">
-             <h3 className="text-xl font-black italic uppercase text-brand-gold">Packs Buffet Pro</h3>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {items.filter(i => i.category === 'Pack-Buffet' || i.category === 'Pack').map((p, i) => (
-                  <div key={i} className="bg-white/5 p-6 rounded-[2.5rem] border border-white/5 flex gap-5 items-center">
-                     <img src={p.image} className="w-20 h-20 rounded-2xl object-cover shadow-lg" />
-                     <div className="flex-1">
-                        <h4 className="font-black text-[10px] text-brand-gold italic uppercase">{p.name}</h4>
-                        <p className="text-brand-orange font-black text-sm">{p.price} F</p>
-                     </div>
-                     <button onClick={() => setEditingItem(p)} className="p-3 bg-white/5 rounded-xl text-white/40 hover:text-white transition-all"><Edit3 size={16}/></button>
+            <h3 className="text-xl font-black italic uppercase text-brand-gold">
+              Packs Buffet Pro
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {items
+                .filter(
+                  (i) => i.category === "Pack-Buffet" || i.category === "Pack",
+                )
+                .map((p, i) => (
+                  <div
+                    key={i}
+                    className="bg-white/5 p-6 rounded-[2.5rem] border border-white/5 flex gap-5 items-center"
+                  >
+                    <img
+                      src={p.image}
+                      className="w-20 h-20 rounded-2xl object-cover shadow-lg"
+                    />
+                    <div className="flex-1">
+                      <h4 className="font-black text-[10px] text-brand-gold italic uppercase">
+                        {p.name}
+                      </h4>
+                      <p className="text-brand-orange font-black text-sm">
+                        {p.price} F
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setEditingItem(p)}
+                      className="p-3 bg-white/5 rounded-xl text-white/40 hover:text-white transition-all"
+                    >
+                      <Edit3 size={16} />
+                    </button>
                   </div>
                 ))}
-             </div>
+            </div>
           </div>
         );
 
       case AdminView.CLIENTS:
         return (
           <div className="space-y-6 animate-fade-in">
-             <h3 className="text-xl font-black italic uppercase text-brand-gold">Gestion Clientèle Elite</h3>
-             <div className="bg-white/5 rounded-[3rem] border border-white/5 overflow-hidden">
-                <table className="w-full text-left">
-                   <thead className="bg-white/5 text-[8px] font-black uppercase tracking-[0.3em] text-white/30">
-                      <tr>
-                         <th className="p-6">Client</th>
-                         <th className="p-6">Rang</th>
-                         <th className="p-6">Points</th>
-                         <th className="p-6">Dernière commande</th>
-                      </tr>
-                   </thead>
-                   <tbody className="text-[10px] font-bold">
-                      {[
-                        { name: 'Abdou R.', rank: 'Gold', points: 1250, date: 'Aujourd\'hui' },
-                        { name: 'Mariama K.', rank: 'Silver', points: 450, date: 'Hier' },
-                        { name: 'Issoufou Z.', rank: 'Platinum', points: 5200, date: 'Il y a 2 jours' }
-                      ].map((c, i) => (
-                        <tr key={i} className="border-t border-white/5 hover:bg-white/[0.02] transition-colors">
-                           <td className="p-6 flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-white/10" /> {c.name}</td>
-                           <td className="p-6"><span className={`px-3 py-1 rounded-full text-[7px] ${c.rank === 'Platinum' ? 'bg-brand-gold text-brand-brown' : 'bg-white/10 text-white/60'}`}>{c.rank}</span></td>
-                           <td className="p-6 text-brand-orange">{c.points}</td>
-                           <td className="p-6 opacity-40">{c.date}</td>
-                        </tr>
-                      ))}
-                   </tbody>
-                </table>
-             </div>
+            <h3 className="text-xl font-black italic uppercase text-brand-gold">
+              Gestion Clientèle Elite
+            </h3>
+            <div className="bg-white/5 rounded-[3rem] border border-white/5 overflow-hidden">
+              <table className="w-full text-left">
+                <thead className="bg-white/5 text-[8px] font-black uppercase tracking-[0.3em] text-white/30">
+                  <tr>
+                    <th className="p-6">Client</th>
+                    <th className="p-6">Rang</th>
+                    <th className="p-6">Points</th>
+                    <th className="p-6">Dernière commande</th>
+                  </tr>
+                </thead>
+                <tbody className="text-[10px] font-bold">
+                  {[
+                    {
+                      name: "Abdou R.",
+                      rank: "Gold",
+                      points: 1250,
+                      date: "Aujourd'hui",
+                    },
+                    {
+                      name: "Mariama K.",
+                      rank: "Silver",
+                      points: 450,
+                      date: "Hier",
+                    },
+                    {
+                      name: "Issoufou Z.",
+                      rank: "Platinum",
+                      points: 5200,
+                      date: "Il y a 2 jours",
+                    },
+                  ].map((c, i) => (
+                    <tr
+                      key={i}
+                      className="border-t border-white/5 hover:bg-white/[0.02] transition-colors"
+                    >
+                      <td className="p-6 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-white/10" />{" "}
+                        {c.name}
+                      </td>
+                      <td className="p-6">
+                        <span
+                          className={`px-3 py-1 rounded-full text-[7px] ${c.rank === "Platinum" ? "bg-brand-gold text-brand-brown" : "bg-white/10 text-white/60"}`}
+                        >
+                          {c.rank}
+                        </span>
+                      </td>
+                      <td className="p-6 text-brand-orange">{c.points}</td>
+                      <td className="p-6 opacity-40">{c.date}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         );
 
       case AdminView.DELIVERY:
         return (
           <div className="space-y-6 animate-fade-in">
-             <h3 className="text-xl font-black italic uppercase text-brand-gold">Flotte Billo Express</h3>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[
-                  { name: 'Sani D.', status: 'En livraison', zone: 'Plateau', phone: '+227 96 00 00 01' },
-                  { name: 'Moussa B.', status: 'Disponible', zone: 'Base', phone: '+227 96 00 00 02' },
-                  { name: 'Idé G.', status: 'En pause', zone: 'Goudel', phone: '+227 96 00 00 03' }
-                ].map((l, i) => (
-                  <div key={i} className="bg-white/5 p-6 rounded-[2.5rem] border border-white/5 flex items-center gap-5">
-                     <div className="w-16 h-16 bg-brand-orange/20 rounded-2xl flex items-center justify-center text-brand-orange"><Bike size={32} /></div>
-                     <div className="flex-1">
-                        <h4 className="font-black text-xs text-white italic uppercase">{l.name}</h4>
-                        <p className="text-[9px] font-bold text-white/40 uppercase mb-2">{l.phone}</p>
-                        <div className="flex items-center gap-2">
-                           <span className={`w-2 h-2 rounded-full ${l.status === 'En livraison' ? 'bg-brand-orange' : l.status === 'Disponible' ? 'bg-green-500' : 'bg-gray-500'}`} />
-                           <span className="text-[8px] font-black uppercase text-white/60 tracking-widest">{l.status} • {l.zone}</span>
-                        </div>
-                     </div>
-                     <button className="bg-white/5 p-3 rounded-xl text-white/20 hover:text-white transition-all"><MessageCircle size={18}/></button>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h3 className="text-xl font-black italic uppercase text-brand-gold">
+                  Flotte & Dispatch Billo Express
+                </h3>
+                <p className="text-[10px] font-bold text-white/50 uppercase">
+                  Ligne directe Administrateur ↔ Livreur : +227 92 08 08 22
+                </p>
+              </div>
+              <a
+                href="https://wa.me/22792080822?text=Bonjour%20Billo%20Express,%20message%20de%20l'administration%20Khady's%20Food."
+                target="_blank"
+                rel="noreferrer"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-2xl text-[9px] font-black uppercase italic shadow-lg flex items-center gap-2 active:scale-95 transition-all"
+              >
+                <MessageCircle size={16} /> WhatsApp Livreur (+227 92 08 08 22)
+              </a>
+            </div>
+
+            {/* Carte Centrale Livreur Principal Billo Express */}
+            <div className="bg-gradient-to-r from-[#2C1810] via-[#3D2116] to-[#1A0F0D] p-6 sm:p-8 rounded-[3rem] border-2 border-brand-gold/40 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div className="flex items-center gap-5">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-brand-gold/20 rounded-3xl border border-brand-gold/50 flex items-center justify-center text-3xl shadow-inner shrink-0">
+                  🚲
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                    <h4 className="font-black text-base text-white italic uppercase">
+                      Centrale Livreur Billo Express
+                    </h4>
                   </div>
-                ))}
-             </div>
+                  <p className="text-xs font-black text-brand-gold font-mono mt-1">
+                    Contact WhatsApp : +227 92 08 08 22
+                  </p>
+                  <p className="text-[9px] text-white/60 uppercase font-bold mt-1">
+                    Responsable acheminement des commandes Khady's Food à Niamey
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                <a
+                  href="https://wa.me/22792080822"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-2xl text-[9px] font-black uppercase italic flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
+                >
+                  <MessageCircle size={15} /> Discuter WhatsApp
+                </a>
+                <a
+                  href="tel:+22792080822"
+                  className="flex-1 md:flex-none bg-white/10 hover:bg-white/20 text-brand-gold px-5 py-3 rounded-2xl text-[9px] font-black uppercase italic flex items-center justify-center gap-1.5 border border-white/10 active:scale-95 transition-all"
+                >
+                  <Phone size={15} /> Appeler
+                </a>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[
+                {
+                  name: "Billo Express (Livreur Principal)",
+                  status: "Disponible",
+                  zone: "Niamey Centre & Périphérie",
+                  phone: "+227 92 08 08 22",
+                  isPrimary: true,
+                },
+                {
+                  name: "Sani D.",
+                  status: "En livraison",
+                  zone: "Plateau / Yantala",
+                  phone: "+227 96 00 00 01",
+                  isPrimary: false,
+                },
+                {
+                  name: "Moussa B.",
+                  status: "Disponible",
+                  zone: "Base 11 / Aéroport",
+                  phone: "+227 96 00 00 02",
+                  isPrimary: false,
+                },
+                {
+                  name: "Idé G.",
+                  status: "En pause",
+                  zone: "Goudel / Bobiel",
+                  phone: "+227 96 00 00 03",
+                  isPrimary: false,
+                },
+              ].map((l, i) => (
+                <div
+                  key={i}
+                  className={`p-6 rounded-[2.5rem] border flex items-center gap-5 transition-all ${
+                    l.isPrimary
+                      ? "bg-[#2A160E] border-brand-gold/50 shadow-xl"
+                      : "bg-white/5 border-white/5"
+                  }`}
+                >
+                  <div className="w-16 h-16 bg-brand-orange/20 rounded-2xl flex items-center justify-center text-brand-orange shrink-0">
+                    <Bike size={32} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-black text-xs text-white italic uppercase truncate">
+                      {l.name}
+                    </h4>
+                    <p className="text-[9px] font-bold text-brand-gold font-mono uppercase mb-2">
+                      {l.phone}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`w-2 h-2 rounded-full ${l.status === "En livraison" ? "bg-brand-orange" : l.status === "Disponible" ? "bg-green-500" : "bg-gray-500"}`}
+                      />
+                      <span className="text-[8px] font-black uppercase text-white/60 tracking-widest truncate">
+                        {l.status} • {l.zone}
+                      </span>
+                    </div>
+                  </div>
+                  <a
+                    href={`https://wa.me/${l.phone.replace(/[^0-9]/g, "")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-white/5 p-3.5 rounded-xl text-emerald-400 hover:text-white hover:bg-emerald-600 transition-all shrink-0"
+                    title="WhatsApp"
+                  >
+                    <MessageCircle size={18} />
+                  </a>
+                </div>
+              ))}
+            </div>
           </div>
         );
 
@@ -478,17 +938,33 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         return (
           <div className="space-y-6 animate-fade-in">
             <div className="bg-white/5 p-8 sm:p-10 rounded-[3rem] border border-white/5 relative overflow-hidden shadow-2xl">
-               <div className="flex justify-between items-center mb-8">
-                  <h3 className="text-xl font-black italic uppercase text-brand-gold flex items-center gap-3"><Zap className="text-brand-orange" /> Analyseur de Stock IA</h3>
-                  <button onClick={runAiStrategy} disabled={isAiLoading} className="bg-brand-orange text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-3 shadow-lg hover:scale-105 transition-all">
-                    {isAiLoading ? <RefreshCw className="animate-spin" size={16} /> : <Sparkles size={16} />} Analyser le Stock
-                  </button>
-               </div>
-               {aiStrategy ? (
-                 <div className="p-6 bg-black/40 rounded-3xl border border-white/10 text-brand-gold/80 italic text-sm leading-relaxed animate-fade-in mb-6">
-                   {aiStrategy}
-                 </div>
-               ) : <div className="text-center py-10 opacity-40 italic text-xs mb-6">Cliquez sur Analyser pour recevoir un conseil stratégique instantané...</div>}
+              <div className="flex justify-between items-center mb-8">
+                <h3 className="text-xl font-black italic uppercase text-brand-gold flex items-center gap-3">
+                  <Zap className="text-brand-orange" /> Analyseur de Stock IA
+                </h3>
+                <button
+                  onClick={runAiStrategy}
+                  disabled={isAiLoading}
+                  className="bg-brand-orange text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-3 shadow-lg hover:scale-105 transition-all"
+                >
+                  {isAiLoading ? (
+                    <RefreshCw className="animate-spin" size={16} />
+                  ) : (
+                    <Sparkles size={16} />
+                  )}{" "}
+                  Analyser le Stock
+                </button>
+              </div>
+              {aiStrategy ? (
+                <div className="p-6 bg-black/40 rounded-3xl border border-white/10 text-brand-gold/80 italic text-sm leading-relaxed animate-fade-in mb-6">
+                  {aiStrategy}
+                </div>
+              ) : (
+                <div className="text-center py-10 opacity-40 italic text-xs mb-6">
+                  Cliquez sur Analyser pour recevoir un conseil stratégique
+                  instantané...
+                </div>
+              )}
             </div>
 
             {/* Générateur de Promotions IA pour Admin */}
@@ -497,10 +973,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         );
 
       case AdminView.BLOG_MGMT:
-        return <BlogMgmtView posts={posts} setPosts={setPosts} menuItems={items} />;
+        return (
+          <BlogMgmtView posts={posts} setPosts={setPosts} menuItems={items} />
+        );
 
       case AdminView.GALLERY_MGMT:
-        return <GalleryMgmtView items={galleryItems} setItems={setGalleryItems} menuItems={items} />;
+        return (
+          <GalleryMgmtView
+            items={galleryItems}
+            setItems={setGalleryItems}
+            menuItems={items}
+          />
+        );
 
       case AdminView.CLIENTS:
         return <ClientsMgmtView clients={clients} setClients={setClients} />;
@@ -508,81 +992,115 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       case AdminView.SETTINGS:
         return (
           <div className="space-y-8 animate-fade-in">
-             <h3 className="text-xl font-black italic uppercase text-brand-gold">Configuration de l'Établissement</h3>
-             <div className="bg-white/5 p-10 rounded-[3rem] border border-white/5 space-y-8">
-                <div className="flex items-center justify-between p-6 bg-black/20 rounded-3xl border border-white/5">
-                   <div>
-                      <h4 className="font-black text-white italic text-sm uppercase">Statut Restaurant</h4>
-                      <p className="text-[10px] text-white/40 uppercase font-bold tracking-widest">{isRestaurantOpen ? 'Ouvert - Accepte les commandes' : 'Fermé - Indisponible'}</p>
-                   </div>
-                   <button onClick={() => setIsRestaurantOpen(!isRestaurantOpen)} className={`w-16 h-8 rounded-full relative p-1 transition-all ${isRestaurantOpen ? 'bg-brand-orange' : 'bg-white/10'}`}>
-                      <div className={`w-6 h-6 bg-white rounded-full transition-all ${isRestaurantOpen ? 'translate-x-8' : 'translate-x-0'} shadow-xl`}></div>
-                   </button>
+            <h3 className="text-xl font-black italic uppercase text-brand-gold">
+              Configuration de l'Établissement
+            </h3>
+            <div className="bg-white/5 p-10 rounded-[3rem] border border-white/5 space-y-8">
+              <div className="flex items-center justify-between p-6 bg-black/20 rounded-3xl border border-white/5">
+                <div>
+                  <h4 className="font-black text-white italic text-sm uppercase">
+                    Statut Restaurant
+                  </h4>
+                  <p className="text-[10px] text-white/40 uppercase font-bold tracking-widest">
+                    {isRestaurantOpen
+                      ? "Ouvert - Accepte les commandes"
+                      : "Fermé - Indisponible"}
+                  </p>
                 </div>
-                <div className="space-y-2">
-                   <h4 className="font-black text-brand-gold uppercase text-[10px] ml-4 tracking-[0.3em]">Contact WhatsApp Live</h4>
-                   <input className="w-full p-5 bg-white/5 rounded-2xl text-white font-bold border border-white/10 outline-none focus:border-brand-gold" defaultValue="+227 74 44 16 21" />
-                </div>
-                <div className="space-y-2">
-                   <h4 className="font-black text-brand-gold uppercase text-[10px] ml-4 tracking-[0.3em]">Code Promo Actif</h4>
-                   <input className="w-full p-5 bg-white/5 rounded-2xl text-white font-bold border border-white/10 outline-none focus:border-brand-gold" defaultValue="KHADY24" />
-                </div>
-                <button className="w-full bg-brand-gold text-brand-brown py-6 rounded-3xl font-black uppercase italic shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all">
-                   <Save size={20}/> Appliquer les Paramètres
+                <button
+                  onClick={() => setIsRestaurantOpen(!isRestaurantOpen)}
+                  className={`w-16 h-8 rounded-full relative p-1 transition-all ${isRestaurantOpen ? "bg-brand-orange" : "bg-white/10"}`}
+                >
+                  <div
+                    className={`w-6 h-6 bg-white rounded-full transition-all ${isRestaurantOpen ? "translate-x-8" : "translate-x-0"} shadow-xl`}
+                  ></div>
                 </button>
-             </div>
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-black text-brand-gold uppercase text-[10px] ml-4 tracking-[0.3em]">
+                  Contact WhatsApp Live
+                </h4>
+                <input
+                  className="w-full p-5 bg-white/5 rounded-2xl text-white font-bold border border-white/10 outline-none focus:border-brand-gold"
+                  defaultValue="+227 74 44 16 21"
+                />
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-black text-brand-gold uppercase text-[10px] ml-4 tracking-[0.3em]">
+                  Code Promo Actif
+                </h4>
+                <input
+                  className="w-full p-5 bg-white/5 rounded-2xl text-white font-bold border border-white/10 outline-none focus:border-brand-gold"
+                  defaultValue="KHADY24"
+                />
+              </div>
+              <button className="w-full bg-brand-gold text-brand-brown py-6 rounded-3xl font-black uppercase italic shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all">
+                <Save size={20} /> Appliquer les Paramètres
+              </button>
+            </div>
           </div>
         );
 
       default:
-        return <div className="text-center py-20 text-white/20 italic">Module en développement...</div>;
+        return (
+          <div className="text-center py-20 text-white/20 italic">
+            Module en développement...
+          </div>
+        );
     }
   };
 
   const navList = [
-    { v: AdminView.DASHBOARD, i: LayoutDashboard, l: 'Accueil' },
-    { v: AdminView.WHATSAPP_AUTOMATION, i: Bot, l: 'WhatsApp 24/7' },
-    { v: AdminView.ORDERS, i: ShoppingBag, l: 'Commandes' },
-    { v: AdminView.MENU_MGMT, i: Utensils, l: 'Carte' },
-    { v: AdminView.BLOG_MGMT, i: BookOpen, l: 'Blog' },
-    { v: AdminView.GALLERY_MGMT, i: Camera, l: 'Galerie' },
-    { v: AdminView.DELIVERY, i: Bike, l: 'Livreurs' },
-    { v: AdminView.CLIENTS, i: Users, l: 'Clients' },
-    { v: AdminView.AI_MARKETING, i: Zap, l: 'Marketing' },
-    { v: AdminView.SETTINGS, i: Settings, l: 'Paramètres' }
+    { v: AdminView.DASHBOARD, i: LayoutDashboard, l: "Accueil" },
+    { v: AdminView.WHATSAPP_AUTOMATION, i: Bot, l: "WhatsApp 24/7" },
+    { v: AdminView.ORDERS, i: ShoppingBag, l: "Commandes" },
+    { v: AdminView.MENU_MGMT, i: Utensils, l: "Carte" },
+    { v: AdminView.BLOG_MGMT, i: BookOpen, l: "Blog" },
+    { v: AdminView.GALLERY_MGMT, i: Camera, l: "Galerie" },
+    { v: AdminView.DELIVERY, i: Bike, l: "Livreurs" },
+    { v: AdminView.CLIENTS, i: Users, l: "Clients" },
+    { v: AdminView.AI_MARKETING, i: Zap, l: "Marketing" },
+    { v: AdminView.SETTINGS, i: Settings, l: "Paramètres" },
   ];
 
   return (
     <div className="min-h-screen w-full bg-[#0F0807] text-white flex flex-col md:flex-row font-sans overflow-x-hidden">
-      <input 
-        type="file" 
-        ref={adminPhotoInputRef} 
-        className="hidden" 
-        accept="image/*" 
+      <input
+        type="file"
+        ref={adminPhotoInputRef}
+        className="hidden"
+        accept="image/*"
         onChange={handleAdminPhotoChange}
       />
 
       {/* Sidebar Desktop (PC / Tablettes) */}
       <div className="hidden md:flex md:w-28 bg-black/40 border-r border-white/5 flex-col items-center py-8 gap-5 overflow-y-auto no-scrollbar shrink-0">
         <KhadyLogo variant="light" className="scale-75 mb-4" />
-        {navList.map(n => (
-          <button 
-            key={n.l} 
-            onClick={() => { setCurrentView(n.v); playSound('pop'); }} 
-            className={`flex flex-col items-center transition-all duration-300 w-full px-2 ${currentView === n.v ? 'scale-105 opacity-100' : 'opacity-30 hover:opacity-100'}`}
+        {navList.map((n) => (
+          <button
+            key={n.l}
+            onClick={() => {
+              setCurrentView(n.v);
+              playSound("pop");
+            }}
+            className={`flex flex-col items-center transition-all duration-300 w-full px-2 ${currentView === n.v ? "scale-105 opacity-100" : "opacity-30 hover:opacity-100"}`}
           >
-             <div className={`p-3 rounded-2xl transition-colors ${currentView === n.v ? 'bg-brand-orange text-white shadow-xl' : 'bg-white/5'}`}>
-               <n.i size={20} />
-             </div>
-             <span className="text-[7px] mt-1.5 font-black tracking-widest uppercase text-center w-full leading-tight truncate">{n.l}</span>
+            <div
+              className={`p-3 rounded-2xl transition-colors ${currentView === n.v ? "bg-brand-orange text-white shadow-xl" : "bg-white/5"}`}
+            >
+              <n.i size={20} />
+            </div>
+            <span className="text-[7px] mt-1.5 font-black tracking-widest uppercase text-center w-full leading-tight truncate">
+              {n.l}
+            </span>
           </button>
         ))}
-        <button 
-          onClick={onExit} 
+        <button
+          onClick={onExit}
           className="mt-auto p-3.5 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all active:scale-90"
           title="Quitter le mode Admin"
         >
-          <Power size={20}/>
+          <Power size={20} />
         </button>
       </div>
 
@@ -592,21 +1110,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="flex items-center gap-2.5">
             <KhadyLogo variant="light" className="scale-75" />
             <div>
-              <h2 className="text-xs font-black italic uppercase text-brand-gold tracking-widest leading-none">Admin Console</h2>
-              <p className="text-[7px] text-white/40 font-black uppercase mt-0.5">Khady's Food Niamey</p>
+              <h2 className="text-xs font-black italic uppercase text-brand-gold tracking-widest leading-none">
+                Admin Console
+              </h2>
+              <p className="text-[7px] text-white/40 font-black uppercase mt-0.5">
+                Khady's Food Niamey
+              </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <button 
+            <button
               onClick={() => adminPhotoInputRef.current?.click()}
               className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden cursor-pointer"
               title="Changer la photo admin"
             >
-              {adminAvatar ? <img src={adminAvatar} className="w-full h-full object-cover" /> : <Camera className="text-brand-gold opacity-40" size={15} />}
+              {adminAvatar ? (
+                <img src={adminAvatar} className="w-full h-full object-cover" />
+              ) : (
+                <Camera className="text-brand-gold opacity-40" size={15} />
+              )}
             </button>
-            <button 
-              onClick={onExit} 
+            <button
+              onClick={onExit}
               className="px-3 py-1.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl text-[9px] font-black uppercase italic flex items-center gap-1 active:scale-95"
             >
               <Power size={13} /> Quitter
@@ -616,19 +1142,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         {/* Barre de navigation horizontale défilable pour Mobile */}
         <div className="flex overflow-x-auto p-2 gap-2 no-scrollbar bg-black/40 border-t border-white/5">
-          {navList.map(n => {
+          {navList.map((n) => {
             const isActive = currentView === n.v;
             return (
               <button
                 key={n.l}
-                onClick={() => { setCurrentView(n.v); playSound('pop'); }}
+                onClick={() => {
+                  setCurrentView(n.v);
+                  playSound("pop");
+                }}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider whitespace-nowrap transition-all shrink-0 ${
-                  isActive 
-                    ? 'bg-brand-orange text-white shadow-lg border border-brand-orange/40 scale-105' 
-                    : 'bg-white/5 text-white/50 hover:bg-white/10 border border-white/5'
+                  isActive
+                    ? "bg-brand-orange text-white shadow-lg border border-brand-orange/40 scale-105"
+                    : "bg-white/5 text-white/50 hover:bg-white/10 border border-white/5"
                 }`}
               >
-                <n.i size={14} className={isActive ? 'text-white' : 'text-brand-gold'} />
+                <n.i
+                  size={14}
+                  className={isActive ? "text-white" : "text-brand-gold"}
+                />
                 <span>{n.l}</span>
               </button>
             );
@@ -638,24 +1170,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="hidden md:flex p-6 md:p-8 justify-between items-center border-b border-white/5 bg-black/20 backdrop-blur-md relative z-20">
-           <div>
-             <h2 className="text-sm font-black italic uppercase text-brand-gold tracking-[0.3em] leading-none">Console Admin Elite</h2>
-             <p className="text-[8px] text-white/20 font-black uppercase mt-1">Terminal de Contrôle Niamey</p>
-           </div>
-           <div className="flex items-center gap-3">
-             <button onClick={onExit} className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-xl text-[10px] font-black uppercase italic transition-all flex items-center gap-1.5">
-               <Power size={14} /> Quitter Admin
-             </button>
-             <div 
-                  onClick={() => adminPhotoInputRef.current?.click()}
-                  className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center relative group cursor-pointer overflow-hidden shadow-2xl hover:border-brand-orange transition-all"
-                >
-                   {adminAvatar ? <img src={adminAvatar} className="w-full h-full object-cover" /> : <Camera className="text-brand-gold opacity-20" size={20} />}
-                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
-                      <Camera size={16} className="text-white" />
-                   </div>
-             </div>
-           </div>
+          <div>
+            <h2 className="text-sm font-black italic uppercase text-brand-gold tracking-[0.3em] leading-none">
+              Console Admin Elite
+            </h2>
+            <p className="text-[8px] text-white/20 font-black uppercase mt-1">
+              Terminal de Contrôle Niamey
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onExit}
+              className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-xl text-[10px] font-black uppercase italic transition-all flex items-center gap-1.5"
+            >
+              <Power size={14} /> Quitter Admin
+            </button>
+            <div
+              onClick={() => adminPhotoInputRef.current?.click()}
+              className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center relative group cursor-pointer overflow-hidden shadow-2xl hover:border-brand-orange transition-all"
+            >
+              {adminAvatar ? (
+                <img src={adminAvatar} className="w-full h-full object-cover" />
+              ) : (
+                <Camera className="text-brand-gold opacity-20" size={20} />
+              )}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                <Camera size={16} className="text-white" />
+              </div>
+            </div>
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10 no-scrollbar bg-gradient-to-br from-transparent to-brand-orange/[0.02]">
@@ -666,113 +1209,187 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* Modal d'édition/ajout de plat */}
       {editingItem && (
         <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-6 animate-fade-in">
-           <div className="bg-brand-brown w-full max-w-sm rounded-[3.5rem] p-10 border-4 border-white/10 shadow-2xl relative overflow-y-auto max-h-[90vh] no-scrollbar">
-              <button onClick={() => setEditingItem(null)} className="absolute top-8 right-8 text-white/20 hover:text-white transition-colors"><X size={24}/></button>
-              <h3 className="text-xl font-black italic uppercase text-brand-gold mb-8 tracking-tighter leading-none">{editingItem.id ? 'Éditer le Plat' : 'Nouveau Plat'}</h3>
-              <form onSubmit={handleSaveItem} className="space-y-4">
-                 <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-white/30 ml-4">Nom du plat</label>
-                    <input required value={editingItem.name || ''} onChange={e => setEditingItem({...editingItem, name: e.target.value})} className="w-full p-4 bg-white/5 rounded-2xl text-white text-xs font-bold border border-white/10 outline-none focus:border-brand-gold" placeholder="Ex: Tiep Royal" />
-                 </div>
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                       <label className="text-[8px] font-black uppercase text-white/30 ml-4">Prix (F CFA)</label>
-                       <input type="number" required value={editingItem.price || ''} onChange={e => setEditingItem({...editingItem, price: Number(e.target.value)})} className="w-full p-4 bg-white/5 rounded-2xl text-white text-xs font-bold border border-white/10" />
-                    </div>
-                    <div className="space-y-1">
-                       <label className="text-[8px] font-black uppercase text-white/30 ml-4">Catégorie</label>
-                       <select value={editingItem.category || 'Plat Africain'} onChange={e => setEditingItem({...editingItem, category: e.target.value as any})} className="w-full p-4 bg-white/5 rounded-2xl text-white text-[10px] font-black border border-white/10 outline-none">
-                          <option value="Plat Africain">Plat Africain</option>
-                          <option value="Spécialité Maison">Spécialité</option>
-                          <option value="Box Sauce">Box Sauce</option>
-                          <option value="Pack-Buffet">Pack-Buffet</option>
-                          <option value="Boisson Froide">Boisson</option>
-                          <option value="Dessert">Dessert</option>
-                       </select>
-                    </div>
-                 </div>
-                 {/* Hidden input for dish photo upload */}
-                 <input 
-                   type="file" 
-                   ref={dishPhotoInputRef} 
-                   className="hidden" 
-                   accept="image/*" 
-                   onChange={handleDishPhotoChange}
-                 />
+          <div className="bg-brand-brown w-full max-w-sm rounded-[3.5rem] p-10 border-4 border-white/10 shadow-2xl relative overflow-y-auto max-h-[90vh] no-scrollbar">
+            <button
+              onClick={() => setEditingItem(null)}
+              className="absolute top-8 right-8 text-white/20 hover:text-white transition-colors"
+            >
+              <X size={24} />
+            </button>
+            <h3 className="text-xl font-black italic uppercase text-brand-gold mb-8 tracking-tighter leading-none">
+              {editingItem.id ? "Éditer le Plat" : "Nouveau Plat"}
+            </h3>
+            <form onSubmit={handleSaveItem} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[8px] font-black uppercase text-white/30 ml-4">
+                  Nom du plat
+                </label>
+                <input
+                  required
+                  value={editingItem.name || ""}
+                  onChange={(e) =>
+                    setEditingItem({ ...editingItem, name: e.target.value })
+                  }
+                  className="w-full p-4 bg-white/5 rounded-2xl text-white text-xs font-bold border border-white/10 outline-none focus:border-brand-gold"
+                  placeholder="Ex: Tiep Royal"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase text-white/30 ml-4">
+                    Prix (F CFA)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={editingItem.price || ""}
+                    onChange={(e) =>
+                      setEditingItem({
+                        ...editingItem,
+                        price: Number(e.target.value),
+                      })
+                    }
+                    className="w-full p-4 bg-white/5 rounded-2xl text-white text-xs font-bold border border-white/10"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black uppercase text-white/30 ml-4">
+                    Catégorie
+                  </label>
+                  <select
+                    value={editingItem.category || "Plat Africain"}
+                    onChange={(e) =>
+                      setEditingItem({
+                        ...editingItem,
+                        category: e.target.value as any,
+                      })
+                    }
+                    className="w-full p-4 bg-white/5 rounded-2xl text-white text-[10px] font-black border border-white/10 outline-none"
+                  >
+                    <option value="Plat Africain">Plat Africain</option>
+                    <option value="Spécialité Maison">Spécialité</option>
+                    <option value="Box Sauce">Box Sauce</option>
+                    <option value="Pack-Buffet">Pack-Buffet</option>
+                    <option value="Boisson Froide">Boisson</option>
+                    <option value="Dessert">Dessert</option>
+                  </select>
+                </div>
+              </div>
+              {/* Hidden input for dish photo upload */}
+              <input
+                type="file"
+                ref={dishPhotoInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleDishPhotoChange}
+              />
 
-                 <div className="space-y-2">
-                    <label className="text-[8px] font-black uppercase text-white/40 ml-4">Photo du Plat (Appareil / Galerie)</label>
-                    
-                    {editingItem.image ? (
-                      <div className="relative w-full h-36 rounded-2xl overflow-hidden border border-white/10 group bg-black/40">
-                        <img src={editingItem.image} alt="Aperçu du plat" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 sm:opacity-0 transition-opacity flex items-center justify-center gap-2 p-2">
-                          <button
-                            type="button"
-                            onClick={() => dishPhotoInputRef.current?.click()}
-                            className="bg-brand-orange text-white px-3 py-2 rounded-xl text-[9px] font-black uppercase flex items-center gap-1.5 shadow-lg active:scale-95"
-                          >
-                            <Camera size={14} /> Changer
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingItem({ ...editingItem, image: '' })}
-                            className="bg-red-500 text-white p-2 rounded-xl text-[9px] font-black active:scale-95"
-                            title="Effacer la photo"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                        <div className="absolute bottom-2 right-2 flex gap-1 sm:hidden">
-                          <button
-                            type="button"
-                            onClick={() => dishPhotoInputRef.current?.click()}
-                            className="bg-brand-orange text-white p-2 rounded-xl shadow-md active:scale-95 flex items-center gap-1 text-[8px] font-black uppercase"
-                          >
-                            <Camera size={12} /> Changer
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div 
+              <div className="space-y-2">
+                <label className="text-[8px] font-black uppercase text-white/40 ml-4">
+                  Photo du Plat (Appareil / Galerie)
+                </label>
+
+                {editingItem.image ? (
+                  <div className="relative w-full h-36 rounded-2xl overflow-hidden border border-white/10 group bg-black/40">
+                    <img
+                      src={editingItem.image}
+                      alt="Aperçu du plat"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 sm:opacity-0 transition-opacity flex items-center justify-center gap-2 p-2">
+                      <button
+                        type="button"
                         onClick={() => dishPhotoInputRef.current?.click()}
-                        className="w-full h-32 rounded-2xl border-2 border-dashed border-white/20 hover:border-brand-gold bg-white/5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all p-4 text-center active:scale-98"
+                        className="bg-brand-orange text-white px-3 py-2 rounded-xl text-[9px] font-black uppercase flex items-center gap-1.5 shadow-lg active:scale-95"
                       >
-                        <div className="p-3 bg-brand-orange/20 text-brand-orange rounded-xl">
-                          <Camera size={22} />
-                        </div>
-                        <span className="text-[10px] font-black uppercase text-brand-gold italic">Prendre une photo / Choisir dans Photos</span>
-                        <span className="text-[7.5px] text-white/40 font-medium">Touchez ici pour ouvrir directement votre appareil ou galerie</span>
-                      </div>
-                    )}
+                        <Camera size={14} /> Changer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditingItem({ ...editingItem, image: "" })
+                        }
+                        className="bg-red-500 text-white p-2 rounded-xl text-[9px] font-black active:scale-95"
+                        title="Effacer la photo"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="absolute bottom-2 right-2 flex gap-1 sm:hidden">
+                      <button
+                        type="button"
+                        onClick={() => dishPhotoInputRef.current?.click()}
+                        className="bg-brand-orange text-white p-2 rounded-xl shadow-md active:scale-95 flex items-center gap-1 text-[8px] font-black uppercase"
+                      >
+                        <Camera size={12} /> Changer
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => dishPhotoInputRef.current?.click()}
+                    className="w-full h-32 rounded-2xl border-2 border-dashed border-white/20 hover:border-brand-gold bg-white/5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all p-4 text-center active:scale-98"
+                  >
+                    <div className="p-3 bg-brand-orange/20 text-brand-orange rounded-xl">
+                      <Camera size={22} />
+                    </div>
+                    <span className="text-[10px] font-black uppercase text-brand-gold italic">
+                      Prendre une photo / Choisir dans Photos
+                    </span>
+                    <span className="text-[7.5px] text-white/40 font-medium">
+                      Touchez ici pour ouvrir directement votre appareil ou
+                      galerie
+                    </span>
+                  </div>
+                )}
 
-                    <button
-                      type="button"
-                      onClick={() => dishPhotoInputRef.current?.click()}
-                      className="w-full bg-white/10 hover:bg-white/20 text-brand-gold py-3 rounded-2xl text-[9px] font-black uppercase italic flex items-center justify-center gap-2 border border-white/10 active:scale-95 transition-all"
-                    >
-                      <Camera size={14} /> Ouvrir l'application Photos
-                    </button>
+                <button
+                  type="button"
+                  onClick={() => dishPhotoInputRef.current?.click()}
+                  className="w-full bg-white/10 hover:bg-white/20 text-brand-gold py-3 rounded-2xl text-[9px] font-black uppercase italic flex items-center justify-center gap-2 border border-white/10 active:scale-95 transition-all"
+                >
+                  <Camera size={14} /> Ouvrir l'application Photos
+                </button>
 
-                    <details className="text-[8px] text-white/40 pt-1">
-                      <summary className="cursor-pointer hover:text-white/60 select-none">Ou coller un lien Web URL (optionnel)</summary>
-                      <input 
-                        value={editingItem.image || ''} 
-                        onChange={e => setEditingItem({...editingItem, image: e.target.value})} 
-                        className="w-full mt-1.5 p-3 bg-white/5 rounded-xl text-white text-[9px] border border-white/10 outline-none focus:border-brand-gold" 
-                        placeholder="https://..." 
-                      />
-                    </details>
-                 </div>
-                 <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-white/30 ml-4">Description</label>
-                    <textarea value={editingItem.description || ''} onChange={e => setEditingItem({...editingItem, description: e.target.value})} className="w-full p-4 bg-white/5 rounded-2xl text-white text-[10px] h-24 border border-white/10 resize-none" placeholder="Détails du plat..." />
-                 </div>
-                 <button type="submit" className="w-full bg-brand-orange text-white py-6 rounded-[2.5rem] font-black uppercase italic shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all mt-4">
-                    {editingItem.id ? 'Mettre à jour' : 'Ajouter à la Carte'} <CheckCircle2 size={20}/>
-                 </button>
-              </form>
-           </div>
+                <details className="text-[8px] text-white/40 pt-1">
+                  <summary className="cursor-pointer hover:text-white/60 select-none">
+                    Ou coller un lien Web URL (optionnel)
+                  </summary>
+                  <input
+                    value={editingItem.image || ""}
+                    onChange={(e) =>
+                      setEditingItem({ ...editingItem, image: e.target.value })
+                    }
+                    className="w-full mt-1.5 p-3 bg-white/5 rounded-xl text-white text-[9px] border border-white/10 outline-none focus:border-brand-gold"
+                    placeholder="https://..."
+                  />
+                </details>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[8px] font-black uppercase text-white/30 ml-4">
+                  Description
+                </label>
+                <textarea
+                  value={editingItem.description || ""}
+                  onChange={(e) =>
+                    setEditingItem({
+                      ...editingItem,
+                      description: e.target.value,
+                    })
+                  }
+                  className="w-full p-4 bg-white/5 rounded-2xl text-white text-[10px] h-24 border border-white/10 resize-none"
+                  placeholder="Détails du plat..."
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-brand-orange text-white py-6 rounded-[2.5rem] font-black uppercase italic shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all mt-4"
+              >
+                {editingItem.id ? "Mettre à jour" : "Ajouter à la Carte"}{" "}
+                <CheckCircle2 size={20} />
+              </button>
+            </form>
+          </div>
         </div>
       )}
     </div>
