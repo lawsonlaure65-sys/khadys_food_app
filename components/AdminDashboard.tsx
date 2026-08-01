@@ -11,12 +11,14 @@ import {
 import { MenuItem, AdminView, Order, Review, MenuCategory, OrderStatus, BlogPost, GalleryItem, ClientUser } from '../types';
 import { KhadyLogo } from './KhadyLogo';
 import { playSound } from '../utils/audio';
+import { sendOrderNotification } from '../utils/notifications';
 import { GoogleGenAI } from "@google/genai";
 import { DISTRICTS, BILLO_INFO, INITIAL_BLOG_POSTS, INITIAL_GALLERY_ITEMS, INITIAL_CLIENTS } from '../constants';
 import { WhatsAppAutomationView } from './WhatsAppAutomationView';
 import { BlogMgmtView } from './BlogMgmtView';
 import { GalleryMgmtView } from './GalleryMgmtView';
 import { ClientsMgmtView } from './ClientsMgmtView';
+import { AIPromoGenerator } from './AIPromoGenerator';
 
 interface AdminDashboardProps {
   items: MenuItem[];
@@ -97,7 +99,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+    setOrders(prev => prev.map(o => {
+      if (o.id === orderId) {
+        const updated = { ...o, status: newStatus };
+        sendOrderNotification(updated);
+        return updated;
+      }
+      return o;
+    }));
     playSound('notification');
   };
 
@@ -440,19 +449,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       case AdminView.AI_MARKETING:
         return (
           <div className="space-y-6 animate-fade-in">
-            <div className="bg-white/5 p-10 rounded-[3rem] border border-white/5 relative overflow-hidden shadow-2xl">
-               <div className="flex justify-between items-center mb-10">
-                  <h3 className="text-xl font-black italic uppercase text-brand-gold flex items-center gap-3"><Zap className="text-brand-orange" /> Marketing IA</h3>
+            <div className="bg-white/5 p-8 sm:p-10 rounded-[3rem] border border-white/5 relative overflow-hidden shadow-2xl">
+               <div className="flex justify-between items-center mb-8">
+                  <h3 className="text-xl font-black italic uppercase text-brand-gold flex items-center gap-3"><Zap className="text-brand-orange" /> Analyseur de Stock IA</h3>
                   <button onClick={runAiStrategy} disabled={isAiLoading} className="bg-brand-orange text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-3 shadow-lg hover:scale-105 transition-all">
                     {isAiLoading ? <RefreshCw className="animate-spin" size={16} /> : <Sparkles size={16} />} Analyser le Stock
                   </button>
                </div>
                {aiStrategy ? (
-                 <div className="p-8 bg-black/40 rounded-3xl border border-white/10 text-brand-gold/80 italic text-sm leading-relaxed animate-fade-in">
+                 <div className="p-6 bg-black/40 rounded-3xl border border-white/10 text-brand-gold/80 italic text-sm leading-relaxed animate-fade-in mb-6">
                    {aiStrategy}
                  </div>
-               ) : <div className="text-center py-20 opacity-20 italic">Cliquez sur Analyser pour générer des textes de vente avec Gemini 3...</div>}
+               ) : <div className="text-center py-10 opacity-40 italic text-xs mb-6">Cliquez sur Analyser pour recevoir un conseil stratégique instantané...</div>}
             </div>
+
+            {/* Générateur de Promotions IA pour Admin */}
+            <AIPromoGenerator />
           </div>
         );
 

@@ -42,7 +42,7 @@ export const db = {
       .select('*')
       .order('category', { ascending: true });
     if (error) {
-      console.warn("Table menu_items non accessible ou vide sur Supabase:", error.message);
+      // Supabase non prêt ou tables non créées -> Bascule silencieuse vers les données locales
       return null;
     }
     if (!data) return null;
@@ -96,7 +96,7 @@ export const db = {
       .select('*')
       .order('timestamp', { ascending: false });
     if (error) {
-      console.warn("Table orders non accessible ou vide sur Supabase:", error.message);
+      // Supabase non prêt ou tables non créées -> Bascule silencieuse vers les commandes locales
       return null;
     }
     if (!data) return null;

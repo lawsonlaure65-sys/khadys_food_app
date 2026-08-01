@@ -8,7 +8,10 @@ export interface ChatMessage {
 
 export const getSmartResponse = async (userMessage: string, history: ChatMessage[] = []): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = ((import.meta as any).env?.VITE_GEMINI_API_KEY) || 
+                   ((import.meta as any).env?.API_KEY) || 
+                   (typeof process !== 'undefined' && process.env?.API_KEY) || '';
+    const ai = new GoogleGenAI({ apiKey });
     
     const systemInstruction = `
       Tu es "Conseiller Culinaire Khady", l'ambassadrice culinaire de "Khady's Food & Event" à Niamey.

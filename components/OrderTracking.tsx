@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Order, OrderStatus } from '../types';
 import { playSound } from '../utils/audio';
+import { sendOrderNotification, requestNotificationPermission } from '../utils/notifications';
 import { 
   Clock, CheckCircle2, ChefHat, Bike, PackageCheck, Box, Bell, MapPin, Navigation, 
   Zap, MessageSquare, AlertTriangle, PhoneCall, ShieldCheck, FileCheck, Smartphone
@@ -27,14 +28,28 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ order, onComplete, onUpda
   const [billoPos, setBilloPos] = useState(0);
   const [showDriverIssueModal, setShowDriverIssueModal] = useState(false);
   const [issueText, setIssueText] = useState('');
+  const [hasNotificationPermission, setHasNotificationPermission] = useState<boolean>(() => {
+    return 'Notification' in window && Notification.permission === 'granted';
+  });
 
   useEffect(() => {
     const actualIdx = steps.findIndex(s => s.status === order.status);
     if (actualIdx !== -1) {
       setCurrentStepIdx(actualIdx);
+      // Déclencher notification Push Web
+      sendOrderNotification(order);
       if (order.status === 'DELIVERED') onComplete();
     }
   }, [order.status]);
+
+  const handleEnableNotifications = async () => {
+    const granted = await requestNotificationPermission();
+    setHasNotificationPermission(granted);
+    if (granted) {
+      playSound('success');
+      sendOrderNotification(order);
+    }
+  };
 
   useEffect(() => {
     if (steps[currentStepIdx]?.status === 'DELIVERING') {
@@ -74,6 +89,26 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ order, onComplete, onUpda
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Web Push Notification Enable Prompt */}
+      {!hasNotificationPermission && 'Notification' in window && (
+        <div className="bg-gradient-to-r from-brand-brown via-[#2A1510] to-[#1A0F0D] p-5 rounded-3xl text-white border border-brand-gold/30 shadow-xl flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-brand-gold/20 text-brand-gold rounded-2xl shrink-0">
+              <Bell size={20} className="animate-bounce" />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase text-brand-gold">Notifications Push Web</p>
+              <p className="text-[9px] font-bold text-white/70">Recevez des alertes en direct sur votre téléphone à chaque changement d'étape !</p>
+            </div>
+          </div>
+          <button 
+            onClick={handleEnableNotifications}
+            className="px-4 py-2.5 bg-brand-gold text-brand-brown font-black text-[9px] uppercase rounded-xl shrink-0 shadow-md active:scale-95 transition-all"
+          >
+            Activer
+          </button>
+        </div>
+      )}
       {/* Payment Proof Badge */}
       {order.paymentType === 'MOBILE_MONEY' && (
         <div className={`p-5 rounded-3xl border-2 flex items-center justify-between ${

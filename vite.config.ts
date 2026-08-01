@@ -5,6 +5,9 @@ import react from '@vitejs/plugin-react';
 // Fix: Simplified Vite config to resolve process.cwd() type error and follow Gemini API guidelines.
 export default defineConfig({
   plugins: [react()],
+  define: {
+    'process.env.API_KEY': JSON.stringify(process.env.API_KEY || process.env.VITE_GEMINI_API_KEY || ''),
+  },
   server: {
     port: 3000,
     host: '0.0.0.0',

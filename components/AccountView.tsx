@@ -4,13 +4,14 @@ import { Order, UserProfile } from '../types';
 import { 
   ShoppingBag, Gift, ChevronRight, LogOut, Settings, 
   Award, QrCode, User, Mail, 
-  ArrowRight, Fingerprint, Info, CheckCircle2, Truck
+  ArrowRight, Fingerprint, Info, CheckCircle2, Truck, Download, Share2, Facebook, Instagram, Sparkles
 } from 'lucide-react';
 import { playSound } from '../utils/audio';
 import { PasswordInput } from './PasswordInput';
 import { PhoneInput } from './PhoneInput';
 import OrderTracking from './OrderTracking';
 import { ADMIN_PASSWORD, REWARDS } from '../constants';
+import { SOCIAL_LINKS } from './ShareModal';
 
 interface AccountViewProps {
   orders: Order[];
@@ -19,9 +20,14 @@ interface AccountViewProps {
   onLoginSuccess: (isAdmin: boolean, customProfile?: UserProfile) => void;
   onOpenGuide: () => void;
   onUpdateOrder?: (updatedOrder: Order) => void;
+  onOpenInstallModal?: () => void;
+  onOpenShareModal?: () => void;
 }
 
-const AccountView: React.FC<AccountViewProps> = ({ orders, userProfile, onAdminAccess, onLoginSuccess, onOpenGuide, onUpdateOrder }) => {
+const AccountView: React.FC<AccountViewProps> = ({ 
+  orders, userProfile, onAdminAccess, onLoginSuccess, onOpenGuide, onUpdateOrder,
+  onOpenInstallModal, onOpenShareModal 
+}) => {
   const [isLoggedIn, setIsLoggedIn] = useState(userProfile.email !== undefined); // default to logged in if some email has been configured (which isn't default Abdou R.)
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [adminTapCount, setAdminTapCount] = useState(0);
@@ -275,6 +281,8 @@ const AccountView: React.FC<AccountViewProps> = ({ orders, userProfile, onAdminA
         <div className="space-y-4 mb-10">
           <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-[0.4em] ml-6 mb-6">SERVICES ÉLITE</h3>
           {[
+            ...(onOpenInstallModal ? [{ icon: Download, label: 'Installer l\'Application (Android / iPhone)', color: 'text-brand-orange', action: onOpenInstallModal }] : []),
+            ...(onOpenShareModal ? [{ icon: Share2, label: 'Partager l\'Application à mes Amis', color: 'text-brand-gold', action: onOpenShareModal }] : []),
             { icon: ShoppingBag, label: 'Historique des Commandes', color: 'text-brand-brown', action: () => {} },
             { icon: Info, label: 'Guide d\'utilisation', color: 'text-brand-orange', action: onOpenGuide },
             { icon: Gift, label: 'Mes Récompenses & Cadeaux', color: 'text-brand-orange', action: () => setShowRewards(true) },
@@ -291,6 +299,40 @@ const AccountView: React.FC<AccountViewProps> = ({ orders, userProfile, onAdminA
                 <ChevronRight size={16} className="text-gray-200 group-hover:text-brand-orange transition-colors" />
             </button>
           ))}
+
+          {/* Social Media Links Widget */}
+          <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-50 space-y-3">
+            <h4 className="text-[10px] font-black uppercase text-brand-brown tracking-wider">Suivez-nous sur les Réseaux</h4>
+            <div className="grid grid-cols-3 gap-2">
+              <a 
+                href={SOCIAL_LINKS.facebook}
+                target="_blank"
+                rel="noreferrer"
+                className="p-3 bg-blue-50 text-blue-600 rounded-2xl flex flex-col items-center justify-center text-center hover:bg-blue-100 transition-colors"
+              >
+                <Facebook size={18} />
+                <span className="text-[8px] font-black uppercase mt-1">Facebook</span>
+              </a>
+              <a 
+                href={SOCIAL_LINKS.instagram}
+                target="_blank"
+                rel="noreferrer"
+                className="p-3 bg-pink-50 text-pink-600 rounded-2xl flex flex-col items-center justify-center text-center hover:bg-pink-100 transition-colors"
+              >
+                <Instagram size={18} />
+                <span className="text-[8px] font-black uppercase mt-1">Instagram</span>
+              </a>
+              <a 
+                href={SOCIAL_LINKS.tiktok}
+                target="_blank"
+                rel="noreferrer"
+                className="p-3 bg-gray-100 text-gray-800 rounded-2xl flex flex-col items-center justify-center text-center hover:bg-gray-200 transition-colors"
+              >
+                <Sparkles size={18} />
+                <span className="text-[8px] font-black uppercase mt-1">TikTok</span>
+              </a>
+            </div>
+          </div>
         </div>
       )}
 

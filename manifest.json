@@ -11,22 +11,22 @@
   "scope": "/",
   "icons": [
     {
-      "src": "https://i.ibb.co/h1rgJJMb/1766933626062.jpg",
+      "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/jpeg",
-      "purpose": "any"
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "https://i.ibb.co/h1rgJJMb/1766933626062.jpg",
       "sizes": "512x512",
       "type": "image/jpeg",
       "purpose": "any"
-    },
-    {
-      "src": "https://i.ibb.co/h1rgJJMb/1766933626062.jpg",
-      "sizes": "512x512",
-      "type": "image/jpeg",
-      "purpose": "maskable"
     }
   ],
   "screenshots": [

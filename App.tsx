@@ -18,11 +18,13 @@ import { BlogView } from './components/BlogView';
 import { GalleryView } from './components/GalleryView';
 import { VideoDemoModal } from './components/VideoDemoModal';
 import { AIGourmandeWidget } from './components/AIGourmandeWidget';
+import { InstallGuideModal } from './components/InstallGuideModal';
+import { ShareModal } from './components/ShareModal';
 import { Page, MenuItem, Order, Review, CartItem, UserProfile, BlogPost, GalleryItem, ClientUser } from './types';
 import { MENU_ITEMS, REVIEWS, LOGO_URL, POINTS_PER_1000, INITIAL_BLOG_POSTS, INITIAL_GALLERY_ITEMS, INITIAL_CLIENTS } from './constants';
 import { playSound } from './utils/audio';
 import { db, isSupabaseConfigured } from './lib/supabase';
-import { ShoppingBag, User as UserIcon, Heart, Utensils, Star, Sparkles, Navigation, Info, BookOpen, Camera, Play, Volume2, VolumeX, Bell, Flame } from 'lucide-react';
+import { ShoppingBag, User as UserIcon, Heart, Utensils, Star, Sparkles, Navigation, Info, BookOpen, Camera, Play, Volume2, VolumeX, Bell, Flame, WifiOff, Download, Share2 } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.HOME);
@@ -48,13 +50,60 @@ const App: React.FC = () => {
   const [activeMenuSection, setActiveMenuSection] = useState('CARTE');
   const [isVideoDemoOpen, setIsVideoDemoOpen] = useState(false);
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
+  const [isLoadingMenu, setIsLoadingMenu] = useState(true);
 
   const [greetingIndex, setGreetingIndex] = useState(0);
   const greetings = ["SALAM 👋🏾", "BONJOUR 👋🏾", "BARKA 👋🏾", "FOFO 👋🏾", "VOTRE FESTIN ? 🥘"];
 
+  // Mode Hors-Ligne & Install PWA Prompt
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [shareModalItem, setShareModalItem] = useState<MenuItem | null>(null);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      showToast("Réseau rétabli ! Mode en ligne actif.", 'success');
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      showToast("Mode Hors-Ligne actif. Vos données restent disponibles.", 'info');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        showToast("Installation de Khady's Food réussie !", 'success');
+      }
+      setDeferredPrompt(null);
+      setIsInstallModalOpen(false);
+    }
+  };
+
   // Chargement initial depuis Supabase
   useEffect(() => {
     const loadCloudData = async () => {
+      setIsLoadingMenu(true);
       if (isSupabaseConfigured) {
         try {
           const cloudMenu = await db.fetchMenu();
@@ -62,10 +111,11 @@ const App: React.FC = () => {
           
           const cloudOrders = await db.fetchOrders();
           if (cloudOrders) setOrders(cloudOrders);
-        } catch (e) {
-          console.error("Erreur sync Cloud:", e);
+        } catch {
+          // Utilisation fluide des données locales si le réseau ou la BDD Supabase ne répond pas
         }
       }
+      setIsLoadingMenu(false);
     };
     loadCloudData();
   }, []);
@@ -138,6 +188,16 @@ const App: React.FC = () => {
               </div>
             </div>
 
+            {/* Offline Alert Banner */}
+            {!isOnline && (
+              <div className="mx-4 sm:mx-6 bg-amber-500 text-white p-3.5 rounded-2xl shadow-lg flex items-center justify-between text-xs font-bold animate-pulse">
+                <div className="flex items-center gap-2">
+                  <WifiOff size={18} />
+                  <span>Mode Hors-Ligne activé — Vos commandes et menus sont accessibles localement.</span>
+                </div>
+              </div>
+            )}
+
             {/* Header Elite */}
             <header className="sticky top-0 z-50 px-4 sm:px-6 py-4 glass-card flex justify-between items-center rounded-b-[2.5rem] shadow-lg">
               <div className="flex items-center gap-3">
@@ -152,8 +212,24 @@ const App: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-2">
-                <div className="bg-brand-brown/5 px-3 py-1.5 rounded-xl flex items-center justify-center min-w-[95px]">
-                  <span className="text-[8px] font-black text-brand-brown uppercase italic tracking-wider animate-fade-in" key={greetingIndex}>
+                <button
+                  onClick={() => { playSound('pop'); setIsInstallModalOpen(true); }}
+                  className="w-9 h-9 bg-brand-brown text-brand-gold hover:bg-brand-orange hover:text-white rounded-xl flex items-center justify-center shadow-md active:scale-90 transition-all"
+                  title="Installer l'application"
+                >
+                  <Download size={16} />
+                </button>
+
+                <button
+                  onClick={() => { playSound('pop'); setShareModalItem(null); setIsShareModalOpen(true); }}
+                  className="w-9 h-9 bg-brand-orange text-white rounded-xl flex items-center justify-center shadow-md active:scale-90 transition-all"
+                  title="Partager l'application"
+                >
+                  <Share2 size={16} />
+                </button>
+
+                <div className="flex bg-brand-brown/5 px-2.5 py-1.5 rounded-xl items-center justify-center min-w-[90px] border border-brand-brown/10">
+                  <span className="text-[9px] font-black text-brand-brown uppercase italic tracking-wider animate-fade-in" key={greetingIndex}>
                     {greetings[greetingIndex]}
                   </span>
                 </div>
@@ -281,7 +357,18 @@ const App: React.FC = () => {
           </div>
         );
       case Page.MENU:
-        return <div className="max-w-4xl mx-auto"><MenuView items={items} onSelectItem={(item) => { setSelectedItem(item); setIsItemModalOpen(true); }} activeSection={activeMenuSection} onSectionChange={setActiveMenuSection} /></div>;
+        return (
+          <div className="max-w-4xl mx-auto">
+            <MenuView 
+              items={items} 
+              isLoading={isLoadingMenu} 
+              onSelectItem={(item) => { setSelectedItem(item); setIsItemModalOpen(true); }} 
+              activeSection={activeMenuSection} 
+              onSectionChange={setActiveMenuSection} 
+              onOpenShareApp={() => { setShareModalItem(null); setIsShareModalOpen(true); }}
+            />
+          </div>
+        );
       case Page.BLOG:
         return <div className="max-w-4xl mx-auto px-4"><BlogView posts={posts} onSelectDish={(dishId) => { const item = items.find(i => i.id === dishId); if (item) { setSelectedItem(item); setIsItemModalOpen(true); } else { setCurrentPage(Page.MENU); } }} onGoToMenu={() => setCurrentPage(Page.MENU)} /></div>;
       case Page.GALLERY:
@@ -321,6 +408,8 @@ const App: React.FC = () => {
             onUpdateOrder={(updatedOrder) => {
               setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
             }}
+            onOpenInstallModal={() => setIsInstallModalOpen(true)}
+            onOpenShareModal={() => { setShareModalItem(null); setIsShareModalOpen(true); }}
           />
         </div>;
       case Page.ADMIN:
@@ -368,6 +457,10 @@ const App: React.FC = () => {
         isOpen={isItemModalOpen} 
         onClose={() => setIsItemModalOpen(false)} 
         onAddToCart={handleAddToCart} 
+        onShareItem={(item) => {
+          setShareModalItem(item);
+          setIsShareModalOpen(true);
+        }}
       />
 
       <UpsellModal 
@@ -376,6 +469,20 @@ const App: React.FC = () => {
         suggestions={upsellSuggestions}
         onAdd={(item) => { handleAddToCart(item, 1, ''); setIsUpsellOpen(false); }}
         onProceed={() => { setIsUpsellOpen(false); setCurrentPage(Page.CART); }}
+      />
+
+      <InstallGuideModal 
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        deferredPrompt={deferredPrompt}
+        onInstallClick={handleInstallClick}
+      />
+
+      <ShareModal 
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        item={shareModalItem}
+        onShowToast={(msg) => showToast(msg, 'success')}
       />
 
       {lastOrder && (

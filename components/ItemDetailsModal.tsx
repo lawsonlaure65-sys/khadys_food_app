@@ -1,16 +1,18 @@
 
 import React, { useState } from 'react';
 import { MenuItem } from '../types';
-import { X, Plus, Minus, MessageSquare, Flame, Leaf, CheckCircle2, Clock, ShieldCheck, Users, Info, Box } from 'lucide-react';
+import { X, Plus, Minus, MessageSquare, Flame, Leaf, CheckCircle2, Clock, ShieldCheck, Users, Info, Box, Share2 } from 'lucide-react';
+import { playSound } from '../utils/audio';
 
 interface ItemDetailsModalProps {
   item: MenuItem | null;
   isOpen: boolean;
   onClose: () => void;
   onAddToCart: (item: MenuItem, quantity: number, instructions: string) => void;
+  onShareItem?: (item: MenuItem) => void;
 }
 
-const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ item, isOpen, onClose, onAddToCart }) => {
+const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ item, isOpen, onClose, onAddToCart, onShareItem }) => {
   const [quantity, setQuantity] = useState(1);
   const [instructions, setInstructions] = useState('');
 
@@ -43,7 +45,18 @@ const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ item, isOpen, onClo
                )}
             </div>
 
-            <button onClick={onClose} className="absolute top-8 right-8 bg-white/10 backdrop-blur-xl text-white p-3.5 rounded-3xl transition-all shadow-2xl border border-white/20"><X size={28} /></button>
+            <div className="absolute top-8 right-8 flex items-center gap-3">
+               {onShareItem && (
+                 <button 
+                   onClick={() => { playSound('pop'); onShareItem(item); }} 
+                   className="bg-brand-brown/80 backdrop-blur-xl text-brand-gold p-3.5 rounded-3xl transition-all shadow-2xl border border-brand-gold/30 hover:bg-brand-orange hover:text-white"
+                   title="Partager ce plat"
+                 >
+                   <Share2 size={24} />
+                 </button>
+               )}
+               <button onClick={onClose} className="bg-white/10 backdrop-blur-xl text-white p-3.5 rounded-3xl transition-all shadow-2xl border border-white/20"><X size={28} /></button>
+            </div>
             
             <div className="absolute bottom-10 left-10 right-10">
                <h2 className="text-4xl font-black text-white leading-none italic uppercase tracking-tighter mb-4 drop-shadow-2xl">{item.name}</h2>
