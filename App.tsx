@@ -24,6 +24,7 @@ import FAQSection from './components/FAQSection';
 import { Page, MenuItem, Order, Review, CartItem, UserProfile, BlogPost, GalleryItem, ClientUser } from './types';
 import { MENU_ITEMS, REVIEWS, LOGO_URL, POINTS_PER_1000, INITIAL_BLOG_POSTS, INITIAL_GALLERY_ITEMS, INITIAL_CLIENTS } from './constants';
 import { playSound } from './utils/audio';
+import { persistentStorage } from './utils/storage';
 import { db, isSupabaseConfigured } from './lib/supabase';
 import { ShoppingBag, User as UserIcon, Heart, Utensils, Star, Sparkles, Navigation, Info, BookOpen, Camera, Play, Volume2, VolumeX, Bell, Flame, WifiOff, Download, Share2 } from 'lucide-react';
 
@@ -115,37 +116,37 @@ const App: React.FC = () => {
     }
   });
 
-  // Sauvegarde automatique dans localStorage dès qu'une modification survient
+  // Sauvegarde automatique persistant (IndexedDB + LocalStorage)
   useEffect(() => {
-    try { localStorage.setItem('khadys_menu_items', JSON.stringify(items)); } catch {}
+    persistentStorage.setItem('khadys_menu_items', items);
   }, [items]);
 
   useEffect(() => {
-    try { localStorage.setItem('khadys_blog_posts', JSON.stringify(posts)); } catch {}
+    persistentStorage.setItem('khadys_blog_posts', posts);
   }, [posts]);
 
   useEffect(() => {
-    try { localStorage.setItem('khadys_gallery_items', JSON.stringify(galleryItems)); } catch {}
+    persistentStorage.setItem('khadys_gallery_items', galleryItems);
   }, [galleryItems]);
 
   useEffect(() => {
-    try { localStorage.setItem('khadys_clients', JSON.stringify(clients)); } catch {}
+    persistentStorage.setItem('khadys_clients', clients);
   }, [clients]);
 
   useEffect(() => {
-    try { localStorage.setItem('khadys_cart', JSON.stringify(cart)); } catch {}
+    persistentStorage.setItem('khadys_cart', cart);
   }, [cart]);
 
   useEffect(() => {
-    try { localStorage.setItem('khadys_orders', JSON.stringify(orders)); } catch {}
+    persistentStorage.setItem('khadys_orders', orders);
   }, [orders]);
 
   useEffect(() => {
-    try { localStorage.setItem('khadys_reviews', JSON.stringify(reviews)); } catch {}
+    persistentStorage.setItem('khadys_reviews', reviews);
   }, [reviews]);
 
   useEffect(() => {
-    try { localStorage.setItem('khadys_user_profile', JSON.stringify(userProfile)); } catch {}
+    persistentStorage.setItem('khadys_user_profile', userProfile);
   }, [userProfile]);
 
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
@@ -206,24 +207,39 @@ const App: React.FC = () => {
     }
   };
 
-  // Chargement initial depuis Supabase
+  // Chargement initial depuis le stockage persistant (IndexedDB) puis Supabase si configuré
   useEffect(() => {
-    const loadCloudData = async () => {
+    const loadInitialData = async () => {
       setIsLoadingMenu(true);
-      if (isSupabaseConfigured) {
-        try {
+      try {
+        const storedItems = await persistentStorage.getItem<MenuItem[]>('khadys_menu_items', MENU_ITEMS);
+        if (storedItems && storedItems.length > 0) {
+          setItems(storedItems);
+        }
+
+        const storedPosts = await persistentStorage.getItem<BlogPost[]>('khadys_blog_posts', INITIAL_BLOG_POSTS);
+        if (storedPosts && storedPosts.length > 0) setPosts(storedPosts);
+
+        const storedGallery = await persistentStorage.getItem<GalleryItem[]>('khadys_gallery_items', INITIAL_GALLERY_ITEMS);
+        if (storedGallery && storedGallery.length > 0) setGalleryItems(storedGallery);
+
+        const storedOrders = await persistentStorage.getItem<Order[]>('khadys_orders', []);
+        if (storedOrders && storedOrders.length > 0) setOrders(storedOrders);
+
+        if (isSupabaseConfigured) {
           const cloudMenu = await db.fetchMenu();
           if (cloudMenu && cloudMenu.length > 0) setItems(cloudMenu);
           
           const cloudOrders = await db.fetchOrders();
-          if (cloudOrders) setOrders(cloudOrders);
-        } catch {
-          // Utilisation fluide des données locales si le réseau ou la BDD Supabase ne répond pas
+          if (cloudOrders && cloudOrders.length > 0) setOrders(cloudOrders);
         }
+      } catch (err) {
+        console.warn("[App] Utilisation des données locales:", err);
+      } finally {
+        setIsLoadingMenu(false);
       }
-      setIsLoadingMenu(false);
     };
-    loadCloudData();
+    loadInitialData();
   }, []);
 
   useEffect(() => {

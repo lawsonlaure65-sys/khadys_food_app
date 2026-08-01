@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'khadys-food-v5-sync-persistent';
+const CACHE_NAME = 'khadys-food-v7-network-first';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -32,7 +32,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            console.log('[SW] Suppression de l\'ancien cache:', cacheName);
+            console.log('[SW] Nettoyage ancien cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -55,8 +55,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body,
-    icon: '/manifest.json', // ou logo
-    badge: '/manifest.json',
+    icon: '/logo.png',
+    badge: '/logo.png',
     vibrate: [200, 100, 200],
     data: {
       url: data.url || '/'
@@ -86,24 +86,42 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
+// Stratégie NETWORK-FIRST pour s'assurer de toujours charger la version la plus récente du code et du HTML
 self.addEventListener('fetch', (event) => {
-  // Stratégie : Stale-while-revalidate pour les polices et scripts, 
-  // Network-first pour les prix et menus.
+  if (event.request.method !== 'GET') return;
+
+  const url = new URL(event.request.url);
+
+  // Pour les requêtes HTML, scripts JS et API -> Network First avec secours sur Cache si hors-ligne
+  if (event.request.mode === 'navigate' || url.pathname.endsWith('.tsx') || url.pathname.endsWith('.ts') || url.pathname.endsWith('.js') || url.pathname.includes('/node_modules/')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(event.request).then((cachedResponse) => cachedResponse || caches.match('/index.html'));
+        })
+    );
+    return;
+  }
+
+  // Pour les images et polices de caractères -> Cache First avec secours sur Réseau
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && event.request.method === 'GET') {
+      if (cachedResponse) return cachedResponse;
+      return fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
         }
         return networkResponse;
-      }).catch(() => {
-        // Fallback si hors ligne
-        return cachedResponse;
       });
-      return cachedResponse || fetchPromise;
     })
   );
 });
+

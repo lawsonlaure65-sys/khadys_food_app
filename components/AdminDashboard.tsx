@@ -19,6 +19,7 @@ import { BlogMgmtView } from './BlogMgmtView';
 import { GalleryMgmtView } from './GalleryMgmtView';
 import { ClientsMgmtView } from './ClientsMgmtView';
 import { AIPromoGenerator } from './AIPromoGenerator';
+import { compressImage } from '../utils/image';
 
 interface AdminDashboardProps {
   items: MenuItem[];
@@ -62,30 +63,43 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const dishPhotoInputRef = useRef<HTMLInputElement>(null);
   const [adminAvatar, setAdminAvatar] = useState(() => localStorage.getItem('khadys_admin_avatar') || '');
 
-  const handleAdminPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAdminPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setAdminAvatar(base64String);
-        localStorage.setItem('khadys_admin_avatar', base64String);
+      try {
+        const compressed = await compressImage(file, 400, 400, 0.8);
+        setAdminAvatar(compressed);
+        localStorage.setItem('khadys_admin_avatar', compressed);
         playSound('success');
-      };
-      reader.readAsDataURL(file);
+      } catch {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64String = reader.result as string;
+          setAdminAvatar(base64String);
+          localStorage.setItem('khadys_admin_avatar', base64String);
+          playSound('success');
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
-  const handleDishPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDishPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && editingItem) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setEditingItem(prev => prev ? { ...prev, image: base64String } : null);
+      try {
+        const compressed = await compressImage(file, 600, 600, 0.75);
+        setEditingItem(prev => prev ? { ...prev, image: compressed } : null);
         playSound('pop');
-      };
-      reader.readAsDataURL(file);
+      } catch {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64String = reader.result as string;
+          setEditingItem(prev => prev ? { ...prev, image: base64String } : null);
+          playSound('pop');
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 

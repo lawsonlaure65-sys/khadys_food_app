@@ -4,6 +4,7 @@ import {
   Camera, Plus, Trash2, Edit3, Sparkles, Image as ImageIcon, Check, X
 } from 'lucide-react';
 import { playSound } from '../utils/audio';
+import { compressImage } from '../utils/image';
 
 interface GalleryMgmtViewProps {
   items: GalleryItem[];
@@ -15,15 +16,21 @@ export const GalleryMgmtView: React.FC<GalleryMgmtViewProps> = ({ items, setItem
   const [showAddModal, setShowAddModal] = useState(false);
   const galleryPhotoInputRef = useRef<HTMLInputElement>(null);
 
-  const handleGalleryPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleGalleryPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewItem(prev => ({ ...prev, image: reader.result as string }));
+      try {
+        const compressed = await compressImage(file, 700, 700, 0.75);
+        setNewItem(prev => ({ ...prev, image: compressed }));
         playSound('pop');
-      };
-      reader.readAsDataURL(file);
+      } catch {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setNewItem(prev => ({ ...prev, image: reader.result as string }));
+          playSound('pop');
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
   const [newItem, setNewItem] = useState<Partial<GalleryItem>>({

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { playSound } from '../utils/audio';
 import { GoogleGenAI } from '@google/genai';
+import { compressImage } from '../utils/image';
 
 interface BlogMgmtViewProps {
   posts: BlogPost[];
@@ -19,15 +20,21 @@ export const BlogMgmtView: React.FC<BlogMgmtViewProps> = ({ posts, setPosts, men
   const [aiTopic, setAiTopic] = useState('');
   const postPhotoInputRef = useRef<HTMLInputElement>(null);
 
-  const handlePostPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePostPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewPost(prev => ({ ...prev, image: reader.result as string }));
+      try {
+        const compressed = await compressImage(file, 700, 700, 0.75);
+        setNewPost(prev => ({ ...prev, image: compressed }));
         playSound('pop');
-      };
-      reader.readAsDataURL(file);
+      } catch {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setNewPost(prev => ({ ...prev, image: reader.result as string }));
+          playSound('pop');
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
