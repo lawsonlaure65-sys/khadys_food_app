@@ -1,7 +1,7 @@
 
 {
   "name": "KHADY'S FOOD & EVENT",
-  "short_name": "Khady's",
+  "short_name": "KHADY'S FOOD",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#3E2723",
@@ -14,13 +14,25 @@
       "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "https://i.ibb.co/h1rgJJMb/1766933626062.jpg",
