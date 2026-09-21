@@ -22,6 +22,16 @@
       "*": ["*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx"],
+  "include": [
+    "index.tsx",
+    "App.tsx",
+    "types.ts",
+    "constants.ts",
+    "supabase.ts",
+    "components/**/*",
+    "lib/**/*",
+    "services/**/*",
+    "utils/**/*"
+  ],
   "exclude": ["node_modules"]
 }

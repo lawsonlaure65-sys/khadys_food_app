@@ -12,6 +12,7 @@ import { PhoneInput } from './PhoneInput';
 import OrderTracking from './OrderTracking';
 import { ADMIN_PASSWORD, REWARDS } from '../constants';
 import { SOCIAL_LINKS } from './ShareModal';
+import { getTierProgress, LOYALTY_TIERS, pointsToFCA } from '../utils/loyalty';
 
 interface AccountViewProps {
   orders: Order[];
@@ -199,12 +200,12 @@ const AccountView: React.FC<AccountViewProps> = ({
     );
   }
 
-  const nextRank = userProfile.rank === 'Silver' ? 'Gold' : userProfile.rank === 'Gold' ? 'Platinum' : 'Elite Master';
-  const progressToNext = userProfile.rank === 'Silver' ? (userProfile.points / 2000) * 100 : userProfile.rank === 'Gold' ? (userProfile.points / 5000) * 100 : 100;
+  const currentTier = LOYALTY_TIERS[userProfile.rank] || LOYALTY_TIERS.Silver;
+  const tierProgress = getTierProgress(userProfile.points, userProfile.rank);
 
   return (
     <div className="animate-fade-in p-6 pb-40">
-      <header className="flex flex-col items-center mb-10 pt-10">
+      <header className="flex flex-col items-center mb-8 pt-10">
          <div 
            className="w-28 h-28 bg-white rounded-[3rem] shadow-2xl p-1 mb-4 border-4 border-brand-orange/10 relative cursor-pointer active:scale-95 transition-transform"
            onClick={handleSecretAdmin}
@@ -215,24 +216,80 @@ const AccountView: React.FC<AccountViewProps> = ({
             </div>
          </div>
          <h2 className="text-3xl font-black italic uppercase text-brand-brown mb-1 tracking-tighter">{userProfile.name}</h2>
-         <p className="text-[10px] font-black text-brand-orange uppercase tracking-[0.3em] italic">Membre Club {userProfile.rank} ✨</p>
+         <div className="flex items-center gap-2 mt-1">
+            <span className="text-[10px] font-black text-brand-orange uppercase tracking-[0.2em] italic px-3 py-1 rounded-full bg-brand-orange/10 border border-brand-orange/20">
+               {currentTier.badge}
+            </span>
+            <span className="text-[9px] font-black text-brand-gold bg-brand-brown px-2.5 py-0.5 rounded-full uppercase">
+               Multiplicateur {currentTier.multiplier}x
+            </span>
+         </div>
       </header>
 
-      <div className="grid grid-cols-2 gap-4 mb-10">
-         <div className="bg-[#1A0F0D] p-7 rounded-[3rem] text-brand-gold shadow-2xl border-4 border-white flex flex-col items-center text-center">
-            <span className="text-[8px] font-black uppercase tracking-widest text-white/40 mb-3">POINTS FIDÉLITÉ</span>
-            <span className="text-3xl font-black italic mb-3">{userProfile.points.toLocaleString()}</span>
-            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden mb-2">
-               <div className="bg-brand-gold h-full shadow-[0_0_15px_#FFD700] transition-all duration-1000" style={{ width: `${Math.min(100, progressToNext)}%` }}></div>
+      {/* DYNAMIC LOYALTY CARD & STATS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+         <div className="bg-[#1A0F0D] p-7 rounded-[3rem] text-brand-gold shadow-2xl border-4 border-white flex flex-col justify-between">
+            <div>
+               <div className="flex justify-between items-center mb-3">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-white/50">POINTS FIDÉLITÉ DYNAMIQUES</span>
+                  <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-md bg-white/10 text-brand-gold">
+                     {pointsToFCA(userProfile.points).toLocaleString()} F CFA
+                  </span>
+               </div>
+               <span className="text-3xl font-black italic tracking-tight">{userProfile.points.toLocaleString()} pts</span>
             </div>
-            <span className="text-[7px] font-bold text-white/40 uppercase tracking-widest uppercase">PROCHAIN RANG: {nextRank}</span>
+
+            <div className="mt-4 space-y-2">
+               <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden p-0.5">
+                  <div 
+                     className="bg-gradient-to-r from-amber-400 to-brand-gold h-full rounded-full shadow-[0_0_15px_#FFD700] transition-all duration-1000" 
+                     style={{ width: `${Math.min(100, Math.max(8, tierProgress.progressPercent))}%` }}
+                  />
+               </div>
+               <div className="flex justify-between text-[7px] font-bold text-white/50 uppercase tracking-wider">
+                  <span>{tierProgress.progressPercent}% vers {tierProgress.nextRankName}</span>
+                  <span>{tierProgress.pointsToNext > 0 ? `${tierProgress.pointsToNext} pts restants` : 'MAX'}</span>
+               </div>
+            </div>
          </div>
-         <div className="bg-white p-7 rounded-[3rem] shadow-xl border border-gray-100 flex flex-col items-center text-center">
-            <span className="text-[8px] font-black uppercase tracking-widest text-gray-300 mb-3">COMMANDES</span>
-            <span className="text-3xl font-black italic text-brand-brown mb-3">{orders.length}</span>
-            <div className="flex gap-1.5 mt-2">
-               {[...Array(5)].map((_, i) => <div key={i} className={`w-2 h-2 rounded-full ${i < orders.length ? 'bg-brand-orange' : 'bg-gray-100'}`}></div>)}
+
+         <div className="bg-white p-7 rounded-[3rem] shadow-xl border border-gray-100 flex flex-col justify-between">
+            <div>
+               <div className="flex justify-between items-center mb-3">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-gray-400">COMMANDES & RANG</span>
+                  <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-md bg-brand-orange/10 text-brand-orange">
+                     Rang {userProfile.rank}
+                  </span>
+               </div>
+               <span className="text-3xl font-black italic text-brand-brown">{orders.length}</span>
             </div>
+
+            <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-[8px] font-bold text-gray-400">
+               <span>Paliers : Silver ➔ Gold (2000) ➔ Platinum (5000)</span>
+            </div>
+         </div>
+      </div>
+
+      {/* TIERS EXPLANATION CARD */}
+      <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 p-6 rounded-[2.5rem] border border-brand-orange/20 mb-10 space-y-3">
+         <div className="flex items-center gap-2 text-brand-brown text-xs font-black uppercase italic">
+            <Sparkles size={16} className="text-brand-orange" /> Paliers du Programme Fidélité Dynamique
+         </div>
+         <div className="grid grid-cols-3 gap-2 text-center">
+            {Object.values(LOYALTY_TIERS).map(tier => (
+               <div 
+                  key={tier.name} 
+                  className={`p-3 rounded-2xl border transition-all ${
+                     userProfile.rank === tier.name 
+                        ? 'bg-white border-brand-orange shadow-md scale-102' 
+                        : 'bg-white/50 border-gray-200 opacity-75'
+                  }`}
+               >
+                  <p className="text-[9px] font-black uppercase text-brand-brown">{tier.badge}</p>
+                  <p className="text-[8px] font-black text-brand-orange mt-0.5">x{tier.multiplier} pts</p>
+                  <p className="text-[7px] text-gray-500 mt-1 font-medium">{tier.minPoints} pts min</p>
+               </div>
+            ))}
          </div>
       </div>
 

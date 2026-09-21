@@ -43,6 +43,7 @@ import {
 } from "./constants";
 import { playSound } from "./utils/audio";
 import { persistentStorage } from "./utils/storage";
+import { calculateDynamicPoints, getRankFromPoints } from "./utils/loyalty";
 import { db, isSupabaseConfigured } from "./lib/supabase";
 import {
   ShoppingBag,
@@ -431,16 +432,12 @@ const App: React.FC = () => {
     setNewOrderAlert(order);
     playSound("notification");
 
-    // Attribution des points : 100 points par 1000 F (basé sur le total de la commande)
-    const pointsEarned = Math.floor(order.total / 1000) * POINTS_PER_1000;
+    // Attribution dynamique des points selon le rang VIP (Silver x1, Gold x1.25, Platinum x1.5)
+    const pointsEarned = calculateDynamicPoints(order.total, userProfile.rank);
 
     setUserProfile((prev) => {
       const newPoints = prev.points + pointsEarned;
-      let newRank = prev.rank;
-      if (newPoints > 5000) newRank = "Platinum";
-      else if (newPoints > 2000) newRank = "Gold";
-      else newRank = "Silver";
-
+      const newRank = getRankFromPoints(newPoints);
       return { ...prev, points: newPoints, rank: newRank };
     });
 

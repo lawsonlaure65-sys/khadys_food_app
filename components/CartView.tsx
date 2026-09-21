@@ -1,15 +1,18 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { CartItem, Order, PaymentMethod, UserProfile } from '../types';
 import { 
   Trash2, ShoppingBag, ArrowRight, MapPin, Smartphone, ChevronLeft, 
   ShieldCheck, Wallet, CreditCard, Banknote, Sparkles, Upload, Image as ImageIcon, 
-  CheckCircle2, AlertCircle, FileText, Check, MessageCircle, Send, Bike, Phone
+  CheckCircle2, AlertCircle, FileText, Check, MessageCircle, Send, Bike, Phone,
+  Camera, Award, TrendingUp, RefreshCw
 } from 'lucide-react';
 import { PhoneInput } from './PhoneInput';
+import { MynitaModal } from './MynitaModal';
 import { playSound } from '../utils/audio';
 import { BILLO_INFO, DISTRICTS, DISCOUNT_PER_100_POINTS, PAYMENT_ACCOUNTS } from '../constants';
+import { calculateDynamicPoints, pointsToFCA, getTierProgress, LOYALTY_TIERS } from '../utils/loyalty';
 
 interface CartViewProps {
   cart: CartItem[];
@@ -26,6 +29,8 @@ const CartView: React.FC<CartViewProps> = ({ cart, setCart, onOrderPlace, onClos
   const [paymentProofUrl, setPaymentProofUrl] = useState('');
   const [isUploadingProof, setIsUploadingProof] = useState(false);
   const [usePoints, setUsePoints] = useState(false);
+  const [selectedPointsRedeem, setSelectedPointsRedeem] = useState<number>(0);
+  const [isMynitaModalOpen, setIsMynitaModalOpen] = useState(false);
   const [payment, setPayment] = useState<PaymentMethod>('CASH');
   const [submittedOrder, setSubmittedOrder] = useState<Order | null>(null);
   const [customer, setCustomer] = useState({
@@ -34,6 +39,8 @@ const CartView: React.FC<CartViewProps> = ({ cart, setCart, onOrderPlace, onClos
     address: '',
     district: DISTRICTS[0]?.name || 'Plateau'
   });
+
+  const directCameraInputRef = useRef<HTMLInputElement>(null);
 
   const handleProofFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -49,11 +56,46 @@ const CartView: React.FC<CartViewProps> = ({ cart, setCart, onOrderPlace, onClos
     }
   };
 
+  const handleDirectCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setIsUploadingProof(true);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPaymentProofUrl(reader.result as string);
+        setIsUploadingProof(false);
+        playSound('success');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleProofCapturedFromModal = (dataUrl: string, tid?: string) => {
+    setPaymentProofUrl(dataUrl);
+    if (tid && tid.trim()) {
+      setTransactionId(tid.trim());
+    }
+    playSound('success');
+  };
+
   const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   
-  // Points max utilisables : soit tous les points, soit le montant du panier / conversion
-  const maxRedeemablePoints = Math.min(userProfile.points, Math.floor(subtotal / DISCOUNT_PER_100_POINTS) * 100);
-  const discount = usePoints ? (maxRedeemablePoints / 100) * DISCOUNT_PER_100_POINTS : 0;
+  // Points max utilisables : soit tous les points du client, soit la valeur du panier
+  const maxRedeemablePoints = Math.min(
+    Math.floor(userProfile.points / 100) * 100, 
+    Math.floor(subtotal / 100) * 100
+  );
+
+  // Valeur dynamique de réduction
+  const activeDiscountPoints = usePoints 
+    ? (selectedPointsRedeem > 0 ? Math.min(selectedPointsRedeem, maxRedeemablePoints) : maxRedeemablePoints)
+    : 0;
+  const discount = activeDiscountPoints; // 100 points = 100 F CFA
+
+  // Fidélité dynamique : points gagnés sur le montant net selon le rang VIP
+  const dynamicPointsToEarn = calculateDynamicPoints(Math.max(0, subtotal - discount), userProfile.rank);
+  const currentTier = LOYALTY_TIERS[userProfile.rank] || LOYALTY_TIERS.Silver;
+  const tierProgress = getTierProgress(userProfile.points, userProfile.rank);
 
   const getDeliveryFee = () => {
     const district = DISTRICTS.find(d => d.name === customer.district);
@@ -113,8 +155,8 @@ const CartView: React.FC<CartViewProps> = ({ cart, setCart, onOrderPlace, onClos
       timestamp: new Date().toISOString()
     };
 
-    if (usePoints && maxRedeemablePoints > 0) {
-      onConsumePoints(maxRedeemablePoints);
+    if (usePoints && activeDiscountPoints > 0) {
+      onConsumePoints(activeDiscountPoints);
     }
 
     // Festive confetti animation launch
@@ -250,205 +292,393 @@ const CartView: React.FC<CartViewProps> = ({ cart, setCart, onOrderPlace, onClos
              </div>
           </div>
 
-          <div className="bg-white p-10 rounded-[3.5rem] shadow-xl border border-gray-100">
-             <h3 className="text-brand-brown font-black uppercase italic text-xs tracking-widest mb-8 flex items-center gap-3"><Sparkles size={16} className="text-brand-orange"/> Programme Fidélité</h3>
-             <div className="bg-brand-cream/30 p-6 rounded-3xl border-2 border-dashed border-brand-orange/20">
-                <div className="flex items-center justify-between mb-4">
+          {/* COMPOSANT FIDÉLITÉ DYNAMIQUE */}
+          <div className="bg-white p-8 sm:p-10 rounded-[3.5rem] shadow-xl border border-gray-100 space-y-6">
+             <div className="flex items-center justify-between">
+                <h3 className="text-brand-brown font-black uppercase italic text-xs tracking-widest flex items-center gap-2.5">
+                   <Sparkles size={18} className="text-brand-orange animate-spin-slow" />
+                   Programme Fidélité Dynamique
+                </h3>
+                <span className="text-[9px] font-black uppercase px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-brand-orange border border-brand-orange/30 flex items-center gap-1">
+                   <Award size={12} /> {currentTier.badge}
+                </span>
+             </div>
+
+             {/* Live Points Earning Preview */}
+             <div className="bg-gradient-to-br from-amber-50 via-orange-50/60 to-amber-100/40 p-5 rounded-3xl border-2 border-brand-orange/20 space-y-3">
+                <div className="flex items-center justify-between">
+                   <div>
+                      <span className="text-[9px] font-black uppercase tracking-widest text-brand-brown/60 block">Gain sur cette commande</span>
+                      <div className="flex items-baseline gap-2 mt-0.5">
+                         <span className="text-2xl font-black italic text-brand-orange">
+                            +{dynamicPointsToEarn}
+                         </span>
+                         <span className="text-xs font-black uppercase text-brand-brown">points à remporter</span>
+                      </div>
+                   </div>
+                   {currentTier.multiplier > 1 && (
+                      <span className="text-[8px] font-black uppercase bg-brand-brown text-brand-gold px-2.5 py-1 rounded-xl shadow-sm">
+                         Bonus VIP +{Math.round((currentTier.multiplier - 1) * 100)}%
+                      </span>
+                   )}
+                </div>
+
+                {/* Dynamic Tier Progress Bar */}
+                <div className="space-y-1.5 pt-1">
+                   <div className="flex justify-between text-[8px] font-black uppercase text-brand-brown/70">
+                      <span>Progression vers {tierProgress.nextRankName}</span>
+                      <span>{tierProgress.progressPercent}%</span>
+                   </div>
+                   <div className="w-full h-2.5 bg-black/10 rounded-full overflow-hidden p-0.5">
+                      <div 
+                         className="h-full bg-gradient-to-r from-amber-500 to-brand-orange rounded-full transition-all duration-700 shadow-sm"
+                         style={{ width: `${Math.min(100, Math.max(8, tierProgress.progressPercent))}%` }}
+                      />
+                   </div>
+                   <p className="text-[8px] text-gray-500 font-medium italic">
+                      {tierProgress.pointsToNext > 0 ? (
+                         <>Plus que <strong className="text-brand-orange">{tierProgress.pointsToNext} pts</strong> pour débloquer le rang {tierProgress.nextRankName} !</>
+                      ) : (
+                         <span className="text-purple-700 font-bold">✨ Palier VIP Suprême Débloqué !</span>
+                      )}
+                   </p>
+                </div>
+             </div>
+
+             {/* Interactive Points Redemption Box */}
+             <div className="bg-brand-cream/40 p-6 rounded-3xl border-2 border-dashed border-brand-orange/30 space-y-4">
+                <div className="flex items-center justify-between">
                    <div className="flex flex-col">
-                      <span className="text-[10px] font-black text-brand-brown uppercase italic">Vos Points : {userProfile.points}</span>
-                      <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Equivaut à {Math.floor(userProfile.points / 100) * DISCOUNT_PER_100_POINTS} F</span>
+                      <span className="text-[11px] font-black text-brand-brown uppercase italic">Solde Actuel : {userProfile.points} pts</span>
+                      <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mt-0.5">
+                         Valeur convertible : {pointsToFCA(userProfile.points).toLocaleString()} F CFA
+                      </span>
                    </div>
                    <button 
-                    type="button"
-                    disabled={userProfile.points < 100}
-                    onClick={() => { playSound('pop'); setUsePoints(!usePoints); }}
-                    className={`px-6 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${usePoints ? 'bg-brand-orange text-white shadow-lg' : 'bg-white text-brand-brown border border-brand-brown/10'}`}
+                      type="button"
+                      disabled={userProfile.points < 100}
+                      onClick={() => { 
+                         playSound('pop'); 
+                         setUsePoints(!usePoints); 
+                         if (!usePoints && selectedPointsRedeem === 0) {
+                            setSelectedPointsRedeem(maxRedeemablePoints);
+                         }
+                      }}
+                      className={`px-5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                         usePoints 
+                            ? 'bg-brand-orange text-white shadow-lg scale-102' 
+                            : userProfile.points < 100 
+                               ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                               : 'bg-white text-brand-brown border border-brand-brown/15 hover:bg-gray-50'
+                      }`}
                    >
-                      {usePoints ? 'ANNULER' : 'APPLIQUER'}
+                      {usePoints ? 'DÉSACTIVER' : 'UTILISER'}
                    </button>
                 </div>
-                {usePoints && (
-                  <div className="animate-fade-in flex items-center gap-2 text-brand-orange text-[9px] font-black uppercase italic">
-                    <Sparkles size={14} /> Réduction de {discount} F appliquée !
-                  </div>
+
+                {/* Dynamic Point Chooser Chips when active */}
+                {usePoints && maxRedeemablePoints > 0 && (
+                   <div className="space-y-3 pt-2 border-t border-brand-orange/20 animate-fade-in">
+                      <span className="text-[8px] font-black uppercase text-brand-brown tracking-wider block">
+                         Choisissez le montant de réduction à déduire :
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                         {[100, 200, 500, maxRedeemablePoints]
+                            .filter((val, idx, self) => val <= maxRedeemablePoints && self.indexOf(val) === idx)
+                            .map((pts) => (
+                               <button
+                                  key={pts}
+                                  type="button"
+                                  onClick={() => { playSound('pop'); setSelectedPointsRedeem(pts); }}
+                                  className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${
+                                     (selectedPointsRedeem === pts || (selectedPointsRedeem === 0 && pts === maxRedeemablePoints))
+                                        ? 'bg-brand-brown text-brand-gold border-brand-brown shadow-sm'
+                                        : 'bg-white text-gray-600 border-gray-200 hover:border-brand-orange/40'
+                                  }`}
+                               >
+                                  -{pts} F ({pts} pts)
+                               </button>
+                            ))}
+                      </div>
+
+                      <div className="flex items-center gap-2 text-brand-orange text-[10px] font-black uppercase italic bg-white/80 p-2.5 rounded-xl border border-brand-orange/20 shadow-sm">
+                         <Sparkles size={14} className="text-brand-orange" />
+                         Réduction dynamique de {discount.toLocaleString()} F CFA déduite de votre total !
+                      </div>
+                   </div>
                 )}
              </div>
           </div>
 
+          {/* Hidden Direct Camera Input (capture="environment" targets phone camera directly) */}
+          <input 
+             type="file" 
+             accept="image/*" 
+             capture="environment" 
+             ref={directCameraInputRef} 
+             onChange={handleDirectCameraCapture} 
+             className="hidden" 
+             id="cart-direct-camera-input"
+          />
+
+          {/* Modal Mynita Step-by-Step with Camera & Scanner */}
+          <MynitaModal
+             isOpen={isMynitaModalOpen}
+             onClose={() => setIsMynitaModalOpen(false)}
+             totalAmount={total}
+             onProofCaptured={handleProofCapturedFromModal}
+             existingProofUrl={paymentProofUrl}
+             existingTransactionId={transactionId}
+          />
+
           <div className="bg-white p-8 sm:p-10 rounded-[3.5rem] shadow-xl border border-gray-100 space-y-6">
              <div className="flex items-center justify-between">
                 <h3 className="text-brand-brown font-black uppercase italic text-xs tracking-widest flex items-center gap-3">
-                  <Smartphone size={18} className="text-brand-orange"/> Option de Règlement
+                   <Smartphone size={18} className="text-brand-orange"/> Option de Règlement
                 </h3>
                 <span className="text-[9px] font-black uppercase px-3 py-1 rounded-full bg-brand-gold/20 text-brand-brown border border-brand-gold/30">
-                  Obligatoire
+                   Obligatoire
                 </span>
              </div>
 
              {/* Selector Tabs: Cash vs Mobile Money */}
              <div className="grid grid-cols-2 gap-3 p-1.5 bg-gray-100 rounded-3xl">
                 <button
-                  type="button"
-                  onClick={() => { playSound('pop'); setPaymentType('CASH'); setPayment('CASH'); }}
-                  className={`py-4 rounded-2xl text-[10px] font-black uppercase italic tracking-wider transition-all flex items-center justify-center gap-2 ${
-                    paymentType === 'CASH'
-                      ? 'bg-brand-brown text-white shadow-lg scale-102'
-                      : 'text-gray-400 hover:text-brand-brown'
-                  }`}
+                   type="button"
+                   onClick={() => { playSound('pop'); setPaymentType('CASH'); setPayment('CASH'); }}
+                   className={`py-4 rounded-2xl text-[10px] font-black uppercase italic tracking-wider transition-all flex items-center justify-center gap-2 ${
+                      paymentType === 'CASH'
+                         ? 'bg-brand-brown text-white shadow-lg scale-102'
+                         : 'text-gray-400 hover:text-brand-brown'
+                   }`}
                 >
-                  <Banknote size={16} /> En Espèces
+                   <Banknote size={16} /> En Espèces
                 </button>
 
                 <button
-                  type="button"
-                  onClick={() => { playSound('pop'); setPaymentType('MOBILE_MONEY'); setPayment('MYNITA'); }}
-                  className={`py-4 rounded-2xl text-[10px] font-black uppercase italic tracking-wider transition-all flex items-center justify-center gap-2 ${
-                    paymentType === 'MOBILE_MONEY'
-                      ? 'bg-brand-orange text-white shadow-lg scale-102'
-                      : 'text-gray-400 hover:text-brand-brown'
-                  }`}
+                   type="button"
+                   onClick={() => { playSound('pop'); setPaymentType('MOBILE_MONEY'); setPayment('MYNITA'); }}
+                   className={`py-4 rounded-2xl text-[10px] font-black uppercase italic tracking-wider transition-all flex items-center justify-center gap-2 ${
+                      paymentType === 'MOBILE_MONEY'
+                         ? 'bg-brand-orange text-white shadow-lg scale-102'
+                         : 'text-gray-400 hover:text-brand-brown'
+                   }`}
                 >
-                  <Smartphone size={16} /> Mobile Money
+                   <Smartphone size={16} /> Mobile Money
                 </button>
              </div>
 
              {/* CASH FLOW */}
              {paymentType === 'CASH' && (
                 <div className="p-6 bg-brand-cream/40 rounded-3xl border border-brand-brown/10 space-y-3 animate-fade-in">
-                  <div className="flex items-center gap-3 text-brand-brown">
-                    <CheckCircle2 size={20} className="text-green-600 shrink-0" />
-                    <div>
-                      <h4 className="text-xs font-black uppercase italic">Paiement Main à Main à la Livraison</h4>
-                      <p className="text-[10px] text-gray-500 font-medium mt-0.5">
-                        Vous règlerez la somme exacte de <strong className="text-brand-brown">{total} F</strong> directement au livreur Billo Express lors de la remise de votre commande.
-                      </p>
-                    </div>
-                  </div>
+                   <div className="flex items-center gap-3 text-brand-brown">
+                      <CheckCircle2 size={20} className="text-green-600 shrink-0" />
+                      <div>
+                         <h4 className="text-xs font-black uppercase italic">Paiement Main à Main à la Livraison</h4>
+                         <p className="text-[10px] text-gray-500 font-medium mt-0.5">
+                            Vous règlerez la somme exacte de <strong className="text-brand-brown">{total.toLocaleString()} F</strong> directement au livreur Billo Express lors de la remise de votre commande.
+                         </p>
+                      </div>
+                   </div>
                 </div>
              )}
 
              {/* MOBILE MONEY FLOW */}
              {paymentType === 'MOBILE_MONEY' && (
                 <div className="space-y-6 animate-fade-in">
-                  {/* Choice of Mobile Provider with MyNita Highlighted */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[9px] font-black uppercase tracking-widest text-brand-brown">Sélectionnez votre opérateur Mobile Money</label>
-                      <span className="text-[8px] font-black uppercase text-brand-orange bg-brand-orange/10 px-2 py-0.5 rounded-full">Recommandé : MyNita</span>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {[
-                        { id: 'MYNITA', name: '⭐ MyNita / Nita', num: PAYMENT_ACCOUNTS.mynitaAmana.number, badge: 'Direct App' },
-                        { id: 'AIRTEL_MONEY', name: 'Airtel Money', num: PAYMENT_ACCOUNTS.airtelMoney.number, badge: 'Transfert' },
-                        { id: 'MOOV_MONEY', name: 'Moov / Flooz', num: PAYMENT_ACCOUNTS.moovFlooz.number, badge: 'Transfert' },
-                        { id: 'ORANGE_MONEY', name: 'Orange Money', num: PAYMENT_ACCOUNTS.orangeMoney.number, badge: 'Transfert' },
-                        { id: 'ALLIZA', name: 'All-Iza', num: PAYMENT_ACCOUNTS.allIza.number, badge: 'Transfert' },
-                      ].map((prov) => (
-                        <button
-                          key={prov.id}
-                          type="button"
-                          onClick={() => { playSound('pop'); setPayment(prov.id as any); }}
-                          className={`p-3.5 rounded-2xl text-[9px] font-black uppercase border-2 text-left transition-all relative overflow-hidden ${
-                            payment === prov.id
-                              ? 'border-brand-orange bg-gradient-to-br from-amber-50 to-orange-50 text-brand-orange shadow-md scale-102'
-                              : 'border-gray-100 bg-gray-50 text-gray-500 hover:bg-gray-100'
-                          }`}
-                        >
-                          <div className="flex justify-between items-center mb-1">
-                            <p className="font-black italic">{prov.name}</p>
-                            <span className="text-[7px] font-bold px-1.5 py-0.5 rounded bg-black/5 text-gray-600">{prov.badge}</span>
-                          </div>
-                          <p className="text-[8px] font-mono opacity-90">{prov.num}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Account Instructions Box */}
-                  <div className="p-5 bg-gradient-to-br from-[#2C1810] via-[#3A1F15] to-[#1C0D08] text-white rounded-3xl space-y-3 border-2 border-brand-gold/40 shadow-xl">
-                    <div className="flex items-center gap-2 text-brand-gold text-[10px] sm:text-xs font-black uppercase italic">
-                      <AlertCircle size={18} className="text-brand-gold animate-pulse shrink-0" /> CONDITION STRICTE DE VALIDATION & CONFIRMATION
-                    </div>
-                    <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-2xl space-y-1.5 text-xs text-amber-100 font-medium">
-                      <p className="font-black text-brand-gold uppercase text-[10px] tracking-wider">
-                        📲 Étape 1 : Effectuez votre Dépôt MyNita / Mobile Money
-                      </p>
-                      <p className="leading-relaxed">
-                        Faites le dépôt de <strong className="text-brand-gold text-sm font-black">{total} F CFA</strong> au numéro <strong className="text-white font-mono bg-black/40 px-2 py-0.5 rounded border border-white/20">+227 90 40 51 18 (MyNita)</strong> ou selon l'opérateur choisi.
-                      </p>
-                    </div>
-
-                    <div className="bg-white/5 p-3.5 rounded-2xl space-y-1.5 text-xs text-white/90 font-medium border border-white/10">
-                      <p className="font-black text-emerald-400 uppercase text-[10px] tracking-wider flex items-center gap-1">
-                        <CheckCircle2 size={12} /> Étape 2 : Joignez l'ID + La Capture d'Écran
-                      </p>
-                      <p className="text-[11px] leading-relaxed italic text-gray-200">
-                        La commande ne sera <strong>validée et confirmée</strong> en cuisine qu'après vérification du numéro de transaction ET de la capture d'écran/photo du reçu de dépôt !
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Inputs for Transaction ID & Proof Upload */}
-                  <div className="space-y-4 pt-1">
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black uppercase text-brand-brown ml-1 flex items-center gap-1">
-                        <FileText size={12} className="text-brand-orange" /> 1. Numéro / ID de Transaction du Dépôt (OBLIGATOIRE) *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Ex: NITA-882190, TRX-09281 ou Référence SMS"
-                        value={transactionId}
-                        onChange={(e) => setTransactionId(e.target.value)}
-                        className="w-full p-4 bg-gray-50 rounded-2xl text-xs font-mono font-bold text-brand-brown border-2 border-brand-orange/30 outline-none focus:border-brand-orange focus:bg-white shadow-inner"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black uppercase text-brand-brown ml-1 flex items-center gap-1">
-                        <ImageIcon size={12} className="text-brand-orange" /> 2. Capture d'écran / Photo du Reçu MyNita (OBLIGATOIRE) *
-                      </label>
-
-                      {paymentProofUrl ? (
-                        <div className="relative rounded-3xl overflow-hidden border-2 border-emerald-500 p-3 bg-emerald-50/90 flex items-center justify-between shadow-md">
-                          <div className="flex items-center gap-3">
-                            <img src={paymentProofUrl} alt="Reçu" className="w-16 h-16 object-cover rounded-2xl border-2 border-emerald-400 shadow" />
-                            <div>
-                              <span className="text-[10px] font-black uppercase text-emerald-800 flex items-center gap-1 italic">
-                                <CheckCircle2 size={14} className="text-emerald-600" /> Reçu joint avec succès
-                              </span>
-                              <p className="text-[8px] text-emerald-700 font-bold mt-0.5">Prêt pour validation par l'administrateur</p>
+                   
+                   {/* BANNER PROÉMINENT : MODAL INSTRUCTIONS & SCANNER MYNITA */}
+                   <div className="p-5 bg-gradient-to-r from-[#24130E] via-[#351A11] to-[#200E08] text-white rounded-3xl border-2 border-brand-gold/40 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-3.5">
+                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-orange to-amber-500 flex items-center justify-center text-white font-black text-xl shadow-lg shrink-0">
+                            📲
+                         </div>
+                         <div>
+                            <div className="flex items-center gap-1.5">
+                               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                               <span className="text-[8px] font-black uppercase tracking-widest text-emerald-400">Guide & Scanner Reçu</span>
                             </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setPaymentProofUrl('')}
-                            className="text-xs font-black uppercase text-red-600 px-3.5 py-1.5 bg-white rounded-xl shadow-sm border border-red-200 hover:bg-red-50"
-                          >
-                            Remplacer
-                          </button>
-                        </div>
-                      ) : (
-                        <label className="w-full border-2 border-dashed border-brand-orange bg-gradient-to-b from-brand-orange/5 to-amber-500/10 hover:from-brand-orange/10 hover:to-amber-500/20 transition-all rounded-3xl p-6 flex flex-col items-center justify-center cursor-pointer gap-2 text-center shadow-sm">
-                          <div className="w-12 h-12 rounded-2xl bg-brand-orange/10 text-brand-orange flex items-center justify-center">
-                            <Upload size={24} />
-                          </div>
-                          <span className="text-xs font-black uppercase italic text-brand-brown">
-                            {isUploadingProof ? 'Chargement de l\'image...' : 'Importer la Capture d\'Écran / Reçu de Dépôt MyNita'}
-                          </span>
-                          <span className="text-[9px] text-gray-500 font-bold bg-white/80 px-3 py-1 rounded-full border border-gray-200">
-                            Fichier image JPG, PNG ou Capture d'écran WhatsApp/SMS (Requis)
-                          </span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleProofFileUpload}
-                            className="hidden"
-                          />
-                        </label>
-                      )}
-                    </div>
-                  </div>
+                            <h4 className="text-xs sm:text-sm font-black italic uppercase text-brand-gold tracking-tight">
+                               Instructions Pas-à-Pas Dépôt MyNita
+                            </h4>
+                            <p className="text-[10px] text-gray-300 font-medium">
+                               Ouvrez les étapes détaillées et scannez directement votre reçu avec l'appareil photo.
+                            </p>
+                         </div>
+                      </div>
+                      <button
+                         type="button"
+                         onClick={() => { playSound('pop'); setIsMynitaModalOpen(true); }}
+                         className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-gradient-to-r from-brand-gold to-amber-400 hover:from-amber-400 hover:to-brand-gold text-brand-brown text-[10px] font-black uppercase italic tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 shrink-0"
+                      >
+                         <Camera size={16} /> Guide & Scanner Reçu
+                      </button>
+                   </div>
+
+                   {/* Choice of Mobile Provider with MyNita Highlighted */}
+                   <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                         <label className="text-[9px] font-black uppercase tracking-widest text-brand-brown">Sélectionnez votre opérateur Mobile Money</label>
+                         <span className="text-[8px] font-black uppercase text-brand-orange bg-brand-orange/10 px-2 py-0.5 rounded-full">Recommandé : MyNita</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                         {[
+                            { id: 'MYNITA', name: '⭐ MyNita / Nita', num: PAYMENT_ACCOUNTS.mynitaAmana.number, badge: 'Direct App' },
+                            { id: 'AIRTEL_MONEY', name: 'Airtel Money', num: PAYMENT_ACCOUNTS.airtelMoney.number, badge: 'Transfert' },
+                            { id: 'MOOV_MONEY', name: 'Moov / Flooz', num: PAYMENT_ACCOUNTS.moovFlooz.number, badge: 'Transfert' },
+                            { id: 'ORANGE_MONEY', name: 'Orange Money', num: PAYMENT_ACCOUNTS.orangeMoney.number, badge: 'Transfert' },
+                            { id: 'ALLIZA', name: 'All-Iza', num: PAYMENT_ACCOUNTS.allIza.number, badge: 'Transfert' },
+                         ].map((prov) => (
+                            <button
+                               key={prov.id}
+                               type="button"
+                               onClick={() => { 
+                                  playSound('pop'); 
+                                  setPayment(prov.id as any);
+                                  if (prov.id === 'MYNITA') {
+                                     setIsMynitaModalOpen(true);
+                                  }
+                               }}
+                               className={`p-3.5 rounded-2xl text-[9px] font-black uppercase border-2 text-left transition-all relative overflow-hidden ${
+                                  payment === prov.id
+                                     ? 'border-brand-orange bg-gradient-to-br from-amber-50 to-orange-50 text-brand-orange shadow-md scale-102'
+                                     : 'border-gray-100 bg-gray-50 text-gray-500 hover:bg-gray-100'
+                               }`}
+                            >
+                               <div className="flex justify-between items-center mb-1">
+                                  <p className="font-black italic">{prov.name}</p>
+                                  <span className="text-[7px] font-bold px-1.5 py-0.5 rounded bg-black/5 text-gray-600">{prov.badge}</span>
+                               </div>
+                               <p className="text-[8px] font-mono opacity-90">{prov.num}</p>
+                            </button>
+                         ))}
+                      </div>
+                   </div>
+
+                   {/* Account Instructions Box */}
+                   <div className="p-5 bg-gradient-to-br from-[#2C1810] via-[#3A1F15] to-[#1C0D08] text-white rounded-3xl space-y-3 border-2 border-brand-gold/40 shadow-xl">
+                      <div className="flex items-center gap-2 text-brand-gold text-[10px] sm:text-xs font-black uppercase italic">
+                         <AlertCircle size={18} className="text-brand-gold animate-pulse shrink-0" /> CONDITION STRICTE DE VALIDATION & CONFIRMATION
+                      </div>
+                      <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-2xl space-y-1.5 text-xs text-amber-100 font-medium">
+                         <p className="font-black text-brand-gold uppercase text-[10px] tracking-wider">
+                            📲 Étape 1 : Effectuez votre Dépôt MyNita / Mobile Money
+                         </p>
+                         <p className="leading-relaxed">
+                            Faites le dépôt de <strong className="text-brand-gold text-sm font-black">{total.toLocaleString()} F CFA</strong> au numéro <strong className="text-white font-mono bg-black/40 px-2 py-0.5 rounded border border-white/20">+227 90 40 51 18 (MyNita)</strong> ou selon l'opérateur choisi.
+                         </p>
+                      </div>
+
+                      <div className="bg-white/5 p-3.5 rounded-2xl space-y-1.5 text-xs text-white/90 font-medium border border-white/10">
+                         <p className="font-black text-emerald-400 uppercase text-[10px] tracking-wider flex items-center gap-1">
+                            <CheckCircle2 size={12} /> Étape 2 : Joignez l'ID + La Capture d'Écran ou Photo du Reçu
+                         </p>
+                         <p className="text-[11px] leading-relaxed italic text-gray-200">
+                            La commande ne sera <strong>validée et confirmée</strong> en cuisine qu'après vérification du numéro de transaction ET du reçu scanné !
+                         </p>
+                      </div>
+                   </div>
+
+                   {/* Inputs for Transaction ID & Proof Upload */}
+                   <div className="space-y-4 pt-1">
+                      <div className="space-y-1.5">
+                         <label className="text-[9px] font-black uppercase text-brand-brown ml-1 flex items-center gap-1">
+                            <FileText size={12} className="text-brand-orange" /> 1. Numéro / ID de Transaction du Dépôt (OBLIGATOIRE) *
+                         </label>
+                         <input
+                            type="text"
+                            required
+                            placeholder="Ex: NITA-882190, TRX-09281 ou Référence SMS"
+                            value={transactionId}
+                            onChange={(e) => setTransactionId(e.target.value)}
+                            className="w-full p-4 bg-gray-50 rounded-2xl text-xs font-mono font-bold text-brand-brown border-2 border-brand-orange/30 outline-none focus:border-brand-orange focus:bg-white shadow-inner"
+                         />
+                      </div>
+
+                      <div className="space-y-2">
+                         <div className="flex items-center justify-between">
+                            <label className="text-[9px] font-black uppercase text-brand-brown ml-1 flex items-center gap-1">
+                               <ImageIcon size={12} className="text-brand-orange" /> 2. Capture d'écran / Photo du Reçu MyNita (OBLIGATOIRE) *
+                            </label>
+                            <button
+                               type="button"
+                               onClick={() => setIsMynitaModalOpen(true)}
+                               className="text-[9px] font-black uppercase text-brand-orange hover:underline flex items-center gap-1"
+                            >
+                               <Camera size={12} /> Instructions Pas-à-Pas
+                            </button>
+                         </div>
+
+                         {paymentProofUrl ? (
+                            <div className="relative rounded-3xl overflow-hidden border-2 border-emerald-500 p-3.5 bg-emerald-50/90 flex items-center justify-between shadow-md">
+                               <div className="flex items-center gap-3">
+                                  <img src={paymentProofUrl} alt="Reçu" className="w-16 h-16 object-cover rounded-2xl border-2 border-emerald-400 shadow" />
+                                  <div>
+                                     <span className="text-[10px] font-black uppercase text-emerald-800 flex items-center gap-1 italic">
+                                        <CheckCircle2 size={14} className="text-emerald-600" /> Reçu joint avec succès
+                                     </span>
+                                     <p className="text-[8px] text-emerald-700 font-bold mt-0.5">Prêt pour validation immédiate par l'équipe Khady</p>
+                                  </div>
+                               </div>
+                               <div className="flex items-center gap-2">
+                                  <button
+                                     type="button"
+                                     onClick={() => directCameraInputRef.current?.click()}
+                                     className="text-[10px] font-black uppercase text-amber-700 px-3 py-1.5 bg-white rounded-xl shadow-sm border border-amber-200 hover:bg-amber-50 flex items-center gap-1"
+                                  >
+                                     <RefreshCw size={12} /> Reprendre
+                                  </button>
+                                  <button
+                                     type="button"
+                                     onClick={() => setPaymentProofUrl('')}
+                                     className="text-[10px] font-black uppercase text-red-600 px-3 py-1.5 bg-white rounded-xl shadow-sm border border-red-200 hover:bg-red-50"
+                                  >
+                                     Supprimer
+                                  </button>
+                               </div>
+                            </div>
+                         ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                               {/* DIRECT CAMERA SCANNER BUTTON */}
+                               <button
+                                  type="button"
+                                  onClick={() => directCameraInputRef.current?.click()}
+                                  disabled={isUploadingProof}
+                                  className="border-2 border-brand-orange bg-gradient-to-br from-amber-500/10 via-brand-orange/15 to-amber-600/10 hover:from-amber-500/20 hover:to-brand-orange/25 transition-all rounded-3xl p-5 flex flex-col items-center justify-center gap-2 text-center shadow-md active:scale-95 group"
+                               >
+                                  <div className="w-12 h-12 rounded-2xl bg-brand-orange text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                                     <Camera size={24} />
+                                  </div>
+                                  <span className="text-xs font-black uppercase italic text-brand-brown">
+                                     Ouvrir l'Appareil Photo
+                                  </span>
+                                  <span className="text-[8px] text-gray-500 font-bold bg-white/90 px-2.5 py-0.5 rounded-full border border-gray-200">
+                                     Scanner directement le reçu papier
+                                  </span>
+                               </button>
+
+                               {/* IMPORT FROM FILES / SCREENSHOT */}
+                               <label className="border-2 border-dashed border-gray-300 hover:border-brand-orange bg-gray-50 hover:bg-white transition-all rounded-3xl p-5 flex flex-col items-center justify-center cursor-pointer gap-2 text-center shadow-sm group">
+                                  <div className="w-12 h-12 rounded-2xl bg-gray-100 group-hover:bg-brand-orange/10 text-gray-400 group-hover:text-brand-orange flex items-center justify-center transition-colors">
+                                     <Upload size={24} />
+                                  </div>
+                                  <span className="text-xs font-black uppercase italic text-brand-brown">
+                                     {isUploadingProof ? 'Chargement...' : 'Importer une Capture'}
+                                  </span>
+                                  <span className="text-[8px] text-gray-500 font-bold bg-white/90 px-2.5 py-0.5 rounded-full border border-gray-200">
+                                     Fichier image JPG, PNG ou SMS
+                                  </span>
+                                  <input
+                                     type="file"
+                                     accept="image/*"
+                                     onChange={handleProofFileUpload}
+                                     className="hidden"
+                                  />
+                               </label>
+                            </div>
+                         )}
+                      </div>
+                   </div>
                 </div>
              )}
           </div>
