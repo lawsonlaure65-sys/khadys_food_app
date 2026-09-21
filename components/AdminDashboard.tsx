@@ -61,6 +61,7 @@ import {
   INITIAL_BLOG_POSTS,
   INITIAL_GALLERY_ITEMS,
   INITIAL_CLIENTS,
+  MENU_ITEMS,
 } from "../constants";
 import { WhatsAppAutomationView } from "./WhatsAppAutomationView";
 import { BlogMgmtView } from "./BlogMgmtView";
@@ -68,6 +69,9 @@ import { GalleryMgmtView } from "./GalleryMgmtView";
 import { ClientsMgmtView } from "./ClientsMgmtView";
 import { AIPromoGenerator } from "./AIPromoGenerator";
 import { compressImage } from "../utils/image";
+import { persistentStorage } from "../utils/storage";
+import { db, isSupabaseConfigured } from "../lib/supabase";
+import { Download, Upload, ShieldCheck, Database, FileCheck } from "lucide-react";
 
 interface AdminDashboardProps {
   items: MenuItem[];
@@ -177,7 +181,80 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const handleSaveItem = (e: React.FormEvent) => {
+  const backupFileInputRef = useRef<HTMLInputElement>(null);
+  const [backupStatusMessage, setBackupStatusMessage] = useState<string | null>(null);
+
+  const handleExportBackup = async () => {
+    try {
+      await persistentStorage.downloadBackupFile();
+      setBackupStatusMessage("Sauvegarde exportée et téléchargée avec succès !");
+      playSound("success");
+      setTimeout(() => setBackupStatusMessage(null), 4000);
+    } catch (err) {
+      alert("Erreur lors de l'export de la sauvegarde.");
+    }
+  };
+
+  const handleImportBackupFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const json = JSON.parse(event.target?.result as string);
+          await persistentStorage.restoreBackupData(json);
+          if (Array.isArray(json.menuItems) && json.menuItems.length > 0) {
+            setItems(json.menuItems);
+          }
+          if (Array.isArray(json.orders)) setOrders(json.orders);
+          if (Array.isArray(json.blogPosts)) setPosts(json.blogPosts);
+          if (Array.isArray(json.galleryItems)) setGalleryItems(json.galleryItems);
+          if (Array.isArray(json.clients)) setClients(json.clients);
+          
+          playSound("success");
+          setBackupStatusMessage(`Restauration réussie ! ${json.menuItems?.length || 0} plats restaurés.`);
+          setTimeout(() => setBackupStatusMessage(null), 5000);
+        } catch (parseErr) {
+          alert("Fichier JSON de sauvegarde invalide ou corrompu.");
+        }
+      };
+      reader.readAsText(file);
+    } catch (e) {
+      alert("Erreur lors de la lecture du fichier.");
+    }
+  };
+
+  const handleRestoreSnapshot = async () => {
+    try {
+      const snapshot = await persistentStorage.getLatestMenuSnapshot();
+      if (snapshot && Array.isArray(snapshot) && snapshot.length > 0) {
+        if (confirm(`Restaurer le dernier snapshot de sécurité (${snapshot.length} plats) ?`)) {
+          setItems(snapshot);
+          await persistentStorage.setItem('khadys_menu_items', snapshot);
+          playSound("success");
+          setBackupStatusMessage(`${snapshot.length} plats restaurés depuis le snapshot de sécurité.`);
+          setTimeout(() => setBackupStatusMessage(null), 4000);
+        }
+      } else {
+        alert("Aucun snapshot de sécurité automatique antérieur n'a été trouvé.");
+      }
+    } catch {
+      alert("Erreur lors de la restauration du snapshot.");
+    }
+  };
+
+  const handleResetFactoryMenu = () => {
+    if (confirm("Attention : Voulez-vous réinitialiser le menu aux 10 plats d'origine de Khady's Food ? Pensez à télécharger une sauvegarde avant.")) {
+      setItems(MENU_ITEMS);
+      persistentStorage.setItem('khadys_menu_items', MENU_ITEMS);
+      playSound("pop");
+      setBackupStatusMessage("Menu réinitialisé aux plats d'origine.");
+      setTimeout(() => setBackupStatusMessage(null), 4000);
+    }
+  };
+
+  const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem?.name || !editingItem?.price) return;
 
@@ -192,16 +269,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         "https://images.unsplash.com/photo-1546069901-ba9599a7e63c",
     } as MenuItem;
 
+    let updatedItems: MenuItem[];
     if (items.find((i) => i.id === finalItem.id)) {
-      setItems((prev) =>
-        prev.map((i) => (i.id === finalItem.id ? finalItem : i)),
-      );
+      updatedItems = items.map((i) => (i.id === finalItem.id ? finalItem : i));
     } else {
-      setItems((prev) => [finalItem, ...prev]);
+      updatedItems = [finalItem, ...items];
+    }
+
+    setItems(updatedItems);
+    await persistentStorage.setItem('khadys_menu_items', updatedItems);
+
+    if (isSupabaseConfigured) {
+      try {
+        await db.saveMenuItem(finalItem);
+      } catch (err) {
+        console.warn("Synchro Cloud Supabase différée:", err);
+      }
     }
 
     setEditingItem(null);
     playSound("success");
+    setBackupStatusMessage(`Plat "${finalItem.name}" enregistré et sécurisé avec succès !`);
+    setTimeout(() => setBackupStatusMessage(null), 4000);
   };
 
   const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
@@ -351,46 +440,127 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       case AdminView.MENU_MGMT:
         return (
           <div className="space-y-6 animate-fade-in">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xl font-black italic uppercase text-brand-gold">
-                Gestion de la Carte
-              </h3>
-              <button
-                onClick={() => setEditingItem({})}
-                className="bg-brand-gold text-brand-brown px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 font-black text-[10px] uppercase italic active:scale-95 transition-all"
-              >
-                <Plus size={18} /> Ajouter un Plat
-              </button>
+            {/* Hidden input for backup JSON import */}
+            <input
+              type="file"
+              ref={backupFileInputRef}
+              className="hidden"
+              accept=".json,application/json"
+              onChange={handleImportBackupFile}
+            />
+
+            {/* Notification de Statut Sauvegarde */}
+            {backupStatusMessage && (
+              <div className="bg-emerald-500/20 border border-emerald-500/40 p-4 rounded-2xl text-emerald-300 text-xs font-black flex items-center justify-between animate-fade-in shadow-xl">
+                <span className="flex items-center gap-2">
+                  <ShieldCheck size={18} className="text-emerald-400" />
+                  {backupStatusMessage}
+                </span>
+                <button onClick={() => setBackupStatusMessage(null)} className="text-emerald-400 hover:text-white">
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+
+            {/* Header Gestion de Carte & Outils de Sauvegarde */}
+            <div className="bg-gradient-to-r from-brand-brown via-[#2A1510] to-[#1A0F0D] p-6 rounded-[2.5rem] border-2 border-brand-gold/30 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">
+                    Sauvegarde Persistante Active (IndexedDB)
+                  </span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black italic uppercase text-brand-gold">
+                  Gestion de la Carte ({items.length} Plats)
+                </h3>
+                <p className="text-[10px] text-white/60 font-medium">
+                  Tous les plats que vous ajoutez sont conservés de manière permanente sur cet appareil.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                <button
+                  onClick={handleExportBackup}
+                  className="flex-1 sm:flex-none bg-white/10 hover:bg-white/20 text-brand-gold px-4 py-3 rounded-2xl text-[9px] font-black uppercase italic border border-white/10 flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-lg"
+                  title="Télécharger une copie de sauvegarde sur votre ordinateur ou téléphone"
+                >
+                  <Download size={15} /> Sauvegarder JSON
+                </button>
+                <button
+                  onClick={() => backupFileInputRef.current?.click()}
+                  className="flex-1 sm:flex-none bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-2xl text-[9px] font-black uppercase italic border border-white/10 flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-lg"
+                  title="Restaurer un fichier de sauvegarde préalablement téléchargé"
+                >
+                  <Upload size={15} /> Restaurer JSON
+                </button>
+                <button
+                  onClick={handleRestoreSnapshot}
+                  className="flex-1 sm:flex-none bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-4 py-3 rounded-2xl text-[9px] font-black uppercase italic border border-amber-500/30 flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-lg"
+                  title="Récupérer le dernier snapshot automatique sauvegardé"
+                >
+                  <RefreshCw size={15} /> Snapshot Secours
+                </button>
+                <button
+                  onClick={() => setEditingItem({})}
+                  className="w-full sm:w-auto bg-brand-gold hover:bg-amber-400 text-brand-brown px-6 py-3 rounded-2xl shadow-xl flex items-center justify-center gap-2 font-black text-[10px] uppercase italic active:scale-95 transition-all"
+                >
+                  <Plus size={18} /> Ajouter un Plat
+                </button>
+              </div>
             </div>
+
+            {/* Grid des Plats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {items.map((item) => (
                 <div
                   key={item.id}
-                  className="bg-white/5 p-5 rounded-[2.5rem] border border-white/5 group relative overflow-hidden transition-all hover:bg-white/10"
+                  className="bg-white/5 p-5 rounded-[2.5rem] border border-white/5 group relative overflow-hidden transition-all hover:bg-white/10 hover:border-brand-gold/30"
                 >
-                  <img
-                    src={item.image}
-                    className="w-full h-32 rounded-[2rem] object-cover opacity-80 mb-4"
-                  />
-                  <h4 className="font-black text-xs italic text-brand-gold uppercase truncate mb-1">
-                    {item.name}
-                  </h4>
-                  <p className="text-xs font-black text-brand-orange mb-4">
-                    {item.price} F
+                  <div className="relative w-full h-36 rounded-[2rem] overflow-hidden mb-4 bg-black/40">
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <span className="absolute top-3 left-3 bg-black/70 backdrop-blur-md text-[8px] font-black text-brand-gold px-2.5 py-1 rounded-full uppercase italic border border-white/10">
+                      {item.category}
+                    </span>
+                  </div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h4 className="font-black text-sm italic text-brand-gold uppercase truncate">
+                      {item.name}
+                    </h4>
+                    <span className="text-xs font-black text-brand-orange shrink-0">
+                      {item.price.toLocaleString('fr-FR')} F
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-white/50 line-clamp-2 mb-4 h-7">
+                    {item.description || "Délicieuse spécialité préparée avec soin chez Khady's Food."}
                   </p>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setEditingItem(item)}
-                      className="flex-1 bg-white/5 p-3 rounded-xl text-white/40 hover:text-white hover:bg-brand-gold/20 flex items-center justify-center transition-all"
+                      className="flex-1 bg-white/5 p-3 rounded-xl text-white/60 hover:text-white hover:bg-brand-gold/20 flex items-center justify-center gap-1 text-[9px] font-black uppercase transition-all"
                     >
-                      <Edit3 size={16} />
+                      <Edit3 size={15} /> Modifier
                     </button>
                     <button
-                      onClick={() => {
-                        if (confirm("Supprimer " + item.name + " ?"))
-                          setItems(items.filter((i) => i.id !== item.id));
+                      onClick={async () => {
+                        if (confirm(`Supprimer définitivement "${item.name}" de la carte ?`)) {
+                          const nextItems = items.filter((i) => i.id !== item.id);
+                          setItems(nextItems);
+                          await persistentStorage.setItem('khadys_menu_items', nextItems);
+                          if (isSupabaseConfigured) {
+                            try { await db.deleteMenuItem(item.id); } catch {}
+                          }
+                          playSound("pop");
+                          setBackupStatusMessage(`Plat "${item.name}" supprimé.`);
+                          setTimeout(() => setBackupStatusMessage(null), 3000);
+                        }
                       }}
-                      className="flex-1 bg-red-500/10 p-3 rounded-xl text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center transition-all"
+                      className="bg-red-500/10 p-3 rounded-xl text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center transition-all"
+                      title="Supprimer le plat"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -1037,6 +1207,77 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <button className="w-full bg-brand-gold text-brand-brown py-6 rounded-3xl font-black uppercase italic shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all">
                 <Save size={20} /> Appliquer les Paramètres
               </button>
+            </div>
+
+            {/* Centre de Sécurité & Sauvegarde des Données */}
+            <div className="bg-white/5 p-8 sm:p-10 rounded-[3rem] border-2 border-brand-gold/20 space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-brand-gold/20 flex items-center justify-center text-brand-gold">
+                  <Database size={20} />
+                </div>
+                <div>
+                  <h4 className="text-base font-black italic uppercase text-brand-gold">
+                    Centre de Sauvegarde & Sécurité des Données
+                  </h4>
+                  <p className="text-[10px] text-white/50">
+                    Stockage local persistant garanti (IndexedDB) + Sauvegardes manuelles exportables
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+                <button
+                  onClick={handleExportBackup}
+                  className="bg-white/5 hover:bg-white/10 p-5 rounded-2xl border border-white/10 flex flex-col items-start gap-2 text-left group transition-all"
+                >
+                  <Download size={20} className="text-brand-gold group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-black uppercase italic text-white">
+                    Exporter Sauvegarde (.json)
+                  </span>
+                  <span className="text-[9px] text-white/40">
+                    Téléchargez l'intégralité du menu, blogs et commandes en un fichier.
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => backupFileInputRef.current?.click()}
+                  className="bg-white/5 hover:bg-white/10 p-5 rounded-2xl border border-white/10 flex flex-col items-start gap-2 text-left group transition-all"
+                >
+                  <Upload size={20} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-black uppercase italic text-white">
+                    Restaurer Sauvegarde (.json)
+                  </span>
+                  <span className="text-[9px] text-white/40">
+                    Importez un fichier JSON précédemment sauvegardé.
+                  </span>
+                </button>
+
+                <button
+                  onClick={handleRestoreSnapshot}
+                  className="bg-white/5 hover:bg-white/10 p-5 rounded-2xl border border-white/10 flex flex-col items-start gap-2 text-left group transition-all"
+                >
+                  <RefreshCw size={20} className="text-amber-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-black uppercase italic text-white">
+                    Snapshot de Secours
+                  </span>
+                  <span className="text-[9px] text-white/40">
+                    Récupère la dernière version automatique stockée dans IndexedDB.
+                  </span>
+                </button>
+
+                <button
+                  onClick={handleResetFactoryMenu}
+                  className="bg-red-500/10 hover:bg-red-500/20 p-5 rounded-2xl border border-red-500/20 flex flex-col items-start gap-2 text-left group transition-all"
+                >
+                  <Trash2 size={20} className="text-red-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-black uppercase italic text-red-300">
+                    Menu d'Origine (Reset)
+                  </span>
+                  <span className="text-[9px] text-red-400/60">
+                    Réinitialise le menu aux 10 plats d'origine de Khady's Food.
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         );

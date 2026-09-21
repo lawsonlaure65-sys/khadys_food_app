@@ -19,12 +19,27 @@ const MAIN_SECTIONS = [
   { id: 'PACK', label: 'PACK-BUFFET', icon: <Sparkles size={16} /> }
 ];
 
-const CARTE_CATEGORIES: (MenuCategory | 'TOUT')[] = [
-  'TOUT', 'Petit-déjeuner', 'Déjeuner', 'Dîner', 'Boisson Naturelle', 'Entrée', 'Spécialité Maison', 'Menu du Jour', 'Plat Africain', 'Dessert'
+interface CategoryFilter {
+  id: string;
+  label: string;
+  badge?: string;
+}
+
+const CARTE_CATEGORIES: CategoryFilter[] = [
+  { id: 'TOUT', label: 'TOUT LE MENU' },
+  { id: 'Plat du Jour', label: '⭐ PLAT DU JOUR', badge: 'Jour' },
+  { id: 'Spécialité Maison', label: '👑 SPÉCIALITÉ MAISON', badge: 'Maison' },
+  { id: 'Petit-déjeuner', label: '☕ PETIT-DÉJEUNER' },
+  { id: 'Déjeuner', label: '☀️ DÉJEUNER' },
+  { id: 'Dîner', label: '🌙 DÎNER' },
+  { id: 'Plat Africain', label: '🥘 PLAT AFRICAIN' },
+  { id: 'Entrée', label: '🥗 ENTRÉE & PASTELS' },
+  { id: 'Boisson Naturelle', label: '🍹 BOISSON NATURELLE' },
+  { id: 'Dessert', label: '🍨 DESSERT' },
 ];
 
 const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection, onSectionChange, isLoading = false, onOpenShareApp }) => {
-  const [selectedCategory, setSelectedCategory] = useState<MenuCategory | 'TOUT'>('TOUT');
+  const [selectedCategory, setSelectedCategory] = useState<string>('TOUT');
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredItems = useMemo(() => {
@@ -42,7 +57,17 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
       
       // CARTE SECTION
       const isCarteItem = item.category !== 'Box Sauce' && item.category !== 'Pack-Buffet';
-      const matchesCategory = selectedCategory === 'TOUT' || item.category === selectedCategory;
+      
+      let matchesCategory = false;
+      if (selectedCategory === 'TOUT') {
+        matchesCategory = true;
+      } else if (selectedCategory === 'Plat du Jour') {
+        matchesCategory = item.category === 'Plat du Jour' || item.category === 'Menu du Jour' || item.isPlatDuJour === true;
+      } else if (selectedCategory === 'Spécialité Maison') {
+        matchesCategory = item.category === 'Spécialité Maison' || item.isSpécialitéMaison === true;
+      } else {
+        matchesCategory = item.category === selectedCategory;
+      }
       
       return isCarteItem && matchesCategory && matchesSearch;
     });
@@ -102,16 +127,26 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
         </div>
 
         {activeSection === 'CARTE' && (
-          <div className="flex gap-4 overflow-x-auto no-scrollbar -mx-6 px-6 pb-2">
-             {CARTE_CATEGORIES.map(cat => (
-               <button 
-                 key={cat}
-                 onClick={() => { playSound('pop'); setSelectedCategory(cat); }}
-                 className={`px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-brand-orange text-white shadow-lg' : 'bg-white text-gray-400 border border-gray-100'}`}
-               >
-                 {cat}
-               </button>
-             ))}
+          <div className="flex gap-2.5 overflow-x-auto no-scrollbar -mx-6 px-6 pb-2">
+             {CARTE_CATEGORIES.map(cat => {
+               const isSelected = selectedCategory === cat.id;
+               const isSpecial = cat.id === 'Plat du Jour' || cat.id === 'Spécialité Maison';
+               return (
+                 <button 
+                   key={cat.id}
+                   onClick={() => { playSound('pop'); setSelectedCategory(cat.id); }}
+                   className={`px-4 sm:px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 shadow-sm active:scale-95 ${
+                     isSelected
+                       ? 'bg-gradient-to-r from-brand-orange to-amber-600 text-white shadow-lg shadow-brand-orange/20 scale-[1.03]'
+                       : isSpecial
+                       ? 'bg-amber-50 text-brand-brown border-2 border-brand-gold/60 hover:bg-amber-100/80'
+                       : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+                   }`}
+                 >
+                   {cat.label}
+                 </button>
+               );
+             })}
           </div>
         )}
       </header>
@@ -135,36 +170,54 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
         </div>
       ) : (
         <div className="px-4 sm:px-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 sm:gap-6">
-           {filteredItems.map(item => (
-             <div 
-               key={item.id} 
-               onClick={() => { playSound('pop'); onSelectItem(item); }}
-               className="bg-white rounded-[2rem] sm:rounded-[2.5rem] p-3.5 sm:p-4 shadow-sm border border-brand-brown/5 relative group cursor-pointer active:scale-95 transition-all h-full flex flex-col hover:shadow-xl"
-             >
-                <div className="relative h-28 sm:h-36 w-full mb-3 overflow-hidden rounded-[1.5rem] sm:rounded-[1.8rem] flex-shrink-0">
-                   <img src={item.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={item.name} />
-                   {item.isSpicy && (
-                     <div className="absolute top-2 right-2 bg-red-500 text-white p-1 sm:p-1.5 rounded-full shadow-lg border-2 border-white">
-                        <Flame size={10} fill="white" className="sm:w-3 sm:h-3" />
-                     </div>
-                   )}
-                   {item.rating === 5 && (
-                     <div className="absolute bottom-2 left-2 bg-brand-gold text-brand-brown px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-lg text-[7px] sm:text-[8px] font-black flex items-center gap-1 border border-white">
-                        <Star size={8} fill="currentColor" /> BEST
-                     </div>
-                   )}
-                </div>
-                
-                <h4 className="text-[10px] sm:text-[11px] font-black text-brand-brown uppercase italic leading-tight mb-2 line-clamp-2 flex-1">{item.name}</h4>
-                
-                <div className="flex justify-between items-center mt-2">
-                   <span className="text-xs font-black text-brand-orange">{item.price} F</span>
-                   <div className="w-7 h-7 sm:w-8 sm:h-8 bg-brand-brown text-brand-gold rounded-xl flex items-center justify-center shadow-lg transition-transform active:scale-90">
-                      <Plus size={14} className="sm:w-4 sm:h-4" />
-                   </div>
-                </div>
-             </div>
-           ))}
+           {filteredItems.map(item => {
+             const isPlatJour = item.isPlatDuJour || item.category === 'Menu du Jour' || item.category === 'Plat du Jour';
+             const isSpecialite = item.isSpécialitéMaison || item.category === 'Spécialité Maison';
+
+             return (
+              <div 
+                key={item.id} 
+                onClick={() => { playSound('pop'); onSelectItem(item); }}
+                className="bg-white rounded-[2rem] sm:rounded-[2.5rem] p-3.5 sm:p-4 shadow-sm border border-brand-brown/5 relative group cursor-pointer active:scale-95 transition-all h-full flex flex-col hover:shadow-xl"
+              >
+                 <div className="relative h-28 sm:h-36 w-full mb-3 overflow-hidden rounded-[1.5rem] sm:rounded-[1.8rem] flex-shrink-0">
+                    <img src={item.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={item.name} />
+                    
+                    {/* Badge Plat du Jour ou Spécialité */}
+                    {isPlatJour && (
+                      <div className="absolute top-2 left-2 bg-gradient-to-r from-amber-500 to-brand-orange text-white text-[7.5px] sm:text-[8.5px] font-black uppercase px-2 py-0.5 rounded-full shadow-md border border-white/40 flex items-center gap-1 italic">
+                        ⭐ Plat du Jour
+                      </div>
+                    )}
+                    {!isPlatJour && isSpecialite && (
+                      <div className="absolute top-2 left-2 bg-gradient-to-r from-[#2C1810] to-[#4A281B] text-brand-gold text-[7.5px] sm:text-[8.5px] font-black uppercase px-2 py-0.5 rounded-full shadow-md border border-brand-gold/50 flex items-center gap-1 italic">
+                        👑 Spécialité
+                      </div>
+                    )}
+
+                    {item.isSpicy && (
+                      <div className="absolute top-2 right-2 bg-red-500 text-white p-1 sm:p-1.5 rounded-full shadow-lg border-2 border-white">
+                         <Flame size={10} fill="white" className="sm:w-3 sm:h-3" />
+                      </div>
+                    )}
+                    {item.rating === 5 && (
+                      <div className="absolute bottom-2 left-2 bg-brand-gold text-brand-brown px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-lg text-[7px] sm:text-[8px] font-black flex items-center gap-1 border border-white">
+                         <Star size={8} fill="currentColor" /> BEST
+                      </div>
+                    )}
+                 </div>
+                 
+                 <h4 className="text-[10px] sm:text-[11px] font-black text-brand-brown uppercase italic leading-tight mb-2 line-clamp-2 flex-1">{item.name}</h4>
+                 
+                 <div className="flex justify-between items-center mt-2">
+                    <span className="text-xs font-black text-brand-orange">{item.price} F</span>
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 bg-brand-brown text-brand-gold rounded-xl flex items-center justify-center shadow-lg transition-transform active:scale-90">
+                       <Plus size={14} className="sm:w-4 sm:h-4" />
+                    </div>
+                 </div>
+              </div>
+             );
+           })}
         </div>
       )}
 

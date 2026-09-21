@@ -330,93 +330,115 @@ const CartView: React.FC<CartViewProps> = ({ cart, setCart, onOrderPlace, onClos
              {/* MOBILE MONEY FLOW */}
              {paymentType === 'MOBILE_MONEY' && (
                 <div className="space-y-6 animate-fade-in">
-                  {/* Choice of Mobile Provider */}
+                  {/* Choice of Mobile Provider with MyNita Highlighted */}
                   <div className="space-y-2">
-                    <label className="text-[9px] font-black uppercase tracking-widest text-brand-brown">Sélectionnez votre opérateur</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[9px] font-black uppercase tracking-widest text-brand-brown">Sélectionnez votre opérateur Mobile Money</label>
+                      <span className="text-[8px] font-black uppercase text-brand-orange bg-brand-orange/10 px-2 py-0.5 rounded-full">Recommandé : MyNita</span>
+                    </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {[
-                        { id: 'AIRTEL_MONEY', name: 'Airtel Money', num: PAYMENT_ACCOUNTS.airtelMoney.number },
-                        { id: 'MOOV_MONEY', name: 'Moov / Flooz', num: PAYMENT_ACCOUNTS.moovFlooz.number },
-                        { id: 'ORANGE_MONEY', name: 'Orange Money', num: PAYMENT_ACCOUNTS.orangeMoney.number },
-                        { id: 'MYNITA', name: 'Mynita / Amanata', num: PAYMENT_ACCOUNTS.mynitaAmana.number },
-                        { id: 'ALLIZA', name: 'All-Iza', num: PAYMENT_ACCOUNTS.allIza.number },
+                        { id: 'MYNITA', name: '⭐ MyNita / Nita', num: PAYMENT_ACCOUNTS.mynitaAmana.number, badge: 'Direct App' },
+                        { id: 'AIRTEL_MONEY', name: 'Airtel Money', num: PAYMENT_ACCOUNTS.airtelMoney.number, badge: 'Transfert' },
+                        { id: 'MOOV_MONEY', name: 'Moov / Flooz', num: PAYMENT_ACCOUNTS.moovFlooz.number, badge: 'Transfert' },
+                        { id: 'ORANGE_MONEY', name: 'Orange Money', num: PAYMENT_ACCOUNTS.orangeMoney.number, badge: 'Transfert' },
+                        { id: 'ALLIZA', name: 'All-Iza', num: PAYMENT_ACCOUNTS.allIza.number, badge: 'Transfert' },
                       ].map((prov) => (
                         <button
                           key={prov.id}
                           type="button"
                           onClick={() => { playSound('pop'); setPayment(prov.id as any); }}
-                          className={`p-3 rounded-2xl text-[9px] font-black uppercase border-2 text-left transition-all ${
+                          className={`p-3.5 rounded-2xl text-[9px] font-black uppercase border-2 text-left transition-all relative overflow-hidden ${
                             payment === prov.id
-                              ? 'border-brand-orange bg-brand-orange/10 text-brand-orange shadow-md'
-                              : 'border-gray-100 bg-gray-50 text-gray-400'
+                              ? 'border-brand-orange bg-gradient-to-br from-amber-50 to-orange-50 text-brand-orange shadow-md scale-102'
+                              : 'border-gray-100 bg-gray-50 text-gray-500 hover:bg-gray-100'
                           }`}
                         >
-                          <p className="font-black italic">{prov.name}</p>
-                          <p className="text-[8px] font-mono opacity-80 mt-1">{prov.num}</p>
+                          <div className="flex justify-between items-center mb-1">
+                            <p className="font-black italic">{prov.name}</p>
+                            <span className="text-[7px] font-bold px-1.5 py-0.5 rounded bg-black/5 text-gray-600">{prov.badge}</span>
+                          </div>
+                          <p className="text-[8px] font-mono opacity-90">{prov.num}</p>
                         </button>
                       ))}
                     </div>
                   </div>
 
                   {/* Account Instructions Box */}
-                  <div className="p-5 bg-brand-brown text-white rounded-3xl space-y-2 border-2 border-brand-gold/30">
-                    <div className="flex items-center gap-2 text-brand-gold text-[10px] font-black uppercase italic">
-                      <AlertCircle size={16} /> Instructions de Dépôt OBLIGATOIRE
+                  <div className="p-5 bg-gradient-to-br from-[#2C1810] via-[#3A1F15] to-[#1C0D08] text-white rounded-3xl space-y-3 border-2 border-brand-gold/40 shadow-xl">
+                    <div className="flex items-center gap-2 text-brand-gold text-[10px] sm:text-xs font-black uppercase italic">
+                      <AlertCircle size={18} className="text-brand-gold animate-pulse shrink-0" /> CONDITION STRICTE DE VALIDATION & CONFIRMATION
                     </div>
-                    <p className="text-xs text-white/90 font-bold leading-relaxed">
-                      1. Effectuez un transfert / dépôt de <strong className="text-brand-gold text-sm font-black">{total} F</strong> au numéro correspondant.<br />
-                      2. Saisissez ci-dessous le <strong>N°/ID de transaction</strong> puis <strong>importez la capture d'écran du reçu</strong>.<br />
-                      3. L'administrateur Khady's IA vérifiera le dépôt pour valider définitivement la commande.
-                    </p>
+                    <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-2xl space-y-1.5 text-xs text-amber-100 font-medium">
+                      <p className="font-black text-brand-gold uppercase text-[10px] tracking-wider">
+                        📲 Étape 1 : Effectuez votre Dépôt MyNita / Mobile Money
+                      </p>
+                      <p className="leading-relaxed">
+                        Faites le dépôt de <strong className="text-brand-gold text-sm font-black">{total} F CFA</strong> au numéro <strong className="text-white font-mono bg-black/40 px-2 py-0.5 rounded border border-white/20">+227 90 40 51 18 (MyNita)</strong> ou selon l'opérateur choisi.
+                      </p>
+                    </div>
+
+                    <div className="bg-white/5 p-3.5 rounded-2xl space-y-1.5 text-xs text-white/90 font-medium border border-white/10">
+                      <p className="font-black text-emerald-400 uppercase text-[10px] tracking-wider flex items-center gap-1">
+                        <CheckCircle2 size={12} /> Étape 2 : Joignez l'ID + La Capture d'Écran
+                      </p>
+                      <p className="text-[11px] leading-relaxed italic text-gray-200">
+                        La commande ne sera <strong>validée et confirmée</strong> en cuisine qu'après vérification du numéro de transaction ET de la capture d'écran/photo du reçu de dépôt !
+                      </p>
+                    </div>
                   </div>
 
                   {/* Inputs for Transaction ID & Proof Upload */}
-                  <div className="space-y-4 pt-2">
+                  <div className="space-y-4 pt-1">
                     <div className="space-y-1.5">
-                      <label className="text-[9px] font-black uppercase text-brand-brown ml-1">
-                        Numéro / ID de Transaction (OBLIGATOIRE) *
+                      <label className="text-[9px] font-black uppercase text-brand-brown ml-1 flex items-center gap-1">
+                        <FileText size={12} className="text-brand-orange" /> 1. Numéro / ID de Transaction du Dépôt (OBLIGATOIRE) *
                       </label>
                       <input
                         type="text"
                         required
-                        placeholder="Ex: TRX981240192 ou NITA-8821"
+                        placeholder="Ex: NITA-882190, TRX-09281 ou Référence SMS"
                         value={transactionId}
                         onChange={(e) => setTransactionId(e.target.value)}
-                        className="w-full p-4 bg-gray-50 rounded-2xl text-xs font-mono font-bold text-brand-brown border border-gray-200 outline-none focus:border-brand-orange"
+                        className="w-full p-4 bg-gray-50 rounded-2xl text-xs font-mono font-bold text-brand-brown border-2 border-brand-orange/30 outline-none focus:border-brand-orange focus:bg-white shadow-inner"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[9px] font-black uppercase text-brand-brown ml-1">
-                        Capture d'écran / Reçu de Dépôt (OBLIGATOIRE) *
+                      <label className="text-[9px] font-black uppercase text-brand-brown ml-1 flex items-center gap-1">
+                        <ImageIcon size={12} className="text-brand-orange" /> 2. Capture d'écran / Photo du Reçu MyNita (OBLIGATOIRE) *
                       </label>
 
                       {paymentProofUrl ? (
-                        <div className="relative rounded-3xl overflow-hidden border-2 border-green-500 p-2 bg-green-50 flex items-center justify-between">
+                        <div className="relative rounded-3xl overflow-hidden border-2 border-emerald-500 p-3 bg-emerald-50/90 flex items-center justify-between shadow-md">
                           <div className="flex items-center gap-3">
-                            <img src={paymentProofUrl} alt="Reçu" className="w-14 h-14 object-cover rounded-xl border border-green-200" />
+                            <img src={paymentProofUrl} alt="Reçu" className="w-16 h-16 object-cover rounded-2xl border-2 border-emerald-400 shadow" />
                             <div>
-                              <span className="text-[9px] font-black uppercase text-green-700 flex items-center gap-1">
-                                <CheckCircle2 size={12} /> Reçu joint avec succès
+                              <span className="text-[10px] font-black uppercase text-emerald-800 flex items-center gap-1 italic">
+                                <CheckCircle2 size={14} className="text-emerald-600" /> Reçu joint avec succès
                               </span>
-                              <p className="text-[8px] text-gray-500 font-mono">Image prête pour contrôle admin</p>
+                              <p className="text-[8px] text-emerald-700 font-bold mt-0.5">Prêt pour validation par l'administrateur</p>
                             </div>
                           </div>
                           <button
                             type="button"
                             onClick={() => setPaymentProofUrl('')}
-                            className="text-xs font-black uppercase text-red-500 px-3 py-1 bg-white rounded-xl shadow-sm border border-red-200"
+                            className="text-xs font-black uppercase text-red-600 px-3.5 py-1.5 bg-white rounded-xl shadow-sm border border-red-200 hover:bg-red-50"
                           >
-                            Changer
+                            Remplacer
                           </button>
                         </div>
                       ) : (
-                        <label className="w-full border-2 border-dashed border-brand-orange/40 bg-brand-orange/5 hover:bg-brand-orange/10 transition-colors rounded-3xl p-6 flex flex-col items-center justify-center cursor-pointer gap-2 text-center">
-                          <Upload size={28} className="text-brand-orange" />
+                        <label className="w-full border-2 border-dashed border-brand-orange bg-gradient-to-b from-brand-orange/5 to-amber-500/10 hover:from-brand-orange/10 hover:to-amber-500/20 transition-all rounded-3xl p-6 flex flex-col items-center justify-center cursor-pointer gap-2 text-center shadow-sm">
+                          <div className="w-12 h-12 rounded-2xl bg-brand-orange/10 text-brand-orange flex items-center justify-center">
+                            <Upload size={24} />
+                          </div>
                           <span className="text-xs font-black uppercase italic text-brand-brown">
-                            {isUploadingProof ? 'Chargement en cours...' : 'Ajouter la capture du reçu Mobile Money'}
+                            {isUploadingProof ? 'Chargement de l\'image...' : 'Importer la Capture d\'Écran / Reçu de Dépôt MyNita'}
                           </span>
-                          <span className="text-[9px] text-gray-400 font-bold">Format JPG, PNG ou Capture d'écran WhatsApp/SMS</span>
+                          <span className="text-[9px] text-gray-500 font-bold bg-white/80 px-3 py-1 rounded-full border border-gray-200">
+                            Fichier image JPG, PNG ou Capture d'écran WhatsApp/SMS (Requis)
+                          </span>
                           <input
                             type="file"
                             accept="image/*"
@@ -486,12 +508,21 @@ const CartView: React.FC<CartViewProps> = ({ cart, setCart, onOrderPlace, onClos
             </div>
 
             {/* Banner info double commande */}
-            <div className="p-4 bg-emerald-950/80 border border-emerald-500/40 rounded-2xl space-y-1">
-              <div className="flex items-center gap-2 text-emerald-400 text-[10px] font-black uppercase italic">
-                <MessageCircle size={16} /> Double Validation WhatsApp Immédiate
+            <div className={`p-4 rounded-2xl space-y-1.5 border ${
+              submittedOrder.paymentType === 'MOBILE_MONEY'
+                ? 'bg-amber-950/90 border-amber-500/50 text-amber-200'
+                : 'bg-emerald-950/80 border-emerald-500/40 text-emerald-100'
+            }`}>
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase italic">
+                <MessageCircle size={16} className={submittedOrder.paymentType === 'MOBILE_MONEY' ? 'text-brand-gold' : 'text-emerald-400'} />
+                {submittedOrder.paymentType === 'MOBILE_MONEY'
+                  ? '📲 VALIDATION & CONFIRMATION DÉPÔT MYNITA'
+                  : '⚡ DOUBLE VALIDATION WHATSAPP IMMÉDIATE'}
               </div>
-              <p className="text-[10px] text-emerald-100/80 font-medium leading-relaxed">
-                Transmettez votre reçu directement sur WhatsApp pour une confirmation instantanée en cuisine et l'envoi immédiat de votre livreur !
+              <p className="text-[10px] font-medium leading-relaxed opacity-90">
+                {submittedOrder.paymentType === 'MOBILE_MONEY'
+                  ? 'Votre commande ne sera définitivement validée et confirmée en cuisine qu’après vérification du dépôt MyNita. Cliquez ci-dessous pour transmettre la capture du reçu au restaurant !'
+                  : 'Transmettez votre commande directement sur WhatsApp pour une confirmation instantanée en cuisine et l’envoi immédiat du livreur Billo Express !'}
               </p>
             </div>
 

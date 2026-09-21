@@ -19,6 +19,7 @@ import { VideoDemoModal } from "./components/VideoDemoModal";
 import { AIGourmandeWidget } from "./components/AIGourmandeWidget";
 import { InstallGuideModal } from "./components/InstallGuideModal";
 import { ShareModal } from "./components/ShareModal";
+import { OrdersView } from "./components/OrdersView";
 import FAQSection from "./components/FAQSection";
 import {
   Page,
@@ -155,38 +156,48 @@ const App: React.FC = () => {
     }
   });
 
-  // Sauvegarde automatique persistant (IndexedDB + LocalStorage)
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Sauvegarde automatique persistant (IndexedDB + LocalStorage) uniquement APRES hydratation
   useEffect(() => {
+    if (!isHydrated) return;
     persistentStorage.setItem("khadys_menu_items", items);
-  }, [items]);
+  }, [items, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     persistentStorage.setItem("khadys_blog_posts", posts);
-  }, [posts]);
+  }, [posts, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     persistentStorage.setItem("khadys_gallery_items", galleryItems);
-  }, [galleryItems]);
+  }, [galleryItems, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     persistentStorage.setItem("khadys_clients", clients);
-  }, [clients]);
+  }, [clients, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     persistentStorage.setItem("khadys_cart", cart);
-  }, [cart]);
+  }, [cart, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     persistentStorage.setItem("khadys_orders", orders);
-  }, [orders]);
+  }, [orders, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     persistentStorage.setItem("khadys_reviews", reviews);
-  }, [reviews]);
+  }, [reviews, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     persistentStorage.setItem("khadys_user_profile", userProfile);
-  }, [userProfile]);
+  }, [userProfile, isHydrated]);
 
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
@@ -319,10 +330,20 @@ const App: React.FC = () => {
     const loadInitialData = async () => {
       setIsLoadingMenu(true);
       try {
-        const storedItems = await persistentStorage.getItem<MenuItem[]>(
+        let storedItems = await persistentStorage.getItem<MenuItem[]>(
           "khadys_menu_items",
           MENU_ITEMS,
         );
+
+        // Si le stockage local n'a pas de plats modifiés, vérifier le snapshot de sécurité
+        if (!storedItems || storedItems.length === 0 || (storedItems.length === MENU_ITEMS.length && JSON.stringify(storedItems) === JSON.stringify(MENU_ITEMS))) {
+          const snapshot = await persistentStorage.getLatestMenuSnapshot();
+          if (snapshot && Array.isArray(snapshot) && snapshot.length > 0) {
+            storedItems = snapshot;
+            console.log(`[Storage] ${snapshot.length} plats restaurés depuis le snapshot de sécurité.`);
+          }
+        }
+
         if (storedItems && storedItems.length > 0) {
           setItems(storedItems);
         }
@@ -340,11 +361,23 @@ const App: React.FC = () => {
         if (storedGallery && storedGallery.length > 0)
           setGalleryItems(storedGallery);
 
+        const storedClients = await persistentStorage.getItem<ClientUser[]>(
+          "khadys_clients",
+          INITIAL_CLIENTS,
+        );
+        if (storedClients && storedClients.length > 0) setClients(storedClients);
+
         const storedOrders = await persistentStorage.getItem<Order[]>(
           "khadys_orders",
           [],
         );
         if (storedOrders && storedOrders.length > 0) setOrders(storedOrders);
+
+        const storedReviews = await persistentStorage.getItem<Review[]>(
+          "khadys_reviews",
+          REVIEWS,
+        );
+        if (storedReviews && storedReviews.length > 0) setReviews(storedReviews);
 
         if (isSupabaseConfigured) {
           const cloudMenu = await db.fetchMenu();
@@ -356,6 +389,7 @@ const App: React.FC = () => {
       } catch (err) {
         console.warn("[App] Utilisation des données locales:", err);
       } finally {
+        setIsHydrated(true);
         setIsLoadingMenu(false);
       }
     };
@@ -858,6 +892,22 @@ const App: React.FC = () => {
             />
           </div>
         );
+      case Page.COMMANDES:
+        return (
+          <div className="max-w-3xl mx-auto w-full">
+            <OrdersView
+              orders={orders}
+              onUpdateOrder={(updatedOrder) => {
+                setOrders((prev) =>
+                  prev.map((o) =>
+                    o.id === updatedOrder.id ? updatedOrder : o,
+                  ),
+                );
+              }}
+              onGoToMenu={() => setCurrentPage(Page.MENU)}
+            />
+          </div>
+        );
       case Page.COMPTE:
         return (
           <div className="max-w-xl mx-auto">
@@ -946,6 +996,7 @@ const App: React.FC = () => {
             currentPage={currentPage}
             setPage={setCurrentPage}
             cartCount={cart.reduce((a, b) => a + b.quantity, 0)}
+            activeOrdersCount={orders.filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED').length}
           />
           <AIChat />
         </>

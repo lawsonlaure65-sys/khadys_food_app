@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Home, ScrollText, ShoppingBag, Sparkles, UserRound, BookOpen, Camera } from 'lucide-react';
+import { Home, ScrollText, ShoppingBag, Sparkles, UserRound, BookOpen, Camera, PackageCheck } from 'lucide-react';
 import { Page } from '../types';
 import { playSound } from '../utils/audio';
 
@@ -8,9 +8,10 @@ interface NavbarProps {
   currentPage: Page;
   setPage: (page: Page) => void;
   cartCount: number;
+  activeOrdersCount?: number;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ currentPage, setPage, cartCount }) => {
+const Navbar: React.FC<NavbarProps> = ({ currentPage, setPage, cartCount, activeOrdersCount }) => {
   const [isBouncing, setIsBouncing] = useState(false);
   const prevCount = useRef(cartCount);
 
@@ -26,6 +27,7 @@ const Navbar: React.FC<NavbarProps> = ({ currentPage, setPage, cartCount }) => {
   const navItems = [
     { page: Page.HOME, icon: Home, label: 'Accueil' },
     { page: Page.MENU, icon: ScrollText, label: 'Menu' },
+    { page: Page.COMMANDES, icon: PackageCheck, label: 'Commande', badge: activeOrdersCount && activeOrdersCount > 0 ? activeOrdersCount : undefined },
     { page: Page.GALLERY, icon: Camera, label: 'Galerie' },
     { page: Page.BLOG, icon: BookOpen, label: 'Blog' },
     { page: Page.TRAITEUR, icon: Sparkles, label: 'Event' },
