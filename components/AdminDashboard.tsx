@@ -39,6 +39,7 @@ import {
   PhoneOff,
   BookOpen,
   Phone,
+  Search,
 } from "lucide-react";
 import {
   MenuItem,
@@ -127,6 +128,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiStrategy, setAiStrategy] = useState("");
   const [isRestaurantOpen, setIsRestaurantOpen] = useState(true);
+  const [menuFilterCategory, setMenuFilterCategory] = useState<string>("TOUT");
+  const [menuSearchQuery, setMenuSearchQuery] = useState<string>("");
   const adminPhotoInputRef = useRef<HTMLInputElement>(null);
   const dishPhotoInputRef = useRef<HTMLInputElement>(null);
   const [adminAvatar, setAdminAvatar] = useState(
@@ -254,16 +257,71 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const isItemPlatDuJour = (item: MenuItem): boolean => {
+    return Boolean(
+      item.isPlatDuJour ||
+      item.category === "Plat du Jour" ||
+      item.category === "Menu du Jour"
+    );
+  };
+
+  const handleTogglePlatDuJour = async (e: React.MouseEvent, itemId: string) => {
+    e.stopPropagation();
+    const target = items.find((i) => i.id === itemId);
+    if (!target) return;
+
+    const currentlyJour = isItemPlatDuJour(target);
+    const nextVal = !currentlyJour;
+
+    const updatedItems = items.map((i) => {
+      if (i.id === itemId) {
+        return {
+          ...i,
+          isPlatDuJour: nextVal,
+        };
+      }
+      return i;
+    });
+
+    setItems(updatedItems);
+    await persistentStorage.setItem("khadys_menu_items", updatedItems);
+
+    if (isSupabaseConfigured) {
+      try {
+        const updatedTarget = updatedItems.find((i) => i.id === itemId);
+        if (updatedTarget) await db.saveMenuItem(updatedTarget);
+      } catch (err) {
+        console.warn("Synchro Supabase:", err);
+      }
+    }
+
+    playSound(nextVal ? "success" : "pop");
+    setBackupStatusMessage(
+      nextVal
+        ? `⭐ "${target.name}" est désormais configuré comme PLAT DU JOUR !`
+        : `"${target.name}" retiré des Plats du Jour.`
+    );
+    setTimeout(() => setBackupStatusMessage(null), 3500);
+  };
+
   const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem?.name || !editingItem?.price) return;
+
+    const isJour = Boolean(
+      editingItem.isPlatDuJour ||
+      editingItem.category === "Plat du Jour" ||
+      editingItem.category === "Menu du Jour"
+    );
 
     const finalItem = {
       ...editingItem,
       id: editingItem.id || `item-${Date.now()}`,
       rating: editingItem.rating || 5,
       isAvailable: editingItem.isAvailable ?? true,
-      category: editingItem.category || "Plat Africain",
+      category: editingItem.category || (isJour ? "Plat du Jour" : "Plat Africain"),
+      isPlatDuJour: isJour,
+      isSpécialitéMaison: editingItem.isSpécialitéMaison ?? (editingItem.category === "Spécialité Maison"),
       image:
         editingItem.image ||
         "https://images.unsplash.com/photo-1546069901-ba9599a7e63c",
@@ -402,6 +460,51 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               ))}
             </div>
+
+            {/* Widget ⭐ Plat(s) du Jour Actifs */}
+            <div className="bg-gradient-to-r from-amber-500/10 via-[#2A1710] to-[#1A0F0D] p-6 rounded-[2.5rem] border border-brand-gold/30 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-brand-gold text-brand-brown rounded-2xl shadow-lg shrink-0">
+                  <Star size={24} fill="currentColor" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-brand-gold animate-ping"></span>
+                    <h4 className="font-black text-sm uppercase italic text-brand-gold">
+                      Plat / Menu du Jour ({items.filter(isItemPlatDuJour).length} Actif{items.filter(isItemPlatDuJour).length > 1 ? "s" : ""})
+                    </h4>
+                    {items.filter(isItemPlatDuJour).length > 0 ? (
+                      <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[8px] font-black uppercase px-2 py-0.5 rounded-full">
+                        En Ligne
+                      </span>
+                    ) : (
+                      <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[8px] font-black uppercase px-2 py-0.5 rounded-full">
+                        Non Défini
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-white/70 font-medium mt-1">
+                    {items.filter(isItemPlatDuJour).length > 0
+                      ? items
+                          .filter(isItemPlatDuJour)
+                          .map((p) => p.name)
+                          .join(" • ")
+                      : "Aucun plat défini en Plat du Jour aujourd'hui. Les clients ne voient rien dans ⭐ Plat du Jour."}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setCurrentView(AdminView.MENU_MGMT);
+                  setMenuFilterCategory("Plat du Jour");
+                  playSound("pop");
+                }}
+                className="bg-brand-gold hover:bg-amber-400 text-brand-brown px-5 py-2.5 rounded-2xl text-[9px] font-black uppercase italic shadow-lg flex items-center gap-2 shrink-0 active:scale-95 transition-all"
+              >
+                Gérer les Plats du Jour <Star size={14} fill="currentColor" />
+              </button>
+            </div>
+
             <div className="bg-white/5 p-8 rounded-[2.5rem] border border-white/5">
               <h3 className="text-lg font-black italic uppercase text-brand-gold mb-6">
                 Plats en vogue
@@ -502,7 +605,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <RefreshCw size={15} /> Snapshot Secours
                 </button>
                 <button
-                  onClick={() => setEditingItem({})}
+                  onClick={() => setEditingItem({ isPlatDuJour: menuFilterCategory === "Plat du Jour" })}
                   className="w-full sm:w-auto bg-brand-gold hover:bg-amber-400 text-brand-brown px-6 py-3 rounded-2xl shadow-xl flex items-center justify-center gap-2 font-black text-[10px] uppercase italic active:scale-95 transition-all"
                 >
                   <Plus size={18} /> Ajouter un Plat
@@ -510,64 +613,336 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
 
-            {/* Grid des Plats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-white/5 p-5 rounded-[2.5rem] border border-white/5 group relative overflow-hidden transition-all hover:bg-white/10 hover:border-brand-gold/30"
-                >
-                  <div className="relative w-full h-36 rounded-[2rem] overflow-hidden mb-4 bg-black/40">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-300"
-                    />
-                    <span className="absolute top-3 left-3 bg-black/70 backdrop-blur-md text-[8px] font-black text-brand-gold px-2.5 py-1 rounded-full uppercase italic border border-white/10">
-                      {item.category}
-                    </span>
+            {/* Panneau Dédié ⭐ Plat(s) du Jour en Ligne */}
+            <div className="bg-gradient-to-r from-amber-500/15 via-[#2A1510] to-[#1A0F0D] p-5 sm:p-6 rounded-[2.5rem] border-2 border-brand-gold/40 shadow-2xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-brand-gold text-brand-brown rounded-2xl shadow-lg shrink-0">
+                    <Star size={22} fill="currentColor" />
                   </div>
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <h4 className="font-black text-sm italic text-brand-gold uppercase truncate">
-                      {item.name}
-                    </h4>
-                    <span className="text-xs font-black text-brand-orange shrink-0">
-                      {item.price.toLocaleString('fr-FR')} F
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-white/50 line-clamp-2 mb-4 h-7">
-                    {item.description || "Délicieuse spécialité préparée avec soin chez Khady's Food."}
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setEditingItem(item)}
-                      className="flex-1 bg-white/5 p-3 rounded-xl text-white/60 hover:text-white hover:bg-brand-gold/20 flex items-center justify-center gap-1 text-[9px] font-black uppercase transition-all"
-                    >
-                      <Edit3 size={15} /> Modifier
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (confirm(`Supprimer définitivement "${item.name}" de la carte ?`)) {
-                          const nextItems = items.filter((i) => i.id !== item.id);
-                          setItems(nextItems);
-                          await persistentStorage.setItem('khadys_menu_items', nextItems);
-                          if (isSupabaseConfigured) {
-                            try { await db.deleteMenuItem(item.id); } catch {}
-                          }
-                          playSound("pop");
-                          setBackupStatusMessage(`Plat "${item.name}" supprimé.`);
-                          setTimeout(() => setBackupStatusMessage(null), 3000);
-                        }
-                      }}
-                      className="bg-red-500/10 p-3 rounded-xl text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center transition-all"
-                      title="Supprimer le plat"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-brand-gold animate-ping" />
+                      <h4 className="text-base sm:text-lg font-black italic uppercase text-brand-gold">
+                        Plat(s) du Jour & Formules Quotidiennes
+                      </h4>
+                      <span className="bg-brand-gold text-brand-brown text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm">
+                        {items.filter(isItemPlatDuJour).length} en vedette
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-white/70 font-medium mt-0.5">
+                      Ces plats sont immédiatement mis en avant en tête de carte dans l'onglet client <strong>⭐ PLAT DU JOUR</strong>.
+                    </p>
                   </div>
                 </div>
-              ))}
+
+                {items.filter(isItemPlatDuJour).length === 0 && (
+                  <button
+                    onClick={async () => {
+                      const defaultDish =
+                        items.find(
+                          (i) =>
+                            i.name.toLowerCase().includes("dambou") ||
+                            i.name.toLowerCase().includes("tiep") ||
+                            i.name.toLowerCase().includes("garba")
+                        ) || items[0];
+                      if (defaultDish) {
+                        await handleTogglePlatDuJour(
+                          { stopPropagation: () => {} } as any,
+                          defaultDish.id
+                        );
+                      }
+                    }}
+                    className="bg-brand-gold hover:bg-amber-400 text-brand-brown px-4 py-2.5 rounded-2xl text-[9px] font-black uppercase italic shadow-lg flex items-center justify-center gap-2 shrink-0 active:scale-95 transition-all"
+                  >
+                    <Star size={14} fill="currentColor" /> Activer un Plat du Jour
+                  </button>
+                )}
+              </div>
+
+              {/* Plats du jour actuellement sélectionnés */}
+              {items.filter(isItemPlatDuJour).length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                  {items.filter(isItemPlatDuJour).map((p) => (
+                    <div
+                      key={p.id}
+                      className="bg-black/50 border border-brand-gold/40 p-3 rounded-2xl flex items-center justify-between gap-3 hover:border-brand-gold transition-all shadow-md group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={p.image}
+                          alt={p.name}
+                          className="w-12 h-12 rounded-xl object-cover shrink-0 border border-brand-gold/40 group-hover:scale-105 transition-transform"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-brand-gold uppercase truncate italic">
+                            {p.name}
+                          </p>
+                          <p className="text-[10px] font-black text-brand-orange">
+                            {p.price.toLocaleString("fr-FR")} F CFA
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => handleTogglePlatDuJour(e, p.id)}
+                        className="bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase shrink-0 transition-all active:scale-95"
+                        title="Retirer du Plat du Jour"
+                      >
+                        Retirer
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl flex items-center gap-3 text-amber-300">
+                  <AlertCircle size={20} className="shrink-0 text-amber-400" />
+                  <div className="text-[10px] leading-relaxed">
+                    <span className="font-bold">Attention :</span> Aucun plat n'est actuellement marqué comme <strong>"Plat du Jour"</strong>.
+                    Cliquez sur le bouton <span className="font-black underline text-brand-gold">⭐ Mettre en Plat du Jour</span> sur n'importe quel plat de la carte ci-dessous pour le rendre instantanément visible à vos clients.
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Barre de Recherche et Filtres par Catégorie */}
+            <div className="space-y-3">
+              <div className="relative w-full">
+                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
+                <input
+                  type="text"
+                  value={menuSearchQuery}
+                  onChange={(e) => setMenuSearchQuery(e.target.value)}
+                  placeholder="Rechercher un plat par son nom ou description..."
+                  className="w-full pl-12 pr-10 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-xs text-white placeholder-white/40 font-medium focus:outline-none focus:border-brand-gold/50"
+                />
+                {menuSearchQuery && (
+                  <button
+                    onClick={() => setMenuSearchQuery("")}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              {/* Filtres Catégories */}
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+                {[
+                  { id: "TOUT", label: `Tous (${items.length})` },
+                  {
+                    id: "Plat du Jour",
+                    label: `⭐ Plat du Jour (${items.filter(isItemPlatDuJour).length})`,
+                    highlight: true,
+                  },
+                  {
+                    id: "Spécialité Maison",
+                    label: `👑 Spécialités (${items.filter((i) => i.isSpécialitéMaison || i.category === "Spécialité Maison").length})`,
+                  },
+                  {
+                    id: "Plat Africain",
+                    label: `🥘 Plats Africains (${items.filter((i) => i.category === "Plat Africain" || i.category === "Déjeuner" || i.category === "Dîner").length})`,
+                  },
+                  {
+                    id: "Box Sauce",
+                    label: `📦 Box Sauce (${items.filter((i) => i.category === "Box Sauce" || i.category === "Box Repas").length})`,
+                  },
+                  {
+                    id: "Pack-Buffet",
+                    label: `🎪 Buffets & Packs (${items.filter((i) => i.category === "Pack-Buffet" || i.category === "Pack" || i.category === "Buffet").length})`,
+                  },
+                  {
+                    id: "Boisson",
+                    label: `🍹 Boissons & Desserts (${items.filter((i) => i.category.includes("Boisson") || i.category === "Dessert").length})`,
+                  },
+                ].map((tab) => {
+                  const isActive = menuFilterCategory === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => {
+                        setMenuFilterCategory(tab.id);
+                        playSound("pop");
+                      }}
+                      className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 active:scale-95 ${
+                        isActive
+                          ? "bg-brand-gold text-brand-brown shadow-lg font-black border border-brand-gold scale-105"
+                          : tab.highlight
+                          ? "bg-brand-gold/15 text-brand-gold border border-brand-gold/30 hover:bg-brand-gold/25"
+                          : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white border border-white/5"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Grid des Plats Filtrés */}
+            {(() => {
+              const displayedItems = items.filter((item) => {
+                const matchesSearch =
+                  !menuSearchQuery ||
+                  item.name.toLowerCase().includes(menuSearchQuery.toLowerCase()) ||
+                  (item.description &&
+                    item.description.toLowerCase().includes(menuSearchQuery.toLowerCase()));
+
+                if (!matchesSearch) return false;
+
+                if (menuFilterCategory === "TOUT") return true;
+                if (menuFilterCategory === "Plat du Jour") return isItemPlatDuJour(item);
+                if (menuFilterCategory === "Spécialité Maison")
+                  return item.isSpécialitéMaison || item.category === "Spécialité Maison";
+                if (menuFilterCategory === "Plat Africain")
+                  return (
+                    item.category === "Plat Africain" ||
+                    item.category === "Déjeuner" ||
+                    item.category === "Dîner"
+                  );
+                if (menuFilterCategory === "Box Sauce")
+                  return item.category === "Box Sauce" || item.category === "Box Repas";
+                if (menuFilterCategory === "Pack-Buffet")
+                  return (
+                    item.category === "Pack-Buffet" ||
+                    item.category === "Pack" ||
+                    item.category === "Buffet"
+                  );
+                if (menuFilterCategory === "Boisson")
+                  return item.category.includes("Boisson") || item.category === "Dessert";
+
+                return item.category === menuFilterCategory;
+              });
+
+              if (displayedItems.length === 0) {
+                return (
+                  <div className="bg-white/5 p-12 rounded-[2.5rem] border border-white/5 text-center space-y-3">
+                    <p className="text-sm font-black italic text-brand-gold uppercase">
+                      Aucun plat trouvé
+                    </p>
+                    <p className="text-xs text-white/50">
+                      Aucun plat ne correspond à vos filtres actuels.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setMenuFilterCategory("TOUT");
+                        setMenuSearchQuery("");
+                      }}
+                      className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-[9px] font-black uppercase"
+                    >
+                      Réinitialiser les filtres
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {displayedItems.map((item) => {
+                    const isJour = isItemPlatDuJour(item);
+                    return (
+                      <div
+                        key={item.id}
+                        className={`bg-white/5 p-5 rounded-[2.5rem] border group relative overflow-hidden transition-all hover:bg-white/10 ${
+                          isJour
+                            ? "border-brand-gold/60 shadow-[0_0_20px_rgba(230,175,46,0.15)]"
+                            : "border-white/5 hover:border-brand-gold/30"
+                        }`}
+                      >
+                        <div className="relative w-full h-36 rounded-[2rem] overflow-hidden mb-4 bg-black/40">
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <span className="absolute top-3 left-3 bg-black/70 backdrop-blur-md text-[8px] font-black text-brand-gold px-2.5 py-1 rounded-full uppercase italic border border-white/10">
+                            {item.category}
+                          </span>
+
+                          {/* Badge Plat du Jour sur la photo */}
+                          {isJour && (
+                            <span className="absolute top-3 right-3 bg-brand-gold text-brand-brown font-black text-[8px] px-2.5 py-1 rounded-full uppercase italic shadow-lg flex items-center gap-1 border border-amber-300">
+                              <Star size={10} fill="currentColor" /> Plat du Jour
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <h4 className="font-black text-sm italic text-brand-gold uppercase truncate">
+                            {item.name}
+                          </h4>
+                          <span className="text-xs font-black text-brand-orange shrink-0">
+                            {item.price.toLocaleString("fr-FR")} F
+                          </span>
+                        </div>
+
+                        <p className="text-[10px] text-white/50 line-clamp-2 mb-3 h-7">
+                          {item.description ||
+                            "Délicieuse spécialité préparée avec soin chez Khady's Food."}
+                        </p>
+
+                        {/* Bouton rapide d'activation/désactivation Plat du Jour */}
+                        <button
+                          onClick={(e) => handleTogglePlatDuJour(e, item.id)}
+                          className={`w-full py-2 px-3 rounded-xl text-[9px] font-black uppercase flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 mb-2 ${
+                            isJour
+                              ? "bg-brand-gold text-brand-brown hover:bg-amber-400 font-black shadow-lg"
+                              : "bg-white/5 hover:bg-brand-gold/20 text-white/70 hover:text-brand-gold border border-white/10"
+                          }`}
+                          title="Cliquer pour activer ou désactiver ce plat comme Plat du Jour"
+                        >
+                          <Star size={12} fill={isJour ? "currentColor" : "none"} />
+                          {isJour ? "⭐ Plat du Jour (Actif)" : "⭐ Mettre en Plat du Jour"}
+                        </button>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setEditingItem(item)}
+                            className="flex-1 bg-white/5 p-3 rounded-xl text-white/60 hover:text-white hover:bg-brand-gold/20 flex items-center justify-center gap-1 text-[9px] font-black uppercase transition-all"
+                          >
+                            <Edit3 size={15} /> Modifier
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (
+                                confirm(
+                                  `Supprimer définitivement "${item.name}" de la carte ?`
+                                )
+                              ) {
+                                const nextItems = items.filter(
+                                  (i) => i.id !== item.id
+                                );
+                                setItems(nextItems);
+                                await persistentStorage.setItem(
+                                  "khadys_menu_items",
+                                  nextItems
+                                );
+                                if (isSupabaseConfigured) {
+                                  try {
+                                    await db.deleteMenuItem(item.id);
+                                  } catch {}
+                                }
+                                playSound("pop");
+                                setBackupStatusMessage(
+                                  `Plat "${item.name}" supprimé.`
+                                );
+                                setTimeout(
+                                  () => setBackupStatusMessage(null),
+                                  3000
+                                );
+                              }
+                            }}
+                            className="bg-red-500/10 p-3 rounded-xl text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center transition-all"
+                            title="Supprimer le plat"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         );
 
@@ -1295,7 +1670,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     { v: AdminView.DASHBOARD, i: LayoutDashboard, l: "Accueil" },
     { v: AdminView.WHATSAPP_AUTOMATION, i: Bot, l: "WhatsApp 24/7" },
     { v: AdminView.ORDERS, i: ShoppingBag, l: "Commandes" },
-    { v: AdminView.MENU_MGMT, i: Utensils, l: "Carte" },
+    { v: AdminView.MENU_MGMT, i: Utensils, l: "Carte & Plats" },
     { v: AdminView.BLOG_MGMT, i: BookOpen, l: "Blog" },
     { v: AdminView.GALLERY_MGMT, i: Camera, l: "Galerie" },
     { v: AdminView.DELIVERY, i: Bike, l: "Livreurs" },
@@ -1499,22 +1874,99 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </label>
                   <select
                     value={editingItem.category || "Plat Africain"}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const newCat = e.target.value;
+                      const isJour = newCat === "Plat du Jour" || newCat === "Menu du Jour";
                       setEditingItem({
                         ...editingItem,
-                        category: e.target.value as any,
-                      })
-                    }
+                        category: newCat as any,
+                        isPlatDuJour: isJour ? true : editingItem.isPlatDuJour,
+                      });
+                    }}
                     className="w-full p-4 bg-white/5 rounded-2xl text-white text-[10px] font-black border border-white/10 outline-none"
                   >
-                    <option value="Plat Africain">Plat Africain</option>
-                    <option value="Spécialité Maison">Spécialité</option>
-                    <option value="Box Sauce">Box Sauce</option>
-                    <option value="Pack-Buffet">Pack-Buffet</option>
-                    <option value="Boisson Froide">Boisson</option>
-                    <option value="Dessert">Dessert</option>
+                    <option value="Plat du Jour">⭐ Plat du Jour</option>
+                    <option value="Menu du Jour">⭐ Menu du Jour</option>
+                    <option value="Spécialité Maison">👑 Spécialité Maison</option>
+                    <option value="Plat Africain">🥘 Plat Africain</option>
+                    <option value="Déjeuner">☀️ Déjeuner</option>
+                    <option value="Dîner">🌙 Dîner</option>
+                    <option value="Petit-déjeuner">☕ Petit-déjeuner</option>
+                    <option value="Entrée">🥗 Entrée & Pastels</option>
+                    <option value="Box Sauce">📦 Box Sauce</option>
+                    <option value="Pack-Buffet">🎪 Pack-Buffet</option>
+                    <option value="Boisson Froide">🍹 Boisson Froide</option>
+                    <option value="Dessert">🍨 Dessert</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Toggle rapide Plat / Menu du Jour */}
+              <div className="bg-brand-gold/10 border border-brand-gold/30 p-3.5 rounded-2xl flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={`p-2 rounded-xl transition-colors ${
+                      editingItem.isPlatDuJour ||
+                      editingItem.category === "Plat du Jour" ||
+                      editingItem.category === "Menu du Jour"
+                        ? "bg-brand-gold text-brand-brown"
+                        : "bg-white/10 text-white/40"
+                    }`}
+                  >
+                    <Star
+                      size={18}
+                      fill={
+                        editingItem.isPlatDuJour ||
+                        editingItem.category === "Plat du Jour" ||
+                        editingItem.category === "Menu du Jour"
+                          ? "currentColor"
+                          : "none"
+                      }
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-brand-gold italic">
+                      Plat / Menu du Jour
+                    </p>
+                    <p className="text-[7.5px] text-white/60">
+                      Mettre en vedette dans l'onglet ⭐ Plat du Jour
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentJour = Boolean(
+                      editingItem.isPlatDuJour ||
+                        editingItem.category === "Plat du Jour" ||
+                        editingItem.category === "Menu du Jour"
+                    );
+                    const nextVal = !currentJour;
+                    setEditingItem({
+                      ...editingItem,
+                      isPlatDuJour: nextVal,
+                      category: nextVal
+                        ? editingItem.category || "Plat du Jour"
+                        : editingItem.category === "Plat du Jour" ||
+                          editingItem.category === "Menu du Jour"
+                        ? "Plat Africain"
+                        : editingItem.category,
+                    });
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-wider transition-all ${
+                    editingItem.isPlatDuJour ||
+                    editingItem.category === "Plat du Jour" ||
+                    editingItem.category === "Menu du Jour"
+                      ? "bg-brand-gold text-brand-brown shadow-lg scale-105"
+                      : "bg-white/10 text-white/50 hover:bg-white/20"
+                  }`}
+                >
+                  {editingItem.isPlatDuJour ||
+                  editingItem.category === "Plat du Jour" ||
+                  editingItem.category === "Menu du Jour"
+                    ? "⭐ ACTIF"
+                    : "INACTIF"}
+                </button>
               </div>
               {/* Hidden input for dish photo upload */}
               <input

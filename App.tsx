@@ -20,6 +20,8 @@ import { AIGourmandeWidget } from "./components/AIGourmandeWidget";
 import { InstallGuideModal } from "./components/InstallGuideModal";
 import { ShareModal } from "./components/ShareModal";
 import { OrdersView } from "./components/OrdersView";
+import { OrderNotificationBanner } from "./components/OrderNotificationBanner";
+import { RecommendedForYouSection } from "./components/RecommendedForYouSection";
 import FAQSection from "./components/FAQSection";
 import {
   Page,
@@ -684,6 +686,17 @@ const App: React.FC = () => {
               />
             </div>
 
+            {/* Recommandé pour vous (Section IA Gemini basée sur l'historique des commandes) */}
+            <RecommendedForYouSection
+              orders={orders}
+              items={items}
+              onSelectItem={(item) => {
+                setSelectedItem(item);
+                setIsItemModalOpen(true);
+              }}
+              onAddToCart={(dish) => handleAddToCart(dish, 1, "")}
+            />
+
             {/* Menu Grid */}
             <div className="px-4 sm:px-6 grid grid-cols-1 sm:grid-cols-5 gap-3">
               <div
@@ -1050,53 +1063,19 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* BANNIÈRE ALERTE SONORE ET VISUELLE DE COMMANDE */}
+      {/* BANNIÈRE DE NOTIFICATION DE COMMANDE AVEC MINUTEUR, STATUT LIVRAISON & WHATSAPP RÉPONSE RAPIDE */}
       {newOrderAlert && (
-        <div className="fixed top-4 left-4 right-4 z-50 max-w-xl mx-auto bg-gradient-to-r from-[#2C1810] via-[#3E2723] to-[#1C0D08] border-2 border-brand-gold text-white p-4 sm:p-5 rounded-3xl shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-3 animate-slide-up">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-brand-gold/20 text-brand-gold border border-brand-gold/40 flex items-center justify-center shrink-0 animate-bounce">
-              <Bell size={22} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                <span className="text-[10px] font-black uppercase text-brand-gold tracking-widest italic">
-                  NOUVELLE COMMANDE EN LIGNE !
-                </span>
-              </div>
-              <p className="text-xs font-black italic text-white uppercase mt-0.5">
-                {newOrderAlert.id} • {newOrderAlert.customerName} ({newOrderAlert.total + newOrderAlert.deliveryFee} F CFA)
-              </p>
-              <p className="text-[9px] text-white/70 font-medium">
-                Quartier: {newOrderAlert.district} • Double transmission active
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            <button
-              onClick={() => playSound("notification")}
-              className="px-3 py-2 bg-brand-gold text-brand-brown font-black text-[9px] uppercase rounded-xl shadow-md active:scale-95 transition-all flex items-center gap-1"
-              title="Réécouter l'Alerte Sonore"
-            >
-              🔊 Son
-            </button>
-            <a
-              href={`https://wa.me/22796000000?text=${encodeURIComponent(`Bonjour Khady's Food, confirmation pour la commande ${newOrderAlert.id}`)}`}
-              target="_blank"
-              rel="noreferrer"
-              className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[9px] uppercase rounded-xl shadow-md active:scale-95 transition-all flex items-center gap-1"
-            >
-              <MessageCircle size={14} /> WhatsApp
-            </a>
-            <button
-              onClick={() => setNewOrderAlert(null)}
-              className="p-2 text-white/50 hover:text-white font-black text-xs"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
+        <OrderNotificationBanner
+          order={newOrderAlert}
+          onClose={() => setNewOrderAlert(null)}
+          onViewReceipt={() => setLastOrder(newOrderAlert)}
+          onUpdateOrder={(updated) => {
+            setOrders((prev) =>
+              prev.map((o) => (o.id === updated.id ? updated : o))
+            );
+            setNewOrderAlert(updated);
+          }}
+        />
       )}
 
       <VideoDemoModal

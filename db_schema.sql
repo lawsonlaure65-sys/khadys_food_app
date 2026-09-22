@@ -69,14 +69,15 @@ CREATE POLICY "Accès aux commandes" ON orders
 FOR ALL USING (true);
 
 -- 4. Exemples de Plats de Départ (Menu Khady's Food)
-INSERT INTO menu_items (id, name, description, price, image, category, rating, is_specialite_maison, is_spicy)
+INSERT INTO menu_items (id, name, description, price, image, category, rating, is_specialite_maison, is_spicy, is_plat_du_jour)
 VALUES 
-('sp1', 'Tiep Royal Khady', 'Le chef-d''œuvre de la maison au poisson capitaine, riz rouge parfumé et légumes fondants.', 5500, 'https://images.unsplash.com/photo-1627308595229-7830a5c91f9f?w=800', 'Spécialité Maison', 5, true, true),
-('sp2', 'Plateau Prestige Event', 'Assortiment géant de grillades, pastels et alloco pour 4 personnes.', 15000, 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800', 'Spécialité Maison', 5, true, false),
-('dj1', 'Dambou du Jour', 'Couscous de moringa frais aux arachides grillées, servi avec du poulet braisé.', 2500, 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800', 'Plat Africain', 4.9, false, false),
-('af1', 'Mafé Boeuf Express', 'Sauce arachide onctueuse, riz blanc long grain.', 3500, 'https://images.unsplash.com/photo-1541518763531-4a949439a3f8?w=800', 'Plat Africain', 5, false, false),
-('af3', 'Attiéké Poisson Grillé', 'Semoule de manioc, poisson capitaine grillé, alloco.', 5000, 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=800', 'Plat Africain', 5, false, false),
-('bx1', 'Box Sauce Mafé', 'Onctueuse sauce à l''arachide, prête à réchauffer. Format familial 1L.', 4500, 'https://images.unsplash.com/photo-1541518763531-4a949439a3f8?w=800', 'Box Sauce', 4.8, false, false),
-('de1', 'Dégué Royal', 'Couscous de mil au yaourt onctueux, miel et coco.', 1500, 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=800', 'Dessert', 4.9, false, false),
-('bo1', 'Bissap Rouge Glacé', 'Infusion hibiscus et menthe fraîche.', 500, 'https://images.unsplash.com/photo-1556881286-fc6915169721?w=800', 'Boisson Froide', 5, false, false)
+('sp1', 'Tiep Royal Khady', 'Le chef-d''œuvre de la maison au poisson capitaine, riz rouge parfumé et légumes fondants.', 5500, 'https://images.unsplash.com/photo-1627308595229-7830a5c91f9f?w=800', 'Spécialité Maison', 5, true, true, false),
+('sp2', 'Plateau Prestige Event', 'Assortiment géant de grillades, pastels et alloco pour 4 personnes.', 15000, 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800', 'Spécialité Maison', 5, true, false, false),
+('dj1', 'Dambou du Jour', 'Couscous de moringa frais aux arachides grillées, servi avec du poulet braisé.', 2500, 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800', 'Plat du Jour', 4.9, false, false, true),
+('dj2', 'Riz au Gras Niamey', 'Riz savoureux cuit dans un bouillon de viande et épices locales.', 2000, 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=800', 'Plat du Jour', 4.7, false, false, true),
+('af1', 'Mafé Boeuf Express', 'Sauce arachide onctueuse, riz blanc long grain.', 3500, 'https://images.unsplash.com/photo-1541518763531-4a949439a3f8?w=800', 'Plat Africain', 5, false, false, false),
+('af3', 'Attiéké Poisson Grillé', 'Semoule de manioc, poisson capitaine grillé, alloco.', 5000, 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=800', 'Plat Africain', 5, false, false, false),
+('bx1', 'Box Sauce Mafé', 'Onctueuse sauce à l''arachide, prête à réchauffer. Format familial 1L.', 4500, 'https://images.unsplash.com/photo-1541518763531-4a949439a3f8?w=800', 'Box Sauce', 4.8, false, false, false),
+('de1', 'Dégué Royal', 'Couscous de mil au yaourt onctueux, miel et coco.', 1500, 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=800', 'Dessert', 4.9, false, false, false),
+('bo1', 'Bissap Rouge Glacé', 'Infusion hibiscus et menthe fraîche.', 500, 'https://images.unsplash.com/photo-1556881286-fc6915169721?w=800', 'Boisson Froide', 5, false, false, false)
 ON CONFLICT (id) DO NOTHING;

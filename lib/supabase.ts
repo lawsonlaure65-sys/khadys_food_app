@@ -79,7 +79,8 @@ export const db = {
           rating: item.rating,
           is_available: item.isAvailable,
           is_spicy: item.isSpicy,
-          is_specialite_maison: item.isSpécialitéMaison
+          is_specialite_maison: item.isSpécialitéMaison,
+          is_plat_du_jour: Boolean(item.isPlatDuJour || item.category === 'Plat du Jour' || item.category === 'Menu du Jour')
         })
         .select();
       if (error) return null;
