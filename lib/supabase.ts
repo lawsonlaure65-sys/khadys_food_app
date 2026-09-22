@@ -61,14 +61,23 @@ export function checkSupabaseConfigured(url?: string, key?: string): boolean {
     ? { url: sanitizeSupabaseUrl(url), anonKey: key.trim() }
     : getActiveSupabaseCredentials();
 
+  const urlLower = (creds.url || '').toLowerCase();
+  const keyLower = (creds.anonKey || '').toLowerCase();
+
   return (
     Boolean(creds.url) &&
     creds.url.startsWith('https://') &&
-    !creds.url.includes('votre_projet') &&
-    !creds.url.includes('votre-projet') &&
-    !creds.url.includes('your-project') &&
+    !urlLower.includes('votre_projet') &&
+    !urlLower.includes('votre-projet') &&
+    !urlLower.includes('your-project') &&
+    !urlLower.includes('xxx') &&
+    !urlLower.includes('placeholder') &&
+    !urlLower.includes('example.com') &&
     Boolean(creds.anonKey) &&
-    creds.anonKey.length > 20
+    creds.anonKey.length > 25 &&
+    !keyLower.includes('votre_cle') &&
+    !keyLower.includes('your_key') &&
+    !keyLower.includes('placeholder')
   );
 }
 
@@ -217,6 +226,8 @@ export async function testSupabaseConnection(
   details?: {
     menuTableFound: boolean;
     ordersTableFound: boolean;
+    hasMenuItemsTable?: boolean;
+    hasOrdersTable?: boolean;
     menuCount?: number;
     error?: string;
   };
@@ -268,6 +279,8 @@ export async function testSupabaseConnection(
         details: {
           menuTableFound: false,
           ordersTableFound,
+          hasMenuItemsTable: false,
+          hasOrdersTable: ordersTableFound,
           error: menuError.message,
         },
       };
@@ -281,6 +294,8 @@ export async function testSupabaseConnection(
         details: {
           menuTableFound: false,
           ordersTableFound,
+          hasMenuItemsTable: false,
+          hasOrdersTable: ordersTableFound,
           error: menuError.message,
         },
       };
@@ -293,6 +308,8 @@ export async function testSupabaseConnection(
       details: {
         menuTableFound: true,
         ordersTableFound,
+        hasMenuItemsTable: true,
+        hasOrdersTable: ordersTableFound,
         menuCount: Array.isArray(menuData) ? menuData.length : undefined,
       },
     };
@@ -305,6 +322,8 @@ export async function testSupabaseConnection(
       details: {
         menuTableFound: false,
         ordersTableFound: false,
+        hasMenuItemsTable: false,
+        hasOrdersTable: false,
         error: String(err),
       },
     };
