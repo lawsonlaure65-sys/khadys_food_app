@@ -91,6 +91,13 @@
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
       }
+      .hero-slide-layer {
+        will-change: opacity;
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
+      }
     </style>
   </head>
   <body class="text-[#3E2723] antialiased">

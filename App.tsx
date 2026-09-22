@@ -69,6 +69,49 @@ import {
   MessageCircle,
 } from "lucide-react";
 
+const HERO_SLIDES = [
+  {
+    id: 1,
+    title: "TIEP ROYAL KHADY",
+    subtitle: "Capitaine frais, riz rouge parfumé & légumes du Sahel",
+    tag: "Spécialité du Chef",
+    price: "5 500 F CFA",
+    image: "https://images.unsplash.com/photo-1627308595229-7830a5c91f9f?w=1000",
+  },
+  {
+    id: 2,
+    title: "PLATEAU PRESTIGE EVENT",
+    subtitle: "Giga assortiment de grillades, pastels & alloco pour 4",
+    tag: "Festin Événementiel",
+    price: "15 000 F CFA",
+    image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1000",
+  },
+  {
+    id: 3,
+    title: "DAMBOU DU JOUR",
+    subtitle: "Couscous de moringa aux arachides & poulet braisé",
+    tag: "Recette Traditionnelle",
+    price: "2 500 F CFA",
+    image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=1000",
+  },
+  {
+    id: 4,
+    title: "GARBA IVOIRIEN CLASSIQUE",
+    subtitle: "Attiéké vapeur, thon frit doré & piment haché",
+    tag: "Déjeuner Express",
+    price: "3 500 F CFA",
+    image: "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=1000",
+  },
+  {
+    id: 5,
+    title: "SOUPOU KANDIA ROYAL",
+    subtitle: "Gombo mijoté, crevettes, crabe & bœuf tendre",
+    tag: "Plat Africain",
+    price: "5 000 F CFA",
+    image: "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=1000",
+  },
+] as const;
+
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.HOME);
 
@@ -207,58 +250,50 @@ const App: React.FC = () => {
   const [isUpsellOpen, setIsUpsellOpen] = useState(false);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [currentHeroSlide, setCurrentHeroSlide] = useState(0);
+  const [isHeroSlidePaused, setIsHeroSlidePaused] = useState(false);
   const [newOrderAlert, setNewOrderAlert] = useState<Order | null>(null);
 
-  const HERO_SLIDES = [
-    {
-      id: 1,
-      title: "TIEP ROYAL KHADY",
-      subtitle: "Capitaine frais, riz rouge parfumé & légumes du Sahel",
-      tag: "Spécialité du Chef",
-      price: "5 500 F CFA",
-      image: "https://images.unsplash.com/photo-1627308595229-7830a5c91f9f?w=1000",
-    },
-    {
-      id: 2,
-      title: "PLATEAU PRESTIGE EVENT",
-      subtitle: "Giga assortiment de grillades, pastels & alloco pour 4",
-      tag: "Festin Événementiel",
-      price: "15 000 F CFA",
-      image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1000",
-    },
-    {
-      id: 3,
-      title: "DAMBOU DU JOUR",
-      subtitle: "Couscous de moringa aux arachides & poulet braisé",
-      tag: "Recette Traditionnelle",
-      price: "2 500 F CFA",
-      image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=1000",
-    },
-    {
-      id: 4,
-      title: "GARBA IVOIRIEN CLASSIQUE",
-      subtitle: "Attiéké vapeur, thon frit doré & piment haché",
-      tag: "Déjeuner Express",
-      price: "3 500 F CFA",
-      image: "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=1000",
-    },
-    {
-      id: 5,
-      title: "SOUPOU KANDIA ROYAL",
-      subtitle: "Gombo mijoté, crevettes, crabe & bœuf tendre",
-      tag: "Plat Africain",
-      price: "5 000 F CFA",
-      image: "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=1000",
-    },
-  ];
+  // Normalisation robuste de l'index de slide pour éviter tout dépassement ou état incohérent
+  const safeHeroSlideIndex =
+    ((currentHeroSlide % HERO_SLIDES.length) + HERO_SLIDES.length) %
+    HERO_SLIDES.length;
 
-  // Rotation automatique des plats en boucle
+  const currentHeroData = HERO_SLIDES[safeHeroSlideIndex] ?? HERO_SLIDES[0];
+
+  const handleSelectHeroSlide = (targetIndex: number) => {
+    const total = HERO_SLIDES.length;
+    const normalized = ((targetIndex % total) + total) % total;
+    setCurrentHeroSlide(normalized);
+  };
+
+  // Préchargement préventif des images du hero en mémoire cache pour éliminer tout scintillement ou délai de décodage
   useEffect(() => {
+    HERO_SLIDES.forEach((slide) => {
+      const preloadImg = new Image();
+      preloadImg.src = slide.image;
+    });
+  }, []);
+
+  // Gestion robuste de la rotation automatique avec pause lors du survol ou tab en arrière-plan
+  useEffect(() => {
+    if (isHeroSlidePaused) return;
+
     const interval = setInterval(() => {
       setCurrentHeroSlide((prev) => (prev + 1) % HERO_SLIDES.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [HERO_SLIDES.length]);
+    }, 4500);
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        clearInterval(interval);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isHeroSlidePaused]);
   const [toast, setToast] = useState<{
     message: string;
     type: ToastType;
@@ -589,46 +624,75 @@ const App: React.FC = () => {
             </header>
 
             {/* Banner Hero avec rotation automatique des plats en boucle */}
-            <div className="px-4 sm:px-6 overflow-hidden">
+            <div
+              className="px-4 sm:px-6 overflow-hidden"
+              onMouseEnter={() => setIsHeroSlidePaused(true)}
+              onMouseLeave={() => setIsHeroSlidePaused(false)}
+            >
               <div className="relative h-64 sm:h-72 rounded-[3rem] shadow-2xl overflow-hidden group border-2 border-brand-gold/50 bg-gradient-to-br from-[#2A1710] via-[#3A2016] to-[#1C0D08]">
-                {/* Images des plats qui tournent en boucle */}
-                {HERO_SLIDES.map((slide, index) => (
-                  <div
-                    key={slide.id}
-                    className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
-                      index === currentHeroSlide ? "opacity-100 z-10 scale-100" : "opacity-0 z-0 scale-105 pointer-events-none"
-                    }`}
-                  >
-                    <img
-                      src={slide.image}
-                      className="w-full h-full object-cover opacity-75 mix-blend-overlay animate-zoom-dezoom"
-                      alt={slide.title}
-                    />
-                  </div>
-                ))}
+                {/* Images des plats qui tournent en boucle avec will-change: opacity et accélération matérielle */}
+                {HERO_SLIDES.map((slide, index) => {
+                  const isActive = index === safeHeroSlideIndex;
+                  return (
+                    <div
+                      key={slide.id}
+                      style={{
+                        willChange: "opacity",
+                        transform: "translateZ(0)",
+                        backfaceVisibility: "hidden",
+                        WebkitBackfaceVisibility: "hidden",
+                      }}
+                      className={`hero-slide-layer absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+                        isActive
+                          ? "opacity-100 z-10 pointer-events-auto"
+                          : "opacity-0 z-0 pointer-events-none"
+                      }`}
+                      aria-hidden={!isActive}
+                    >
+                      <img
+                        src={slide.image}
+                        className="w-full h-full object-cover opacity-75 mix-blend-overlay animate-zoom-dezoom select-none"
+                        alt={slide.title}
+                        loading={index === 0 ? "eager" : "lazy"}
+                        decoding="async"
+                        style={{
+                          transform: "translateZ(0)",
+                          backfaceVisibility: "hidden",
+                          WebkitBackfaceVisibility: "hidden",
+                        }}
+                      />
+                    </div>
+                  );
+                })}
 
-                <div className="absolute inset-0 z-10 bg-gradient-to-r from-[#2A1710]/95 via-[#2A1710]/80 to-transparent"></div>
+                <div className="absolute inset-0 z-10 bg-gradient-to-r from-[#2A1710]/95 via-[#2A1710]/80 to-transparent pointer-events-none"></div>
                 <div className="absolute inset-0 z-10 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-brand-gold/30 via-transparent to-transparent pointer-events-none"></div>
 
-                {/* Contenu dynamique du plat courant */}
+                {/* Contenu dynamique du plat courant avec transition fluide */}
                 <div className="absolute inset-0 z-20 flex flex-col justify-center px-6 sm:px-12 space-y-2.5">
-                  <div className="flex items-center gap-2">
-                    <Sparkles
-                      size={14}
-                      className="text-brand-gold animate-pulse"
-                    />
-                    <span className="bg-brand-gold/20 text-brand-gold border border-brand-gold/40 text-[8.5px] font-black px-3.5 py-1 rounded-full uppercase italic tracking-widest shadow-md backdrop-blur-md">
-                      {HERO_SLIDES[currentHeroSlide].tag} • {HERO_SLIDES[currentHeroSlide].price}
-                    </span>
+                  <div
+                    key={safeHeroSlideIndex}
+                    className="animate-fade-in space-y-2.5"
+                    style={{ willChange: "opacity, transform" }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Sparkles
+                        size={14}
+                        className="text-brand-gold animate-pulse"
+                      />
+                      <span className="bg-brand-gold/20 text-brand-gold border border-brand-gold/40 text-[8.5px] font-black px-3.5 py-1 rounded-full uppercase italic tracking-widest shadow-md backdrop-blur-md">
+                        {currentHeroData.tag} • {currentHeroData.price}
+                      </span>
+                    </div>
+
+                    <h2 className="text-2xl sm:text-3xl font-black text-white italic uppercase tracking-tighter leading-tight drop-shadow-md">
+                      {currentHeroData.title}
+                    </h2>
+
+                    <p className="text-[10px] sm:text-xs text-amber-100/90 font-medium italic max-w-md line-clamp-2">
+                      {currentHeroData.subtitle}
+                    </p>
                   </div>
-
-                  <h2 className="text-2xl sm:text-3xl font-black text-white italic uppercase tracking-tighter leading-tight drop-shadow-md">
-                    {HERO_SLIDES[currentHeroSlide].title}
-                  </h2>
-
-                  <p className="text-[10px] sm:text-xs text-amber-100/90 font-medium italic max-w-md line-clamp-2">
-                    {HERO_SLIDES[currentHeroSlide].subtitle}
-                  </p>
 
                   <div className="flex flex-wrap items-center gap-3 pt-2">
                     <button
@@ -636,7 +700,7 @@ const App: React.FC = () => {
                         playSound("pop");
                         setCurrentPage(Page.MENU);
                       }}
-                      className="bg-brand-orange text-white px-6 py-2.5 rounded-full text-[9px] font-black uppercase italic shadow-xl flex items-center gap-2 hover:bg-brand-gold hover:text-brand-brown transition-colors"
+                      className="bg-brand-orange text-white px-6 py-2.5 rounded-full text-[9px] font-black uppercase italic shadow-xl flex items-center gap-2 hover:bg-brand-gold hover:text-brand-brown transition-colors active:scale-95"
                     >
                       Commander maintenant <Navigation size={12} />
                     </button>
@@ -656,21 +720,25 @@ const App: React.FC = () => {
 
                 {/* Puces & Sélecteurs de plats en boucle */}
                 <div className="absolute bottom-3 right-4 sm:right-8 z-30 flex items-center gap-1.5 bg-black/50 px-3.5 py-1.5 rounded-full backdrop-blur-md border border-brand-gold/30">
-                  {HERO_SLIDES.map((slide, idx) => (
-                    <button
-                      key={slide.id}
-                      onClick={() => {
-                        setCurrentHeroSlide(idx);
-                        playSound("pop");
-                      }}
-                      className={`h-2 rounded-full transition-all ${
-                        idx === currentHeroSlide
-                          ? "w-6 bg-brand-gold shadow-md"
-                          : "w-2 bg-white/40 hover:bg-white"
-                      }`}
-                      title={slide.title}
-                    />
-                  ))}
+                  {HERO_SLIDES.map((slide, idx) => {
+                    const isSelected = idx === safeHeroSlideIndex;
+                    return (
+                      <button
+                        key={slide.id}
+                        onClick={() => {
+                          handleSelectHeroSlide(idx);
+                          playSound("pop");
+                        }}
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          isSelected
+                            ? "w-6 bg-brand-gold shadow-md"
+                            : "w-2 bg-white/40 hover:bg-white"
+                        }`}
+                        title={slide.title}
+                        aria-label={`Afficher ${slide.title}`}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             </div>
