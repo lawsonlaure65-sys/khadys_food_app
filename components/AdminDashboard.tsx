@@ -71,8 +71,34 @@ import { ClientsMgmtView } from "./ClientsMgmtView";
 import { AIPromoGenerator } from "./AIPromoGenerator";
 import { compressImage } from "../utils/image";
 import { persistentStorage } from "../utils/storage";
-import { db, isSupabaseConfigured } from "../lib/supabase";
-import { Download, Upload, ShieldCheck, Database, FileCheck } from "lucide-react";
+import {
+  db,
+  isSupabaseConfigured,
+  getIsSupabaseConfigured,
+  getSupabaseConfig,
+  saveSupabaseConfig,
+  saveAutoSyncSetting,
+  clearSupabaseConfig,
+  testSupabaseConnection,
+  pushAllMenuItemsToSupabase,
+} from "../lib/supabase";
+import { SUPABASE_SQL_SCHEMA } from "../utils/supabaseSchema";
+import {
+  Download,
+  Upload,
+  ShieldCheck,
+  Database,
+  FileCheck,
+  Cloud,
+  UploadCloud as CloudUpload,
+  Key,
+  Check,
+  Copy,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  CheckCircle,
+} from "lucide-react";
 
 interface AdminDashboardProps {
   items: MenuItem[];
@@ -286,12 +312,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setItems(updatedItems);
     await persistentStorage.setItem("khadys_menu_items", updatedItems);
 
-    if (isSupabaseConfigured) {
+    if (supabaseAutoSync && (isSupabaseConfigured || getIsSupabaseConfigured())) {
       try {
         const updatedTarget = updatedItems.find((i) => i.id === itemId);
         if (updatedTarget) await db.saveMenuItem(updatedTarget);
       } catch (err) {
-        console.warn("Synchro Supabase:", err);
+        console.warn("Synchro Supabase Plat du Jour:", err);
       }
     }
 
@@ -302,6 +328,146 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         : `"${target.name}" retiré des Plats du Jour.`
     );
     setTimeout(() => setBackupStatusMessage(null), 3500);
+  };
+
+  // --- ÉTAT SUPABASE & SYNCHRONISATION CLOUD ---
+  const [supabaseConfigState, setSupabaseConfigState] = useState(() => getSupabaseConfig());
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState(() => getSupabaseConfig().url);
+  const [supabaseKeyInput, setSupabaseKeyInput] = useState(() => getSupabaseConfig().anonKey);
+  const [supabaseAutoSync, setSupabaseAutoSync] = useState(() => getSupabaseConfig().autoSync);
+  const [showSupabaseKey, setShowSupabaseKey] = useState(false);
+  const [isTestingSupabase, setIsTestingSupabase] = useState(false);
+  const [supabaseTestReport, setSupabaseTestReport] = useState<{
+    success: boolean;
+    latencyMs?: number;
+    message: string;
+    details?: any;
+  } | null>(null);
+  const [isPushingMenuToSupabase, setIsPushingMenuToSupabase] = useState(false);
+  const [pushMenuSummary, setPushMenuSummary] = useState<{
+    success: boolean;
+    count: number;
+    total: number;
+    message: string;
+  } | null>(null);
+  const [showSqlSchemaModal, setShowSqlSchemaModal] = useState(false);
+  const [hasCopiedSql, setHasCopiedSql] = useState(false);
+  const [modalPushToSupabase, setModalPushToSupabase] = useState(true);
+
+  const isCloudConnected = Boolean(
+    supabaseConfigState.isConfigured || getIsSupabaseConfigured()
+  );
+
+  const handleTestSupabaseConnection = async () => {
+    setIsTestingSupabase(true);
+    setSupabaseTestReport(null);
+    try {
+      const result = await testSupabaseConnection(supabaseUrlInput, supabaseKeyInput);
+      setSupabaseTestReport(result);
+      if (result.success) {
+        playSound("success");
+      } else {
+        playSound("pop");
+      }
+    } catch (err: any) {
+      setSupabaseTestReport({
+        success: false,
+        message: `Erreur inattendue : ${err?.message || "Échec du test de connexion"}`,
+      });
+      playSound("pop");
+    } finally {
+      setIsTestingSupabase(false);
+    }
+  };
+
+  const handleSaveSupabaseConfig = () => {
+    saveSupabaseConfig(supabaseUrlInput, supabaseKeyInput, supabaseAutoSync);
+    const updated = getSupabaseConfig();
+    setSupabaseConfigState(updated);
+    playSound("success");
+    setBackupStatusMessage(
+      updated.isConfigured
+        ? "✅ Configuration Supabase enregistrée ! Le Cloud est maintenant actif."
+        : "⚠️ Clés enregistrées en mémoire locale."
+    );
+    setTimeout(() => setBackupStatusMessage(null), 4000);
+  };
+
+  const handleResetSupabaseConfig = () => {
+    if (confirm("Réinitialiser les clés personnalisées et revenir aux valeurs par défaut de l'application ?")) {
+      clearSupabaseConfig();
+      const updated = getSupabaseConfig();
+      setSupabaseConfigState(updated);
+      setSupabaseUrlInput(updated.url);
+      setSupabaseKeyInput(updated.anonKey);
+      setSupabaseAutoSync(updated.autoSync);
+      setSupabaseTestReport(null);
+      playSound("pop");
+      setBackupStatusMessage("Paramètres Supabase réinitialisés.");
+      setTimeout(() => setBackupStatusMessage(null), 3000);
+    }
+  };
+
+  const handleToggleAutoSync = (enabled: boolean) => {
+    setSupabaseAutoSync(enabled);
+    saveAutoSyncSetting(enabled);
+    setSupabaseConfigState((prev) => ({ ...prev, autoSync: enabled }));
+    playSound("pop");
+    setBackupStatusMessage(
+      enabled
+        ? "⚡ Synchronisation automatique activée : chaque plat ajouté/modifié sera poussé vers Supabase."
+        : "⏸️ Synchronisation automatique désactivée : sauvegardes locales uniquement."
+    );
+    setTimeout(() => setBackupStatusMessage(null), 4000);
+  };
+
+  const handlePushAllMenuToSupabase = async () => {
+    setIsPushingMenuToSupabase(true);
+    setPushMenuSummary(null);
+    try {
+      const res = await pushAllMenuItemsToSupabase(items);
+      if (res.success) {
+        playSound("success");
+        setPushMenuSummary({
+          success: true,
+          count: res.count,
+          total: res.total,
+          message: `${res.count} plat(s) sur ${res.total} synchronisés avec succès vers Supabase Cloud !`,
+        });
+        setBackupStatusMessage(`🚀 ${res.count} plat(s) poussés vers Supabase Cloud avec succès !`);
+      } else {
+        playSound("pop");
+        setPushMenuSummary({
+          success: false,
+          count: res.count,
+          total: res.total,
+          message: res.error || "Erreur lors de la synchronisation",
+        });
+        setBackupStatusMessage(`Erreur Supabase : ${res.error}`);
+      }
+      setTimeout(() => setBackupStatusMessage(null), 5000);
+    } catch (err: any) {
+      playSound("pop");
+      setPushMenuSummary({
+        success: false,
+        count: 0,
+        total: items.length,
+        message: err?.message || "Erreur réseau Supabase",
+      });
+    } finally {
+      setIsPushingMenuToSupabase(false);
+    }
+  };
+
+  const handleCopySqlSchema = async () => {
+    try {
+      await navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
+      setHasCopiedSql(true);
+      playSound("success");
+      setTimeout(() => setHasCopiedSql(false), 3000);
+    } catch {
+      alert("Script SQL prêt ! Copiez le contenu affiché à l'écran.");
+    }
   };
 
   const handleSaveItem = async (e: React.FormEvent) => {
@@ -337,18 +503,39 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setItems(updatedItems);
     await persistentStorage.setItem('khadys_menu_items', updatedItems);
 
-    if (isSupabaseConfigured) {
+    const shouldPushToSupabase = modalPushToSupabase || supabaseAutoSync;
+    let cloudSyncSuccess = false;
+    let cloudSyncError = "";
+
+    if (shouldPushToSupabase && isCloudConnected) {
       try {
-        await db.saveMenuItem(finalItem);
-      } catch (err) {
+        const syncRes = await db.saveMenuItem(finalItem);
+        if (syncRes.success) {
+          cloudSyncSuccess = true;
+        } else {
+          cloudSyncError = syncRes.error || "Erreur lors de l'enregistrement distant";
+        }
+      } catch (err: any) {
+        cloudSyncError = err?.message || "Erreur réseau";
         console.warn("Synchro Cloud Supabase différée:", err);
       }
     }
 
     setEditingItem(null);
     playSound("success");
-    setBackupStatusMessage(`Plat "${finalItem.name}" enregistré et sécurisé avec succès !`);
-    setTimeout(() => setBackupStatusMessage(null), 4000);
+
+    if (shouldPushToSupabase && isCloudConnected) {
+      if (cloudSyncSuccess) {
+        setBackupStatusMessage(`✅ Plat « ${finalItem.name} » enregistré et synchronisé avec succès sur Supabase Cloud !`);
+      } else {
+        setBackupStatusMessage(`💾 Plat « ${finalItem.name} » enregistré en local (Échec Supabase : ${cloudSyncError}).`);
+      }
+    } else if (shouldPushToSupabase && !isCloudConnected) {
+      setBackupStatusMessage(`💾 Plat « ${finalItem.name} » enregistré en local. (Supabase non configuré - configurez vos clés dans Paramètres).`);
+    } else {
+      setBackupStatusMessage(`💾 Plat « ${finalItem.name} » enregistré en local avec succès !`);
+    }
+    setTimeout(() => setBackupStatusMessage(null), 4500);
   };
 
   const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
@@ -505,6 +692,59 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </div>
 
+            {/* Widget ☁️ Synchronisation Supabase Cloud */}
+            <div className="bg-gradient-to-r from-emerald-950/40 via-[#132219] to-[#0D1812] p-6 rounded-[2.5rem] border border-emerald-500/30 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className={`p-4 rounded-2xl shadow-lg shrink-0 ${isCloudConnected ? "bg-emerald-500 text-black" : "bg-white/10 text-white/50"}`}>
+                  <Cloud size={24} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${isCloudConnected ? "bg-emerald-400 animate-pulse" : "bg-white/40"}`} />
+                    <h4 className="font-black text-sm uppercase italic text-emerald-300">
+                      Supabase Cloud Sync ({items.length} Plats locaux)
+                    </h4>
+                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                      isCloudConnected
+                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                        : "bg-white/10 text-white/50 border-white/20"
+                    }`}>
+                      {isCloudConnected ? "Connecté" : "Hors ligne"}
+                    </span>
+                    {supabaseAutoSync && (
+                      <span className="bg-brand-gold/20 text-brand-gold border border-brand-gold/30 text-[8px] font-black uppercase px-2 py-0.5 rounded-full">
+                        Auto-Push ON
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-white/70 font-medium mt-1">
+                    {isCloudConnected
+                      ? "Vos plats peuvent être poussés en 1 clic vers le Cloud pour être synchronisés sur tous vos écrans et commandes."
+                      : "Identifiants Supabase non renseignés. Configurez vos clés dans Paramètres pour activer la base en direct."}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                <button
+                  onClick={handlePushAllMenuToSupabase}
+                  disabled={isPushingMenuToSupabase}
+                  className="flex-1 md:flex-none bg-emerald-500 hover:bg-emerald-400 text-black px-5 py-2.5 rounded-2xl text-[9px] font-black uppercase italic shadow-lg flex items-center justify-center gap-2 shrink-0 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  <CloudUpload size={14} className={isPushingMenuToSupabase ? "animate-bounce" : ""} />
+                  {isPushingMenuToSupabase ? "Envoi..." : "Pousser vers Cloud"}
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrentView(AdminView.SETTINGS);
+                    playSound("pop");
+                  }}
+                  className="flex-1 md:flex-none bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-2xl text-[9px] font-black uppercase italic border border-white/10 flex items-center justify-center gap-2 shrink-0 active:scale-95 transition-all"
+                >
+                  <Settings size={14} /> Configurer
+                </button>
+              </div>
+            </div>
+
             <div className="bg-white/5 p-8 rounded-[2.5rem] border border-white/5">
               <h3 className="text-lg font-black italic uppercase text-brand-gold mb-6">
                 Plats en vogue
@@ -583,6 +823,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                <button
+                  onClick={handlePushAllMenuToSupabase}
+                  disabled={isPushingMenuToSupabase}
+                  className="flex-1 sm:flex-none bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-4 py-3 rounded-2xl text-[9px] font-black uppercase italic border border-emerald-400/40 flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-xl disabled:opacity-50"
+                  title="Pousser l'ensemble des plats du menu vers votre base de données Supabase Cloud"
+                >
+                  <CloudUpload size={15} className={isPushingMenuToSupabase ? "animate-bounce" : ""} />
+                  {isPushingMenuToSupabase ? "Envoi..." : `Pousser vers Supabase (${items.length})`}
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrentView(AdminView.SETTINGS);
+                    playSound("pop");
+                  }}
+                  className={`flex-1 sm:flex-none px-3.5 py-3 rounded-2xl text-[8.5px] font-black uppercase italic border flex items-center justify-center gap-1.5 transition-all ${
+                    isCloudConnected
+                      ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20"
+                      : "bg-white/5 text-white/50 border-white/10 hover:bg-white/10"
+                  }`}
+                  title="Gérer les clés d'environnement et tester la connexion Supabase"
+                >
+                  <span className={`w-2 h-2 rounded-full ${isCloudConnected ? "bg-emerald-400 animate-pulse" : "bg-white/30"}`} />
+                  {isCloudConnected ? "Cloud Actif" : "Cloud Déconnecté"}
+                </button>
                 <button
                   onClick={handleExportBackup}
                   className="flex-1 sm:flex-none bg-white/10 hover:bg-white/20 text-brand-gold px-4 py-3 rounded-2xl text-[9px] font-black uppercase italic border border-white/10 flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-lg"
@@ -1537,6 +1801,256 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       case AdminView.SETTINGS:
         return (
           <div className="space-y-8 animate-fade-in">
+            {/* Centre de Gestion Supabase Cloud & Clés d'Environnement */}
+            <div className="bg-gradient-to-br from-emerald-950/50 via-[#132219] to-[#0D1812] p-8 sm:p-10 rounded-[3rem] border-2 border-emerald-500/40 space-y-8 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 pointer-events-none opacity-10">
+                <Cloud size={140} className="text-emerald-400" />
+              </div>
+
+              {/* En-tête Supabase */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-500/20 pb-6">
+                <div className="flex items-center gap-4">
+                  <div className={`p-4 rounded-2xl shadow-xl shrink-0 ${isCloudConnected ? "bg-emerald-500 text-black" : "bg-white/10 text-white/50"}`}>
+                    <Cloud size={28} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2.5 h-2.5 rounded-full ${isCloudConnected ? "bg-emerald-400 animate-pulse" : "bg-white/30"}`} />
+                      <h4 className="text-lg sm:text-xl font-black italic uppercase text-emerald-300">
+                        Supabase Cloud & Clés d'Environnement
+                      </h4>
+                    </div>
+                    <p className="text-[10px] text-white/60 font-medium mt-1">
+                      Configurez et testez votre base de données distante pour synchroniser en temps réel les plats et commandes.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                    isCloudConnected
+                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                      : "bg-white/10 text-white/50 border-white/20"
+                  }`}>
+                    {isCloudConnected ? "🟢 Cloud Connecté" : "⚪ Non configuré (Local)"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Formulaire des Clés */}
+              <div className="grid grid-cols-1 gap-5">
+                {/* Champ VITE_SUPABASE_URL */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase text-emerald-300 tracking-wider flex items-center gap-1.5">
+                      <Key size={12} /> VITE_SUPABASE_URL (URL du Projet)
+                    </label>
+                    <span className="text-[8px] text-white/40">Ex: https://xyzcompany.supabase.co</span>
+                  </div>
+                  <input
+                    type="url"
+                    value={supabaseUrlInput}
+                    onChange={(e) => setSupabaseUrlInput(e.target.value.trim())}
+                    placeholder="https://votre-projet.supabase.co"
+                    className="w-full p-4 bg-black/40 rounded-2xl text-white font-mono text-xs border border-emerald-500/30 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/50 transition-all placeholder:text-white/20"
+                  />
+                </div>
+
+                {/* Champ VITE_SUPABASE_ANON_KEY */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase text-emerald-300 tracking-wider flex items-center gap-1.5">
+                      <Key size={12} /> VITE_SUPABASE_ANON_KEY (Clé Publique Anonyme)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowSupabaseKey(!showSupabaseKey)}
+                      className="text-[9px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-bold"
+                    >
+                      {showSupabaseKey ? <EyeOff size={12} /> : <Eye size={12} />}
+                      {showSupabaseKey ? "Masquer" : "Afficher"}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showSupabaseKey ? "text" : "password"}
+                      value={supabaseKeyInput}
+                      onChange={(e) => setSupabaseKeyInput(e.target.value.trim())}
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      className="w-full p-4 pr-12 bg-black/40 rounded-2xl text-white font-mono text-xs border border-emerald-500/30 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/50 transition-all placeholder:text-white/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSupabaseKey(!showSupabaseKey)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                    >
+                      {showSupabaseKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  <p className="text-[8.5px] text-white/40">
+                    Trouvez ces clés dans votre tableau de bord Supabase : <strong>Project Settings &gt; API &gt; Project API keys</strong>.
+                  </p>
+                </div>
+
+                {/* Paramètre Auto-Sync */}
+                <div className="p-5 bg-black/30 rounded-2xl border border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black uppercase text-white italic">
+                        ⚡ Synchronisation automatique vers Supabase (Auto-Push)
+                      </span>
+                      <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${
+                        supabaseAutoSync ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-white/10 text-white/40"
+                      }`}>
+                        {supabaseAutoSync ? "Activée" : "Désactivée"}
+                      </span>
+                    </div>
+                    <p className="text-[9.5px] text-white/60">
+                      Pousser immédiatement chaque plat ajouté ou modifié vers la table Cloud <code>menu_items</code> de Supabase.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleAutoSync(!supabaseAutoSync)}
+                    className={`px-5 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all shrink-0 active:scale-95 ${
+                      supabaseAutoSync
+                        ? "bg-emerald-500 text-black shadow-lg"
+                        : "bg-white/10 text-white/50 hover:bg-white/20"
+                    }`}
+                  >
+                    {supabaseAutoSync ? "AUTO-SYNC : OUI" : "AUTO-SYNC : NON"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Boutons d'Action & Tests */}
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleTestSupabaseConnection}
+                  disabled={isTestingSupabase}
+                  className="flex-1 sm:flex-none bg-emerald-500 hover:bg-emerald-400 text-black px-5 py-3.5 rounded-2xl font-black text-[10px] uppercase italic flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all disabled:opacity-50"
+                >
+                  <RefreshCw size={15} className={isTestingSupabase ? "animate-spin" : ""} />
+                  {isTestingSupabase ? "Test en cours..." : "Tester la Connexion"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveSupabaseConfig}
+                  className="flex-1 sm:flex-none bg-brand-gold hover:bg-amber-400 text-brand-brown px-5 py-3.5 rounded-2xl font-black text-[10px] uppercase italic flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all"
+                >
+                  <Save size={15} /> Enregistrer les Clés
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePushAllMenuToSupabase}
+                  disabled={isPushingMenuToSupabase}
+                  className="flex-1 sm:flex-none bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-5 py-3.5 rounded-2xl font-black text-[10px] uppercase italic border border-emerald-400/30 flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all disabled:opacity-50"
+                >
+                  <CloudUpload size={15} className={isPushingMenuToSupabase ? "animate-bounce" : ""} />
+                  {isPushingMenuToSupabase ? "Synchronisation..." : `Pousser tous les Plats (${items.length})`}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowSqlSchemaModal(true)}
+                  className="flex-1 sm:flex-none bg-white/10 hover:bg-white/20 text-white px-4 py-3.5 rounded-2xl font-black text-[10px] uppercase italic border border-white/10 flex items-center justify-center gap-2 active:scale-95 transition-all"
+                >
+                  <Database size={15} /> Script SQL (Schema)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetSupabaseConfig}
+                  className="text-white/40 hover:text-white px-3 py-3.5 text-[9px] font-black uppercase italic transition-colors"
+                >
+                  Réinitialiser
+                </button>
+              </div>
+
+              {/* Rapport de Test Live */}
+              {supabaseTestReport && (
+                <div
+                  className={`p-5 rounded-2xl border ${
+                    supabaseTestReport.success
+                      ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-200"
+                      : "bg-red-500/15 border-red-500/40 text-red-200"
+                  } space-y-3 animate-fade-in`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    {supabaseTestReport.success ? (
+                      <CheckCircle className="text-emerald-400 shrink-0" size={20} />
+                    ) : (
+                      <AlertCircle className="text-red-400 shrink-0" size={20} />
+                    )}
+                    <div>
+                      <h5 className="font-black text-xs uppercase tracking-wide">
+                        {supabaseTestReport.success ? "Connexion Réussie avec Supabase Cloud !" : "Échec du Test de Connexion"}
+                      </h5>
+                      <p className="text-[10px] opacity-90 mt-0.5">{supabaseTestReport.message}</p>
+                    </div>
+                  </div>
+
+                  {supabaseTestReport.details && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-white/10 text-[9px]">
+                      <div className="bg-black/30 p-2.5 rounded-xl">
+                        <span className="opacity-60 block">Table menu_items</span>
+                        <strong className={supabaseTestReport.details.hasMenuItemsTable ? "text-emerald-400" : "text-amber-400"}>
+                          {supabaseTestReport.details.hasMenuItemsTable ? "✅ Opérationnelle" : "⚠️ Manquante"}
+                        </strong>
+                      </div>
+                      <div className="bg-black/30 p-2.5 rounded-xl">
+                        <span className="opacity-60 block">Table orders</span>
+                        <strong className={supabaseTestReport.details.hasOrdersTable ? "text-emerald-400" : "text-amber-400"}>
+                          {supabaseTestReport.details.hasOrdersTable ? "✅ Opérationnelle" : "⚠️ Manquante"}
+                        </strong>
+                      </div>
+                      <div className="bg-black/30 p-2.5 rounded-xl">
+                        <span className="opacity-60 block">Temps de Réponse</span>
+                        <strong className="text-white">{supabaseTestReport.latencyMs || "< 100"} ms</strong>
+                      </div>
+                    </div>
+                  )}
+
+                  {!supabaseTestReport.success && (
+                    <div className="text-[9px] bg-black/40 p-3 rounded-xl border border-white/5 space-y-1">
+                      <p className="font-bold text-white">Astuce de dépannage :</p>
+                      <p>
+                        1. Vérifiez que l'URL commence bien par <code>https://</code> et se termine par <code>.supabase.co</code>.
+                      </p>
+                      <p>
+                        2. Si l'erreur indique une table inexistante, cliquez sur <strong>"Script SQL (Schema)"</strong> ci-dessus, puis collez-le dans le SQL Editor de Supabase.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Rapport de Push Live */}
+              {pushMenuSummary && (
+                <div
+                  className={`p-4 rounded-2xl border ${
+                    pushMenuSummary.success
+                      ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-200"
+                      : "bg-red-500/15 border-red-500/40 text-red-200"
+                  } flex items-center justify-between gap-3 text-[10px] animate-fade-in`}
+                >
+                  <div className="flex items-center gap-2">
+                    <CloudUpload size={16} />
+                    <span>{pushMenuSummary.message}</span>
+                  </div>
+                  <button
+                    onClick={() => setPushMenuSummary(null)}
+                    className="p-1 hover:bg-white/10 rounded-lg text-white/60 hover:text-white"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+
             <h3 className="text-xl font-black italic uppercase text-brand-gold">
               Configuration de l'Établissement
             </h3>
@@ -2074,6 +2588,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   placeholder="Détails du plat..."
                 />
               </div>
+
+              {/* Paramètre Pousser vers Supabase */}
+              <div className="bg-emerald-950/40 border border-emerald-500/30 p-4 rounded-2xl flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className={`p-2 rounded-xl transition-colors ${modalPushToSupabase ? "bg-emerald-500 text-black" : "bg-white/10 text-white/40"}`}>
+                    <CloudUpload size={18} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-emerald-300 italic flex items-center gap-1.5">
+                      Pousser vers Supabase
+                      <span className={`text-[7.5px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                        isCloudConnected ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-white/10 text-white/40"
+                      }`}>
+                        {isCloudConnected ? "🟢 Cloud Prêt" : "⚪ Non configuré"}
+                      </span>
+                    </p>
+                    <p className="text-[7.5px] text-white/60">
+                      Synchronise ce plat directement dans votre base de données Supabase Cloud
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalPushToSupabase(!modalPushToSupabase)}
+                  className={`px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-wider transition-all shrink-0 ${
+                    modalPushToSupabase
+                      ? "bg-emerald-500 text-black shadow-lg"
+                      : "bg-white/10 text-white/50 hover:bg-white/20"
+                  }`}
+                >
+                  {modalPushToSupabase ? "OUI (PUSH)" : "NON (LOCAL)"}
+                </button>
+              </div>
+
               <button
                 type="submit"
                 className="w-full bg-brand-orange text-white py-6 rounded-[2.5rem] font-black uppercase italic shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all mt-4"
@@ -2082,6 +2630,75 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <CheckCircle2 size={20} />
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Script SQL Supabase */}
+      {showSqlSchemaModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-[#18110F] border-2 border-emerald-500/40 rounded-[2.5rem] w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-scale-up">
+            <div className="p-6 border-b border-white/10 flex items-center justify-between bg-black/40">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-emerald-500 text-black rounded-2xl">
+                  <Database size={22} />
+                </div>
+                <div>
+                  <h3 className="font-black text-emerald-300 text-base uppercase italic">
+                    Script SQL Supabase (db_schema.sql)
+                  </h3>
+                  <p className="text-[9px] text-white/60">
+                    Copiez et collez ce script dans l'onglet 'SQL Editor' de votre projet Supabase
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSqlSchemaModal(false)}
+                className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl active:scale-95"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-[10px] text-emerald-300 space-y-1">
+                <p className="font-black uppercase">Instructions faciles en 3 étapes :</p>
+                <ol className="list-decimal list-inside space-y-1 text-white/80">
+                  <li>Ouvrez votre projet sur <strong>supabase.com</strong></li>
+                  <li>Allez dans le menu latéral gauche &gt; <strong>SQL Editor</strong></li>
+                  <li>Collez ce script et cliquez sur <strong>RUN</strong></li>
+                </ol>
+              </div>
+
+              <div className="relative">
+                <pre className="p-4 bg-black/60 rounded-2xl border border-white/10 text-[9px] text-emerald-400 font-mono overflow-x-auto max-h-96 leading-relaxed select-all">
+                  {SUPABASE_SQL_SCHEMA}
+                </pre>
+                <button
+                  onClick={handleCopySqlSchema}
+                  className="absolute top-3 right-3 bg-emerald-500 hover:bg-emerald-400 text-black px-3 py-1.5 rounded-xl text-[9px] font-black uppercase italic shadow-lg flex items-center gap-1.5 active:scale-95 transition-all"
+                >
+                  {hasCopiedSql ? <Check size={14} /> : <Copy size={14} />}
+                  {hasCopiedSql ? "Copié !" : "Copier le Script"}
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-white/10 bg-black/40 flex justify-end gap-3">
+              <button
+                onClick={handleCopySqlSchema}
+                className="bg-emerald-500 hover:bg-emerald-400 text-black px-6 py-3 rounded-2xl text-[10px] font-black uppercase italic shadow-lg flex items-center gap-2 active:scale-95 transition-all"
+              >
+                {hasCopiedSql ? <Check size={16} /> : <Copy size={16} />}
+                {hasCopiedSql ? "Copié dans le presse-papier !" : "Copier le Script SQL"}
+              </button>
+              <button
+                onClick={() => setShowSqlSchemaModal(false)}
+                className="bg-white/10 hover:bg-white/20 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase italic active:scale-95"
+              >
+                Fermer
+              </button>
+            </div>
           </div>
         </div>
       )}
