@@ -19,6 +19,12 @@ CREATE TABLE IF NOT EXISTS menu_items (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Mise à jour automatique si la table existait déjà dans une ancienne version
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_plat_du_jour BOOLEAN DEFAULT false;
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_specialite_maison BOOLEAN DEFAULT false;
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_spicy BOOLEAN DEFAULT false;
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_available BOOLEAN DEFAULT true;
+
 -- 2. Table des Commandes Clients
 CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,

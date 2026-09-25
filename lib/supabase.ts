@@ -5,11 +5,70 @@ import { MenuItem, Order } from '../types';
 export const KHADY_SUPABASE_URL_KEY = 'khadys_custom_supabase_url';
 export const KHADY_SUPABASE_ANON_KEY = 'khadys_custom_supabase_anon_key';
 export const KHADY_SUPABASE_AUTO_SYNC_KEY = 'khadys_supabase_auto_sync';
+export const KHADY_STANDALONE_MODE_KEY = 'khadys_standalone_local_mode';
+
+export interface SupabaseKeyValidation {
+  isValidFormat: boolean;
+  keyType:
+    | 'jwt_anon'
+    | 'jwt_service'
+    | 'publishable'
+    | 'empty'
+    | 'url_pasted'
+    | 'project_id'
+    | 'pat_token'
+    | 'secret_key'
+    | 'truncated_jwt'
+    | 'unknown';
+  cleanKey: string;
+  projectRef?: string;
+  derivedUrl?: string;
+  warningMessage?: string;
+}
+
+/**
+ * Nettoie et extrait intelligemment une clé API Supabase (JWT eyJ... ou sb_publishable_...)
+ * même si l'utilisateur a collé un bloc .env complet, des guillemets, "Bearer ", ou des espaces.
+ */
+export function sanitizeSupabaseKey(rawKey?: string): string {
+  if (!rawKey) return '';
+
+  // Supprimer les caractères invisibles (zero-width) fréquents lors du copier-coller mobile
+  let cleaned = rawKey.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+
+  // 1. Si le texte contient un JWT Supabase complet (Header eyJ... . Payload eyJ... . Signature)
+  // Fonctionne même si précédé de VITE_SUPABASE_ANON_KEY=, Bearer, guillemets ou URL
+  const jwtMatch = cleaned.match(/(eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{20,})/);
+  if (jwtMatch?.[1]) {
+    return jwtMatch[1];
+  }
+
+  // 2. Si le texte contient une nouvelle clé publique Supabase (sb_publishable_...)
+  const pubMatch = cleaned.match(/(sb_publishable_[A-Za-z0-9_-]{15,})/);
+  if (pubMatch?.[1]) {
+    return pubMatch[1];
+  }
+
+  // 3. Nettoyage des préfixes .env ou en-têtes HTTP éventuels
+  cleaned = cleaned
+    .replace(/^(?:export\s+)?(?:VITE_|NEXT_PUBLIC_|REACT_APP_|EXPO_PUBLIC_)?SUPABASE_(?:ANON_KEY|PUBLISHABLE_KEY|KEY|API_KEY)\s*=\s*/i, '')
+    .replace(/^(?:apikey|authorization)\s*:\s*/i, '')
+    .replace(/^Bearer\s+/i, '')
+    .replace(/^['"`]+|['"`]+$/g, '')
+    .replace(/\s+/g, '');
+
+  // 4. Si "Bearer" a été collé sans espace devant eyJ... (ex: BearereyJhbG...)
+  if (/^Bearer(eyJ[A-Za-z0-9_-]+)/i.test(cleaned)) {
+    cleaned = cleaned.replace(/^Bearer/i, '');
+  }
+
+  return cleaned;
+}
 
 // Extraction automatique de l'identifiant du projet (ref) depuis la clé JWT Anon Supabase
 export function extractProjectRefFromJwt(token?: string): string | null {
   if (!token) return null;
-  const clean = token.trim().replace(/['"\s]+/g, '');
+  const clean = sanitizeSupabaseKey(token);
   const parts = clean.split('.');
   if (parts.length !== 3) return null;
 
@@ -44,12 +103,154 @@ export function deriveSupabaseUrlFromKey(anonKey?: string): string | null {
   return ref ? `https://${ref}.supabase.co` : null;
 }
 
+/**
+ * Analyse précise de la clé saisie pour expliquer immédiatement à l'utilisateur
+ * pourquoi une clé est valide ou pourquoi elle est refusée ("Invalid API key").
+ */
+export function validateSupabaseKeyFormat(rawKey?: string, rawUrl?: string): SupabaseKeyValidation {
+  const cleanKey = sanitizeSupabaseKey(rawKey);
+
+  if (!cleanKey) {
+    return {
+      isValidFormat: false,
+      keyType: 'empty',
+      cleanKey: '',
+      warningMessage: 'Aucune clé saisie dans le champ Clé Anonyme.',
+    };
+  }
+
+  const lower = cleanKey.toLowerCase();
+
+  // Cas 1 : L'utilisateur a collé l'URL dans le champ de la clé
+  if (
+    lower.startsWith('http://') ||
+    lower.startsWith('https://') ||
+    lower.endsWith('.supabase.co') ||
+    lower.includes('supabase.com/dashboard')
+  ) {
+    return {
+      isValidFormat: false,
+      keyType: 'url_pasted',
+      cleanKey,
+      warningMessage:
+        "⚠️ Vous avez collé une URL (https://...) dans le champ de la clé Anon ! Ce 2ème champ doit contenir la clé API qui commence par « eyJ... » ou « sb_publishable_... ».",
+    };
+  }
+
+  // Cas 2 : L'utilisateur a collé le Reference ID court du projet (ex: 20 caractères alphanumériques)
+  if (/^[a-z0-9]{15,24}$/i.test(cleanKey) && !lower.startsWith('eyj') && !lower.startsWith('sb_')) {
+    return {
+      isValidFormat: false,
+      keyType: 'project_id',
+      cleanKey,
+      projectRef: cleanKey.toLowerCase(),
+      derivedUrl: `https://${cleanKey.toLowerCase()}.supabase.co`,
+      warningMessage: `⚠️ Vous avez collé l'identifiant court du projet (« ${cleanKey} », ${cleanKey.length} caractères) au lieu de la clé API ! Dans Supabase > Project Settings > API Keys, copiez la longue clé « anon public » (eyJ...) ou « Publishable key » (sb_publishable_...).`,
+    };
+  }
+
+  // Cas 3 : Personal Access Token (sbp_...)
+  if (lower.startsWith('sbp_') || lower.startsWith('sba_')) {
+    return {
+      isValidFormat: false,
+      keyType: 'pat_token',
+      cleanKey,
+      warningMessage:
+        "⚠️ Ceci est un jeton personnel (sbp_...), pas la clé publique du projet. Allez dans Project Settings > API Keys et copiez la clé « anon public » (eyJ...) ou « Publishable key » (sb_publishable_...).",
+    };
+  }
+
+  // Cas 4 : Clé secrète sb_secret_...
+  if (lower.startsWith('sb_secret_')) {
+    return {
+      isValidFormat: false,
+      keyType: 'secret_key',
+      cleanKey,
+      warningMessage:
+        "⚠️ Vous avez collé une clé secrète (sb_secret_...). Utilisez plutôt la clé publique « Publishable key » (sb_publishable_...) ou « anon public » (eyJ...).",
+    };
+  }
+
+  // Cas 5 : Nouvelle clé publique Supabase (sb_publishable_...)
+  if (lower.startsWith('sb_publishable_')) {
+    if (cleanKey.length < 25 || cleanKey.includes('...')) {
+      return {
+        isValidFormat: false,
+        keyType: 'truncated_jwt',
+        cleanKey,
+        warningMessage:
+          "⚠️ Votre clé « sb_publishable_... » semble coupée ou incomplète. Cliquez sur le bouton « Copy » dans Supabase.",
+      };
+    }
+    return {
+      isValidFormat: true,
+      keyType: 'publishable',
+      cleanKey,
+    };
+  }
+
+  // Cas 6 : Clé JWT Supabase (commence par eyJ)
+  if (cleanKey.startsWith('eyJ') || lower.startsWith('eyj')) {
+    if (cleanKey.includes('...') || cleanKey.includes('…')) {
+      return {
+        isValidFormat: false,
+        keyType: 'truncated_jwt',
+        cleanKey,
+        warningMessage:
+          "⚠️ Votre clé « eyJ... » contient des points de suspension (...) : vous avez copié un aperçu abrégé ! Sur Supabase, cliquez sur le bouton « Copy » à droite de la clé.",
+      };
+    }
+
+    const parts = cleanKey.split('.');
+    if (parts.length !== 3) {
+      return {
+        isValidFormat: false,
+        keyType: 'truncated_jwt',
+        cleanKey,
+        warningMessage: `⚠️ Votre clé « eyJ... » est incomplète (${parts.length} partie(s) au lieu de 3 séparées par des points). Recopiez la clé entière avec le bouton « Copy » dans Supabase.`,
+      };
+    }
+
+    const ref = extractProjectRefFromJwt(cleanKey);
+    const sig = parts[2] || '';
+
+    // Une signature HMAC-SHA256 en base64url fait exactement 43 caractères
+    if (sig.length < 40 || !/^[A-Za-z0-9_-]+$/.test(sig)) {
+      return {
+        isValidFormat: false,
+        keyType: 'truncated_jwt',
+        cleanKey,
+        projectRef: ref || undefined,
+        derivedUrl: ref ? `https://${ref}.supabase.co` : undefined,
+        warningMessage: `⚠️ La fin de votre clé « eyJ... » est coupée (signature de ${sig.length} caractères au lieu de 43). Cliquez sur le bouton « Copy » dans Supabase pour copier toute la clé.`,
+      };
+    }
+
+    return {
+      isValidFormat: true,
+      keyType: 'jwt_anon',
+      cleanKey,
+      projectRef: ref || undefined,
+      derivedUrl: ref ? `https://${ref}.supabase.co` : undefined,
+    };
+  }
+
+  // Cas 7 : Autre texte (mot de passe, placeholder, texte court...)
+  const preview = cleanKey.length > 12 ? `${cleanKey.slice(0, 8)}...${cleanKey.slice(-3)}` : cleanKey;
+  return {
+    isValidFormat: false,
+    keyType: 'unknown',
+    cleanKey,
+    warningMessage: `⚠️ Le texte actuellement dans le champ Clé (« ${preview} », ${cleanKey.length} caractères) N'EST PAS une clé API Supabase. Une vraie clé commence obligatoirement par « eyJ... » (~200 caractères) ou « sb_publishable_... ».`,
+  };
+}
+
 // Extraction et assainissement automatique de l'origine exacte (ex: https://xxxx.supabase.co)
 export function sanitizeSupabaseUrl(urlStr: string, anonKey?: string): string {
-  let effectiveKey = anonKey;
+  let effectiveKey = sanitizeSupabaseKey(anonKey);
   if (!effectiveKey) {
     try {
-      effectiveKey = localStorage.getItem(KHADY_SUPABASE_ANON_KEY) || '';
+      effectiveKey = sanitizeSupabaseKey(localStorage.getItem(KHADY_SUPABASE_ANON_KEY) || '');
     } catch {
       effectiveKey = '';
     }
@@ -62,8 +263,19 @@ export function sanitizeSupabaseUrl(urlStr: string, anonKey?: string): string {
     return jwtDerivedUrl || '';
   }
 
+  // Si l'utilisateur a collé un bloc .env complet contenant https://xxx.supabase.co
+  const envUrlMatch = urlStr.match(/https?:\/\/([a-z0-9-]{12,32})\.supabase\.(?:co|com|in|io)/i);
+  if (envUrlMatch?.[1]) {
+    const extractedOrigin = `https://${envUrlMatch[1].toLowerCase()}.supabase.co`;
+    if (jwtDerivedUrl && extractedOrigin.toLowerCase() !== jwtDerivedUrl.toLowerCase()) {
+      return jwtDerivedUrl;
+    }
+    return extractedOrigin;
+  }
+
   // Supprimer tous les espaces, retours à la ligne ou guillemets accidentels (fréquent sur mobile)
-  let raw = urlStr.trim().replace(/['"\s]+/g, '');
+  let raw = urlStr.replace(/[\u200B-\u200D\uFEFF]/g, '').trim().replace(/['"\s]+/g, '');
+  raw = raw.replace(/^(?:export\s+)?(?:VITE_|NEXT_PUBLIC_|REACT_APP_)?SUPABASE_URL\s*=\s*/i, '');
 
   // Si l'utilisateur a collé par erreur un JWT dans le champ URL
   if (raw.startsWith('eyJ') && raw.split('.').length === 3) {
@@ -78,7 +290,7 @@ export function sanitizeSupabaseUrl(urlStr: string, anonKey?: string): string {
   }
 
   // Si l'utilisateur a collé uniquement le Reference ID du projet (ex: xyz1234567890abcdef)
-  if (/^[a-z0-9]{15,30}$/i.test(raw)) {
+  if (/^[a-z0-9]{15,30}$/i.test(raw) && !raw.toLowerCase().startsWith('sb_')) {
     return `https://${raw.toLowerCase()}.supabase.co`;
   }
 
@@ -120,6 +332,36 @@ export function sanitizeSupabaseUrl(urlStr: string, anonKey?: string): string {
 }
 
 /**
+ * Crée un client Supabase compatible à la fois avec les clés JWT classiques (eyJ...)
+ * et les nouvelles clés publiques Supabase 2025/2026 (sb_publishable_...)
+ */
+function createSupabaseClientInstance(url: string, key: string, persistSession: boolean = true): SupabaseClient {
+  const isOpaquePublishableKey = /^sb_publishable_/i.test(key);
+
+  return createClient(url, key, {
+    auth: {
+      persistSession,
+      autoRefreshToken: persistSession,
+    },
+    global: isOpaquePublishableKey
+      ? {
+          fetch: async (input, init) => {
+            const headers = new Headers(init?.headers);
+            const authHeader = headers.get('Authorization') || headers.get('authorization');
+            // Dans @supabase/supabase-js < 2.49, l'envoi de "Authorization: Bearer sb_publishable_..."
+            // provoque une erreur "Invalid API key" / JWT invalide sur PostgREST.
+            if (authHeader && /Bearer\s+sb_publishable_/i.test(authHeader)) {
+              headers.delete('Authorization');
+              headers.delete('authorization');
+            }
+            return fetch(input, { ...init, headers });
+          },
+        }
+      : undefined,
+  });
+}
+
+/**
  * Récupère les identifiants Supabase actifs :
  * 1. Priorité aux clés personnalisées saisies par l'Admin (localStorage)
  * 2. Repli sur les variables d'environnement Vite (import.meta.env)
@@ -135,14 +377,34 @@ export function getActiveSupabaseCredentials(): { url: string; anonKey: string; 
     // localStorage inaccessible
   }
 
-  const cleanCustomKey = customKey.trim().replace(/\s+/g, '');
+  let cleanCustomKey = sanitizeSupabaseKey(customKey);
+
+  // Si l'utilisateur avait collé sa clé JWT dans le champ URL par erreur, la récupérer !
+  if (!validateSupabaseKeyFormat(cleanCustomKey).isValidFormat && customUrl) {
+    const rescuedKeyFromUrl = sanitizeSupabaseKey(customUrl);
+    if (validateSupabaseKeyFormat(rescuedKeyFromUrl).isValidFormat) {
+      cleanCustomKey = rescuedKeyFromUrl;
+    }
+  }
+
+  // Si l'utilisateur avait collé l'URL dans le champ Clé par erreur et que l'URL est vide
+  if (!customUrl && customKey && customKey.includes('.supabase.')) {
+    customUrl = customKey;
+  }
+
   const cleanCustomUrl = sanitizeSupabaseUrl(customUrl, cleanCustomKey);
 
-  if (cleanCustomUrl && cleanCustomKey) {
-    // Si l'URL a été réparée automatiquement (ex: depuis le JWT), sauvegarder l'URL propre
-    if (cleanCustomUrl !== customUrl.trim()) {
+  if (cleanCustomUrl || cleanCustomKey) {
+    if (cleanCustomUrl && cleanCustomUrl !== customUrl.trim()) {
       try {
         localStorage.setItem(KHADY_SUPABASE_URL_KEY, cleanCustomUrl);
+      } catch {
+        // Ignorer
+      }
+    }
+    if (cleanCustomKey && cleanCustomKey !== customKey.trim()) {
+      try {
+        localStorage.setItem(KHADY_SUPABASE_ANON_KEY, cleanCustomKey);
       } catch {
         // Ignorer
       }
@@ -154,7 +416,7 @@ export function getActiveSupabaseCredentials(): { url: string; anonKey: string; 
     };
   }
 
-  const envKey = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '').trim().replace(/\s+/g, '');
+  const envKey = sanitizeSupabaseKey((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '');
   const envUrl = sanitizeSupabaseUrl(((import.meta as any).env?.VITE_SUPABASE_URL || '').trim(), envKey);
 
   return {
@@ -168,12 +430,13 @@ export function getActiveSupabaseCredentials(): { url: string; anonKey: string; 
  * Vérifie si la configuration Supabase actuelle est valide
  */
 export function checkSupabaseConfigured(url?: string, key?: string): boolean {
-  const creds = (url !== undefined && key !== undefined)
-    ? { url: sanitizeSupabaseUrl(url, key), anonKey: key.trim().replace(/\s+/g, '') }
-    : getActiveSupabaseCredentials();
+  const creds =
+    url !== undefined && key !== undefined
+      ? { url: sanitizeSupabaseUrl(url, key), anonKey: sanitizeSupabaseKey(key) }
+      : getActiveSupabaseCredentials();
 
   const urlLower = (creds.url || '').toLowerCase();
-  const keyLower = (creds.anonKey || '').toLowerCase();
+  const keyValidation = validateSupabaseKeyFormat(creds.anonKey, creds.url);
 
   return (
     Boolean(creds.url) &&
@@ -187,11 +450,7 @@ export function checkSupabaseConfigured(url?: string, key?: string): boolean {
     !urlLower.includes('example.com') &&
     urlLower !== 'https://supabase.com' &&
     urlLower !== 'https://supabase.co' &&
-    Boolean(creds.anonKey) &&
-    creds.anonKey.length > 25 &&
-    !keyLower.includes('votre_cle') &&
-    !keyLower.includes('your_key') &&
-    !keyLower.includes('placeholder')
+    keyValidation.isValidFormat
   );
 }
 
@@ -214,12 +473,7 @@ export function getSupabaseClient(): SupabaseClient | null {
   }
 
   try {
-    cachedClient = createClient(creds.url, creds.anonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-      },
-    });
+    cachedClient = createSupabaseClientInstance(creds.url, creds.anonKey, true);
     lastClientUrl = creds.url;
     lastClientKey = creds.anonKey;
     return cachedClient;
@@ -292,7 +546,13 @@ export function saveAutoSyncSetting(enabled: boolean): void {
 }
 
 export function saveSupabaseConfig(url: string, anonKey: string, autoSync: boolean = true): void {
-  const cleanKey = (anonKey || '').trim().replace(/\s+/g, '');
+  let cleanKey = sanitizeSupabaseKey(anonKey);
+  if (!validateSupabaseKeyFormat(cleanKey).isValidFormat && url) {
+    const rescuedFromUrl = sanitizeSupabaseKey(url);
+    if (validateSupabaseKeyFormat(rescuedFromUrl).isValidFormat) {
+      cleanKey = rescuedFromUrl;
+    }
+  }
   const clean = sanitizeSupabaseUrl(url, cleanKey);
   try {
     localStorage.setItem(KHADY_SUPABASE_URL_KEY, clean);
@@ -331,12 +591,23 @@ function isTableMissingError(err: any): boolean {
   return (
     code === '42P01' ||
     code === 'PGRST205' ||
-    code === 'PGRST204' ||
-    msg.includes('does not exist') ||
+    (code === 'PGRST204' && !msg.includes('column')) ||
+    (msg.includes('does not exist') && !msg.includes('column')) ||
     msg.includes('schema cache') ||
     msg.includes('could not find the table') ||
     details.includes('does not exist') ||
     details.includes('schema cache')
+  );
+}
+
+function isColumnMissingError(err: any): boolean {
+  if (!err) return false;
+  const code = String(err.code || '').toUpperCase();
+  const msg = String(err.message || '').toLowerCase();
+  return (
+    code === '42703' ||
+    (code === 'PGRST204' && msg.includes('column')) ||
+    (msg.includes('column') && (msg.includes('does not exist') || msg.includes('schema cache')))
   );
 }
 
@@ -369,7 +640,7 @@ function isAuthKeyError(err: any): boolean {
 /**
  * TESTEUR DE CONNEXION SUPABASE
  * Effectue un diagnostic complet en direct :
- * 1. Validation et réparation intelligente de l'URL (notamment via le JWT Anon)
+ * 1. Validation et réparation intelligente de l'URL et de la clé (notamment via le JWT Anon)
  * 2. Requête de test vers l'instance
  * 3. Vérification précise de l'existence de la table `menu_items`
  * 4. Vérification précise de l'existence de la table `orders`
@@ -392,17 +663,32 @@ export async function testSupabaseConnection(
     authError?: boolean;
     missingTables?: boolean;
     correctedUrl?: string;
+    correctedKey?: string;
     menuCount?: number;
     error?: string;
   };
 }> {
   const activeCreds = getActiveSupabaseCredentials();
-  const targetKey = (testKey !== undefined ? testKey : activeCreds.anonKey).trim().replace(/\s+/g, '');
+  let targetKey = sanitizeSupabaseKey(testKey !== undefined ? testKey : activeCreds.anonKey);
+
+  // Si l'utilisateur a collé sa clé JWT dans le champ URL par erreur, la récupérer !
+  if (!validateSupabaseKeyFormat(targetKey).isValidFormat && testUrl) {
+    const rescuedKey = sanitizeSupabaseKey(testUrl);
+    if (validateSupabaseKeyFormat(rescuedKey).isValidFormat) {
+      targetKey = rescuedKey;
+    }
+  }
+
   let targetUrl = sanitizeSupabaseUrl(testUrl !== undefined ? testUrl : activeCreds.url, targetKey);
   const jwtDerivedUrl = deriveSupabaseUrlFromKey(targetKey);
 
   if (!targetUrl && jwtDerivedUrl) {
     targetUrl = jwtDerivedUrl;
+  }
+
+  const keyValidation = validateSupabaseKeyFormat(targetKey, targetUrl);
+  if (!targetUrl && keyValidation.derivedUrl) {
+    targetUrl = keyValidation.derivedUrl;
   }
 
   if (!targetUrl || !targetUrl.startsWith('https://') || !targetUrl.includes('.')) {
@@ -412,17 +698,29 @@ export async function testSupabaseConnection(
     };
   }
 
-  if (!targetKey || targetKey.length < 20) {
+  if (!keyValidation.isValidFormat) {
     return {
       success: false,
-      message: "La clé Anon Supabase est invalide ou trop courte (minimum 20 caractères).",
+      message:
+        keyValidation.warningMessage ||
+        "La clé Anon saisie n'est pas valide. Dans Supabase > Project Settings > API Keys, copiez la clé publique « anon » (eyJ...) ou « Publishable key » (sb_publishable_...).",
+      details: {
+        menuTableFound: false,
+        ordersTableFound: false,
+        hasMenuItemsTable: false,
+        hasOrdersTable: false,
+        menuTableStatus: 'error',
+        ordersTableStatus: 'error',
+        authError: true,
+        correctedUrl: targetUrl,
+        correctedKey: targetKey,
+        error: 'Format de clé API invalide',
+      },
     };
   }
 
   const runProbe = async (probeUrl: string) => {
-    const client = createClient(probeUrl, targetKey, {
-      auth: { persistSession: false },
-    });
+    const client = createSupabaseClientInstance(probeUrl, targetKey, false);
 
     const [menuRes, ordersRes] = await Promise.all([
       client.from('menu_items').select('id', { count: 'exact', head: true }),
@@ -441,10 +739,13 @@ export async function testSupabaseConnection(
   try {
     let { menuCount, menuError, ordersError } = await runProbe(targetUrl);
 
-    // Si l'URL échoue au niveau réseau et que le JWT Anon contient une URL officielle différente,
+    // Si l'URL échoue au niveau réseau ou clé et que le JWT Anon contient une URL officielle différente,
     // basculer automatiquement sur l'URL dérivée du JWT !
     if (
-      (isNetworkFetchError(menuError) || isNetworkFetchError(ordersError)) &&
+      (isNetworkFetchError(menuError) ||
+        isNetworkFetchError(ordersError) ||
+        isAuthKeyError(menuError) ||
+        isAuthKeyError(ordersError)) &&
       jwtDerivedUrl &&
       jwtDerivedUrl.toLowerCase() !== targetUrl.toLowerCase()
     ) {
@@ -472,6 +773,7 @@ export async function testSupabaseConnection(
           ordersTableStatus: 'unreachable',
           networkError: true,
           correctedUrl: targetUrl,
+          correctedKey: targetKey,
           error: menuError?.message || ordersError?.message || 'Failed to fetch',
         },
       };
@@ -482,7 +784,9 @@ export async function testSupabaseConnection(
       return {
         success: false,
         latencyMs,
-        message: `Le serveur Supabase (${targetUrl}) a répondu, mais la clé Anon est refusée (${menuError?.message || ordersError?.message}). Vérifiez que vous avez bien copié la clé publique 'anon' dans Project Settings > API.`,
+        message:
+          keyValidation.warningMessage ||
+          `Le serveur Supabase (${targetUrl}) a refusé cette clé (« Invalid API key »). Assurez-vous d'avoir copié la clé publique « anon » (commençant par eyJ...) ou « Publishable key » (sb_publishable_...) appartenant bien au projet ${targetUrl.replace('https://', '')}.`,
         details: {
           menuTableFound: false,
           ordersTableFound: false,
@@ -492,6 +796,7 @@ export async function testSupabaseConnection(
           ordersTableStatus: 'error',
           authError: true,
           correctedUrl: targetUrl,
+          correctedKey: targetKey,
           error: menuError?.message || ordersError?.message,
         },
       };
@@ -517,7 +822,7 @@ export async function testSupabaseConnection(
       return {
         success: false,
         latencyMs,
-        message: `Connexion établie avec votre projet Supabase (${latencyMs} ms), mais ${missingList.includes('et') ? 'les tables' : 'la table'} ${missingList} n'existe${missingList.includes('et') ? 'nt' : ''} pas encore. Cliquez sur « Script SQL (Schema) » pour copier le script et exécutez-le dans SQL Editor sur Supabase.`,
+        message: `Connexion établie avec votre projet Supabase (${latencyMs} ms), mais ${missingList.includes('et') ? 'les tables' : 'la table'} ${missingList} n'existe${missingList.includes('et') ? 'nt' : ''} pas encore. Cliquez sur « Copier & Voir le Script SQL » ci-dessous et exécutez-le dans SQL Editor sur Supabase.`,
         details: {
           menuTableFound: menuOk,
           ordersTableFound: ordersOk,
@@ -527,6 +832,7 @@ export async function testSupabaseConnection(
           ordersTableStatus: ordersOk ? 'ok' : ordersMissing ? 'missing' : 'error',
           missingTables: true,
           correctedUrl: targetUrl,
+          correctedKey: targetKey,
           error: menuError?.message || ordersError?.message,
         },
       };
@@ -547,6 +853,7 @@ export async function testSupabaseConnection(
           menuTableStatus: menuOk ? 'ok' : 'error',
           ordersTableStatus: ordersOk ? 'ok' : 'error',
           correctedUrl: targetUrl,
+          correctedKey: targetKey,
           error: errObj?.message,
         },
       };
@@ -565,6 +872,7 @@ export async function testSupabaseConnection(
         menuTableStatus: 'ok',
         ordersTableStatus: 'ok',
         correctedUrl: targetUrl,
+        correctedKey: targetKey,
         menuCount,
       },
     };
@@ -583,6 +891,7 @@ export async function testSupabaseConnection(
         ordersTableStatus: 'unreachable',
         networkError: true,
         correctedUrl: targetUrl,
+        correctedKey: targetKey,
         error: String(err),
       },
     };
@@ -593,23 +902,73 @@ export async function testSupabaseConnection(
  * POUSSER TOUT LE MENU EN BLOC VERS SUPABASE
  */
 export async function pushAllMenuItemsToSupabase(
-  items: MenuItem[]
-): Promise<{ success: boolean; count: number; total: number; error?: string }> {
-  const client = getSupabaseClient();
-  if (!client) {
+  items: MenuItem[],
+  customUrl?: string,
+  customKey?: string
+): Promise<{
+  success: boolean;
+  count: number;
+  total: number;
+  error?: string;
+  authError?: boolean;
+  missingTables?: boolean;
+  correctedUrl?: string;
+  correctedKey?: string;
+}> {
+  const activeCreds = getActiveSupabaseCredentials();
+  let targetKey = sanitizeSupabaseKey(customKey !== undefined && customKey.trim() !== '' ? customKey : activeCreds.anonKey);
+
+  // Si la clé a été collée dans le champ URL par erreur
+  if (!validateSupabaseKeyFormat(targetKey).isValidFormat && customUrl) {
+    const rescuedKey = sanitizeSupabaseKey(customUrl);
+    if (validateSupabaseKeyFormat(rescuedKey).isValidFormat) {
+      targetKey = rescuedKey;
+    }
+  }
+
+  let targetUrl = sanitizeSupabaseUrl(
+    customUrl !== undefined && customUrl.trim() !== '' ? customUrl : activeCreds.url,
+    targetKey
+  );
+  const jwtDerivedUrl = deriveSupabaseUrlFromKey(targetKey);
+  if (!targetUrl && jwtDerivedUrl) {
+    targetUrl = jwtDerivedUrl;
+  }
+
+  const keyValidation = validateSupabaseKeyFormat(targetKey, targetUrl);
+  if (!keyValidation.isValidFormat) {
     return {
       success: false,
       count: 0,
       total: items.length,
-      error: "Supabase n'est pas configuré. Veuillez renseigner l'URL et la clé dans Paramètres > Supabase.",
+      authError: true,
+      correctedUrl: targetUrl,
+      correctedKey: targetKey,
+      error:
+        keyValidation.warningMessage ||
+        "Clé API Supabase invalide. Veuillez coller votre clé publique « anon » (eyJ...) ou « Publishable key » (sb_publishable_...).",
     };
   }
 
+  if (!targetUrl || !targetUrl.startsWith('https://')) {
+    return {
+      success: false,
+      count: 0,
+      total: items.length,
+      error: "L'URL du projet Supabase est manquante ou invalide.",
+    };
+  }
+
+  // Sauvegarder la configuration nettoyée
+  saveSupabaseConfig(targetUrl, targetKey, isAutoSyncEnabled());
+
   if (items.length === 0) {
-    return { success: true, count: 0, total: 0 };
+    return { success: true, count: 0, total: 0, correctedUrl: targetUrl, correctedKey: targetKey };
   }
 
   try {
+    const client = createSupabaseClientInstance(targetUrl, targetKey, false);
+
     const payload = items.map((item) => ({
       id: item.id,
       name: item.name,
@@ -634,9 +993,39 @@ export async function pushAllMenuItemsToSupabase(
 
     for (let i = 0; i < payload.length; i += BATCH_SIZE) {
       const batch = payload.slice(i, i + BATCH_SIZE);
-      const { error } = await client.from('menu_items').upsert(batch, { onConflict: 'id' });
+      let { error } = await client.from('menu_items').upsert(batch, { onConflict: 'id' });
+
+      // Si la table menu_items existe mais n'a pas encore la colonne is_plat_du_jour (ancien schéma SQL),
+      // réessayer automatiquement sans la colonne is_plat_du_jour !
+      if (error && isColumnMissingError(error)) {
+        const legacyBatch = batch.map(({ is_plat_du_jour, ...rest }) => rest);
+        const retry = await client.from('menu_items').upsert(legacyBatch, { onConflict: 'id' });
+        error = retry.error;
+      }
 
       if (error) {
+        if (isAuthKeyError(error)) {
+          return {
+            success: false,
+            count: synced,
+            total: items.length,
+            authError: true,
+            correctedUrl: targetUrl,
+            correctedKey: targetKey,
+            error: `La clé Anon a été refusée par ${targetUrl} (« Invalid API key »). Vérifiez que vous avez bien copié la clé « anon public » (eyJ...) ou « Publishable key » (sb_publishable_...) dans Supabase > Project Settings > API Keys.`,
+          };
+        }
+        if (isTableMissingError(error)) {
+          return {
+            success: false,
+            count: synced,
+            total: items.length,
+            missingTables: true,
+            correctedUrl: targetUrl,
+            correctedKey: targetKey,
+            error: `Connexion réussie à Supabase, mais la table 'menu_items' n'a pas encore été créée ! Cliquez sur « Script SQL » et exécutez-le dans SQL Editor sur Supabase.`,
+          };
+        }
         throw new Error(error.message);
       }
       synced += batch.length;
@@ -646,12 +1035,16 @@ export async function pushAllMenuItemsToSupabase(
       success: true,
       count: synced,
       total: items.length,
+      correctedUrl: targetUrl,
+      correctedKey: targetKey,
     };
   } catch (err: any) {
     return {
       success: false,
       count: 0,
       total: items.length,
+      correctedUrl: targetUrl,
+      correctedKey: targetKey,
       error: err?.message || 'Erreur lors de la synchronisation des plats',
     };
   }

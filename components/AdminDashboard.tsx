@@ -83,6 +83,9 @@ import {
   pushAllMenuItemsToSupabase,
   deriveSupabaseUrlFromKey,
   sanitizeSupabaseUrl,
+  sanitizeSupabaseKey,
+  validateSupabaseKeyFormat,
+  KHADY_STANDALONE_MODE_KEY,
 } from "../lib/supabase";
 import { SUPABASE_SQL_SCHEMA } from "../utils/supabaseSchema";
 import {
@@ -337,7 +340,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [supabaseUrlInput, setSupabaseUrlInput] = useState(() => getSupabaseConfig().url);
   const [supabaseKeyInput, setSupabaseKeyInput] = useState(() => getSupabaseConfig().anonKey);
   const [supabaseAutoSync, setSupabaseAutoSync] = useState(() => getSupabaseConfig().autoSync);
-  const [showSupabaseKey, setShowSupabaseKey] = useState(false);
+  const [showSupabaseKey, setShowSupabaseKey] = useState(true);
+  const [isStandaloneMode, setIsStandaloneMode] = useState(() => {
+    try {
+      return localStorage.getItem(KHADY_STANDALONE_MODE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
   const [isTestingSupabase, setIsTestingSupabase] = useState(false);
   const [supabaseTestReport, setSupabaseTestReport] = useState<{
     success: boolean;
@@ -348,6 +358,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isPushingMenuToSupabase, setIsPushingMenuToSupabase] = useState(false);
   const [pushMenuSummary, setPushMenuSummary] = useState<{
     success: boolean;
+    localSaved?: boolean;
+    missingTables?: boolean;
+    authError?: boolean;
     count: number;
     total: number;
     message: string;
@@ -362,31 +375,77 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   );
 
   const derivedJwtUrl = deriveSupabaseUrlFromKey(supabaseKeyInput);
+  const keyValidation = validateSupabaseKeyFormat(supabaseKeyInput, supabaseUrlInput);
 
   const handleSupabaseKeyChange = (val: string) => {
-    const cleanKey = val.trim().replace(/\s+/g, "");
+    // Si l'utilisateur colle un bloc .env complet contenant aussi l'URL
+    const envUrlMatch = val.match(/https?:\/\/([a-z0-9-]{12,32})\.supabase\.(?:co|com|in|io)/i);
+    if (envUrlMatch?.[1]) {
+      setSupabaseUrlInput(`https://${envUrlMatch[1].toLowerCase()}.supabase.co`);
+    }
+
+    const cleanKey = sanitizeSupabaseKey(val);
     setSupabaseKeyInput(cleanKey);
-    const autoUrl = deriveSupabaseUrlFromKey(cleanKey);
-    if (autoUrl) {
-      setSupabaseUrlInput(autoUrl);
+
+    const validation = validateSupabaseKeyFormat(cleanKey);
+    if (validation.derivedUrl) {
+      setSupabaseUrlInput(validation.derivedUrl);
+    } else {
+      const autoUrl = deriveSupabaseUrlFromKey(cleanKey);
+      if (autoUrl) {
+        setSupabaseUrlInput(autoUrl);
+      }
     }
   };
 
   const handleSupabaseUrlChange = (val: string) => {
+    // Si l'utilisateur colle par erreur sa clé eyJ... ou sb_publishable_... dans le champ URL
+    const possibleKey = sanitizeSupabaseKey(val);
+    const possibleValidation = validateSupabaseKeyFormat(possibleKey);
+    if (possibleValidation.isValidFormat) {
+      setSupabaseKeyInput(possibleKey);
+      if (possibleValidation.derivedUrl) {
+        setSupabaseUrlInput(possibleValidation.derivedUrl);
+        return;
+      }
+    }
     setSupabaseUrlInput(val.trim());
+  };
+
+  const handleEnableStandaloneMode = async () => {
+    try {
+      await persistentStorage.setItem("khadys_menu_items", items);
+      localStorage.setItem("khadys_menu_items", JSON.stringify(items));
+      localStorage.setItem(KHADY_STANDALONE_MODE_KEY, "true");
+    } catch {
+      // Ignorer
+    }
+    setIsStandaloneMode(true);
+    setShowSupabaseSettingsModal(false);
+    playSound("success");
+    setBackupStatusMessage(`✅ Mode Autonome activé : Vos ${items.length} plats sont sauvegardés et synchronisés sur votre appareil !`);
+    setTimeout(() => setBackupStatusMessage(null), 5000);
   };
 
   const handleTestSupabaseConnection = async () => {
     setIsTestingSupabase(true);
     setSupabaseTestReport(null);
+    setPushMenuSummary(null);
     try {
-      const effectiveUrl = sanitizeSupabaseUrl(supabaseUrlInput, supabaseKeyInput);
+      const cleanKey = sanitizeSupabaseKey(supabaseKeyInput);
+      const effectiveUrl = sanitizeSupabaseUrl(supabaseUrlInput, cleanKey);
       if (effectiveUrl && effectiveUrl !== supabaseUrlInput) {
         setSupabaseUrlInput(effectiveUrl);
       }
-      const result = await testSupabaseConnection(effectiveUrl || supabaseUrlInput, supabaseKeyInput);
+      if (cleanKey && cleanKey !== supabaseKeyInput) {
+        setSupabaseKeyInput(cleanKey);
+      }
+      const result = await testSupabaseConnection(effectiveUrl || supabaseUrlInput, cleanKey || supabaseKeyInput);
       if (result.details?.correctedUrl && result.details.correctedUrl !== supabaseUrlInput) {
         setSupabaseUrlInput(result.details.correctedUrl);
+      }
+      if (result.details?.correctedKey && result.details.correctedKey !== supabaseKeyInput) {
+        setSupabaseKeyInput(result.details.correctedKey);
       }
       setSupabaseConfigState(getSupabaseConfig());
       setSupabaseTestReport(result);
@@ -407,18 +466,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleSaveSupabaseConfig = () => {
-    const cleanUrl = sanitizeSupabaseUrl(supabaseUrlInput, supabaseKeyInput);
+    const cleanKey = sanitizeSupabaseKey(supabaseKeyInput);
+    const cleanUrl = sanitizeSupabaseUrl(supabaseUrlInput, cleanKey);
     if (cleanUrl) {
       setSupabaseUrlInput(cleanUrl);
     }
-    saveSupabaseConfig(cleanUrl || supabaseUrlInput, supabaseKeyInput, supabaseAutoSync);
+    if (cleanKey) {
+      setSupabaseKeyInput(cleanKey);
+    }
+    saveSupabaseConfig(cleanUrl || supabaseUrlInput, cleanKey || supabaseKeyInput, supabaseAutoSync);
     const updated = getSupabaseConfig();
     setSupabaseConfigState(updated);
     playSound("success");
     setBackupStatusMessage(
       updated.isConfigured
         ? "✅ Configuration Supabase enregistrée ! Le Cloud est maintenant actif."
-        : "⚠️ Clés enregistrées en mémoire locale."
+        : "⚠️ Clés enregistrées en mémoire locale (vérifiez le format de la clé Anon)."
     );
     setTimeout(() => setBackupStatusMessage(null), 4000);
   };
@@ -432,6 +495,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setSupabaseKeyInput(updated.anonKey);
       setSupabaseAutoSync(updated.autoSync);
       setSupabaseTestReport(null);
+      setPushMenuSummary(null);
       playSound("pop");
       setBackupStatusMessage("Paramètres Supabase réinitialisés.");
       setTimeout(() => setBackupStatusMessage(null), 3000);
@@ -452,43 +516,74 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handlePushAllMenuToSupabase = async () => {
-    if (!isCloudConnected) {
-      playSound("pop");
-      setBackupStatusMessage("⚠️ Supabase n'est pas encore configuré ! Veuillez renseigner l'URL et la clé de votre projet.");
-      setShowSupabaseSettingsModal(true);
-      return;
-    }
     setIsPushingMenuToSupabase(true);
     setPushMenuSummary(null);
+
+    // 1. Toujours sauvegarder immédiatement tous les plats dans la mémoire persistante locale (IndexedDB + LocalStorage)
     try {
-      const res = await pushAllMenuItemsToSupabase(items);
+      await persistentStorage.setItem("khadys_menu_items", items);
+      localStorage.setItem("khadys_menu_items", JSON.stringify(items));
+    } catch {
+      // Ignorer
+    }
+
+    const hasAnyInput = Boolean(supabaseUrlInput.trim() || supabaseKeyInput.trim() || isCloudConnected);
+    if (!hasAnyInput) {
+      setIsPushingMenuToSupabase(false);
+      playSound("success");
+      setPushMenuSummary({
+        success: true,
+        localSaved: true,
+        count: items.length,
+        total: items.length,
+        message: `✅ Vos ${items.length} plats sont sauvegardés dans l'application ! (Pour activer en plus le Cloud Supabase, collez votre clé Anon ci-dessus).`,
+      });
+      setBackupStatusMessage(`✅ Vos ${items.length} plats sont bien sauvegardés dans l'application !`);
+      setTimeout(() => setBackupStatusMessage(null), 5000);
+      return;
+    }
+
+    try {
+      const res = await pushAllMenuItemsToSupabase(items, supabaseUrlInput, supabaseKeyInput);
+      if (res.correctedUrl && res.correctedUrl !== supabaseUrlInput) {
+        setSupabaseUrlInput(res.correctedUrl);
+      }
+      if (res.correctedKey && res.correctedKey !== supabaseKeyInput) {
+        setSupabaseKeyInput(res.correctedKey);
+      }
+      setSupabaseConfigState(getSupabaseConfig());
+
       if (res.success) {
         playSound("success");
         setPushMenuSummary({
           success: true,
           count: res.count,
           total: res.total,
-          message: `${res.count} plat(s) sur ${res.total} synchronisés avec succès vers Supabase Cloud !`,
+          message: `🚀 ${res.count} plat(s) sur ${res.total} synchronisés avec succès vers Supabase Cloud !`,
         });
         setBackupStatusMessage(`🚀 ${res.count} plat(s) poussés vers Supabase Cloud avec succès !`);
       } else {
         playSound("pop");
         setPushMenuSummary({
           success: false,
-          count: res.count,
-          total: res.total,
-          message: res.error || "Erreur lors de la synchronisation",
+          localSaved: true,
+          missingTables: res.missingTables,
+          authError: res.authError,
+          count: items.length,
+          total: items.length,
+          message: `💾 Vos ${items.length} plats sont bien sauvegardés sur votre appareil ! Détail Cloud : ${res.error || "Clé Supabase à vérifier"}`,
         });
-        setBackupStatusMessage(`Erreur Supabase : ${res.error}`);
+        setBackupStatusMessage(`💾 ${items.length} plats sauvegardés en local (Cloud : vérifiez la clé Anon).`);
       }
       setTimeout(() => setBackupStatusMessage(null), 5000);
     } catch (err: any) {
       playSound("pop");
       setPushMenuSummary({
         success: false,
-        count: 0,
+        localSaved: true,
+        count: items.length,
         total: items.length,
-        message: err?.message || "Erreur réseau Supabase",
+        message: `💾 Vos ${items.length} plats sont sauvegardés sur l'appareil ! (${err?.message || "Erreur réseau Cloud"})`,
       });
     } finally {
       setIsPushingMenuToSupabase(false);
@@ -857,7 +952,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   Tous les plats que vous ajoutez sont conservés de manière permanente sur cet appareil.
                 </p>
 
-                {!isCloudConnected && (
+                {!isCloudConnected && !isStandaloneMode && (
                   <div className="mt-3 bg-gradient-to-r from-amber-950/70 via-[#2A160F] to-[#1A0E0B] border-2 border-amber-500/50 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-200 shadow-xl">
                     <div className="flex items-center gap-2.5">
                       <div className="p-2 bg-amber-500 text-black rounded-xl shrink-0 font-black">
@@ -865,22 +960,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                       <div>
                         <p className="text-[11px] font-black uppercase text-amber-300">
-                          Supabase Cloud Non Connecté
+                          Synchronisation Cloud Supabase (Optionnel)
                         </p>
                         <p className="text-[9px] text-white/70">
-                          Renseignez votre URL Supabase et clé Anon pour activer la synchronisation de vos {items.length} plats.
+                          Vos {items.length} plats sont déjà sauvegardés sur cet appareil. Connectez Supabase si vous souhaitez une base Cloud externe.
                         </p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => {
-                        setShowSupabaseSettingsModal(true);
-                        playSound("pop");
-                      }}
-                      className="bg-brand-gold hover:bg-amber-400 text-brand-brown px-4 py-2 rounded-xl text-[9px] font-black uppercase italic shadow-lg flex items-center justify-center gap-1.5 shrink-0 active:scale-95 transition-all"
-                    >
-                      <Settings size={14} /> Configurer Supabase
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={handleEnableStandaloneMode}
+                        className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 px-3 py-2 rounded-xl text-[9px] font-black uppercase italic active:scale-95 transition-all"
+                      >
+                        Mode Local Seul
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowSupabaseSettingsModal(true);
+                          playSound("pop");
+                        }}
+                        className="bg-brand-gold hover:bg-amber-400 text-brand-brown px-4 py-2 rounded-xl text-[9px] font-black uppercase italic shadow-lg flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                      >
+                        <Settings size={14} /> Configurer Supabase
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1931,22 +2034,37 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <label className="text-[10px] font-black uppercase text-emerald-300 tracking-wider flex items-center gap-1.5">
                       <Key size={12} /> VITE_SUPABASE_ANON_KEY (Clé Publique Anonyme)
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowSupabaseKey(!showSupabaseKey)}
-                      className="text-[9px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-bold"
-                    >
-                      {showSupabaseKey ? <EyeOff size={12} /> : <Eye size={12} />}
-                      {showSupabaseKey ? "Masquer" : "Afficher"}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {supabaseKeyInput && (
+                        <button
+                          type="button"
+                          onClick={() => setSupabaseKeyInput("")}
+                          className="text-[9px] text-red-400 hover:text-red-300 font-bold"
+                        >
+                          Vider
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowSupabaseKey(!showSupabaseKey)}
+                        className="text-[9px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-bold"
+                      >
+                        {showSupabaseKey ? <EyeOff size={12} /> : <Eye size={12} />}
+                        {showSupabaseKey ? "Masquer" : "Afficher"}
+                      </button>
+                    </div>
                   </div>
                   <div className="relative">
                     <input
                       type={showSupabaseKey ? "text" : "password"}
                       value={supabaseKeyInput}
                       onChange={(e) => handleSupabaseKeyChange(e.target.value)}
-                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                      className="w-full p-4 pr-12 bg-black/40 rounded-2xl text-white font-mono text-xs border border-emerald-500/30 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/50 transition-all placeholder:text-white/20"
+                      placeholder="Collez ici votre clé commençant par eyJ... ou sb_publishable_..."
+                      className={`w-full p-4 pr-12 bg-black/40 rounded-2xl text-white font-mono text-xs border outline-none transition-all placeholder:text-white/20 ${
+                        supabaseKeyInput && !keyValidation.isValidFormat
+                          ? "border-amber-500 focus:border-amber-400"
+                          : "border-emerald-500/30 focus:border-emerald-400"
+                      }`}
                     />
                     <button
                       type="button"
@@ -1956,8 +2074,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       {showSupabaseKey ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
+                  {supabaseKeyInput && !keyValidation.isValidFormat && (
+                    <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-[9.5px] flex items-start justify-between gap-2">
+                      <span>{keyValidation.warningMessage}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSupabaseKeyInput("")}
+                        className="bg-amber-500 text-black px-2.5 py-1 rounded-lg font-black uppercase text-[8px] shrink-0"
+                      >
+                        Effacer
+                      </button>
+                    </div>
+                  )}
+                  {supabaseKeyInput && keyValidation.isValidFormat && (
+                    <p className="text-[9px] text-emerald-400 font-bold">
+                      ✅ Format de clé Supabase valide ({keyValidation.keyType === "publishable" ? "Publishable Key sb_publishable_..." : "Clé JWT Anon eyJ..."})
+                    </p>
+                  )}
                   <p className="text-[8.5px] text-white/40">
-                    Astuce : Collez simplement votre clé <strong>anon (public)</strong> ici — l'URL de votre projet Supabase sera remplie automatiquement !
+                    Astuce : Dans Supabase &gt; <strong>Project Settings (⚙️)</strong> &gt; <strong>API Keys</strong>, cliquez sur <strong>Copy</strong> à côté de la clé <strong>anon public</strong> (<code>eyJ...</code>) ou <strong>Publishable key</strong> (<code>sb_publishable_...</code>).
                   </p>
                 </div>
 
@@ -2983,17 +3118,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               {/* Clé Anon Supabase */}
               <div className="space-y-1.5">
-                <label className="text-[9px] font-black uppercase tracking-wider text-white/60 flex items-center justify-between">
+                <div className="text-[9px] font-black uppercase tracking-wider text-white/60 flex items-center justify-between">
                   <span>Clé Anonyme Publique (VITE_SUPABASE_ANON_KEY)</span>
-                  <span className="text-[8px] text-brand-gold">Obligatoire</span>
-                </label>
+                  <div className="flex items-center gap-2">
+                    {supabaseKeyInput && (
+                      <button
+                        type="button"
+                        onClick={() => setSupabaseKeyInput("")}
+                        className="text-[9px] text-red-400 hover:text-red-300 font-black uppercase"
+                      >
+                        Vider le champ
+                      </button>
+                    )}
+                    <span className="text-[8px] text-brand-gold">Obligatoire pour Cloud</span>
+                  </div>
+                </div>
                 <div className="relative">
                   <input
                     type={showSupabaseKey ? "text" : "password"}
                     value={supabaseKeyInput}
                     onChange={(e) => handleSupabaseKeyChange(e.target.value)}
-                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
-                    className="w-full p-4 pr-12 bg-white/5 rounded-2xl text-white text-xs border border-white/15 outline-none focus:border-emerald-400 font-mono transition-colors"
+                    placeholder="Collez votre clé eyJhbGci... ou sb_publishable_..."
+                    className={`w-full p-4 pr-12 bg-white/5 rounded-2xl text-white text-xs border outline-none font-mono transition-colors ${
+                      supabaseKeyInput && !keyValidation.isValidFormat
+                        ? "border-amber-500 focus:border-amber-400"
+                        : "border-white/15 focus:border-emerald-400"
+                    }`}
                   />
                   <button
                     type="button"
@@ -3004,6 +3154,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     {showSupabaseKey ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
+
+                {/* Diagnostic en direct de la clé saisie */}
+                {supabaseKeyInput && !keyValidation.isValidFormat && (
+                  <div className="p-3 rounded-xl bg-amber-500/20 border border-amber-500/50 text-amber-200 text-[9.5px] space-y-2 animate-fade-in">
+                    <p className="font-bold leading-relaxed">{keyValidation.warningMessage}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSupabaseKeyInput("")}
+                        className="bg-amber-500 hover:bg-amber-400 text-black px-3 py-1.5 rounded-lg font-black uppercase text-[8.5px]"
+                      >
+                        1. Effacer cette clé invalide
+                      </button>
+                      <span className="text-[8.5px] text-white/70">
+                        puis collez la clé <code>eyJ...</code> ou <code>sb_publishable_...</code> depuis Supabase.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {supabaseKeyInput && keyValidation.isValidFormat && (
+                  <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[9px] font-bold flex items-center gap-2">
+                    <CheckCircle size={14} className="text-emerald-400 shrink-0" />
+                    <span>
+                      Format de clé reconnu ({keyValidation.keyType === "publishable" ? "Publishable Key" : "JWT Anon Key"})
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Interrupteur Auto-Push */}
@@ -3144,19 +3322,50 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className={`p-3.5 rounded-2xl border ${
                     pushMenuSummary.success
                       ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-200"
+                      : pushMenuSummary.localSaved
+                      ? "bg-amber-500/15 border-amber-500/40 text-amber-200"
                       : "bg-red-500/15 border-red-500/40 text-red-200"
-                  } flex items-center justify-between gap-3 text-[10px] animate-fade-in`}
+                  } space-y-2.5 text-[10px] animate-fade-in`}
                 >
-                  <div className="flex items-center gap-2">
-                    <CloudUpload size={16} />
-                    <span>{pushMenuSummary.message}</span>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      {pushMenuSummary.success ? (
+                        <CheckCircle size={16} className="text-emerald-400 shrink-0" />
+                      ) : (
+                        <CloudUpload size={16} className="text-amber-400 shrink-0" />
+                      )}
+                      <span className="font-bold">{pushMenuSummary.message}</span>
+                    </div>
+                    <button
+                      onClick={() => setPushMenuSummary(null)}
+                      className="p-1 hover:bg-white/10 rounded-lg text-white/60 hover:text-white shrink-0"
+                    >
+                      <X size={14} />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setPushMenuSummary(null)}
-                    className="p-1 hover:bg-white/10 rounded-lg text-white/60 hover:text-white"
-                  >
-                    <X size={14} />
-                  </button>
+
+                  {pushMenuSummary.missingTables && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowSqlSchemaModal(true);
+                        handleCopySqlSchema();
+                      }}
+                      className="w-full bg-brand-gold hover:bg-amber-400 text-brand-brown py-2.5 px-4 rounded-xl font-black text-[9.5px] uppercase italic shadow-lg flex items-center justify-center gap-2"
+                    >
+                      <Copy size={14} /> Copier & Voir le Script SQL à coller dans Supabase
+                    </button>
+                  )}
+
+                  {!pushMenuSummary.success && (
+                    <button
+                      type="button"
+                      onClick={handleEnableStandaloneMode}
+                      className="w-full bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 py-2.5 px-4 rounded-xl font-black text-[9.5px] uppercase italic flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle size={14} /> Continuer en Mode Autonome (Mes {items.length} plats sont déjà sauvegardés)
+                    </button>
+                  )}
                 </div>
               )}
             </div>
