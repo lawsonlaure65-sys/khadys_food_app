@@ -81,6 +81,8 @@ import {
   clearSupabaseConfig,
   testSupabaseConnection,
   pushAllMenuItemsToSupabase,
+  deriveSupabaseUrlFromKey,
+  sanitizeSupabaseUrl,
 } from "../lib/supabase";
 import { SUPABASE_SQL_SCHEMA } from "../utils/supabaseSchema";
 import {
@@ -359,11 +361,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     supabaseConfigState.isConfigured || getIsSupabaseConfigured()
   );
 
+  const derivedJwtUrl = deriveSupabaseUrlFromKey(supabaseKeyInput);
+
+  const handleSupabaseKeyChange = (val: string) => {
+    const cleanKey = val.trim().replace(/\s+/g, "");
+    setSupabaseKeyInput(cleanKey);
+    const autoUrl = deriveSupabaseUrlFromKey(cleanKey);
+    if (autoUrl) {
+      setSupabaseUrlInput(autoUrl);
+    }
+  };
+
+  const handleSupabaseUrlChange = (val: string) => {
+    setSupabaseUrlInput(val.trim());
+  };
+
   const handleTestSupabaseConnection = async () => {
     setIsTestingSupabase(true);
     setSupabaseTestReport(null);
     try {
-      const result = await testSupabaseConnection(supabaseUrlInput, supabaseKeyInput);
+      const effectiveUrl = sanitizeSupabaseUrl(supabaseUrlInput, supabaseKeyInput);
+      if (effectiveUrl && effectiveUrl !== supabaseUrlInput) {
+        setSupabaseUrlInput(effectiveUrl);
+      }
+      const result = await testSupabaseConnection(effectiveUrl || supabaseUrlInput, supabaseKeyInput);
+      if (result.details?.correctedUrl && result.details.correctedUrl !== supabaseUrlInput) {
+        setSupabaseUrlInput(result.details.correctedUrl);
+      }
+      setSupabaseConfigState(getSupabaseConfig());
       setSupabaseTestReport(result);
       if (result.success) {
         playSound("success");
@@ -382,7 +407,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleSaveSupabaseConfig = () => {
-    saveSupabaseConfig(supabaseUrlInput, supabaseKeyInput, supabaseAutoSync);
+    const cleanUrl = sanitizeSupabaseUrl(supabaseUrlInput, supabaseKeyInput);
+    if (cleanUrl) {
+      setSupabaseUrlInput(cleanUrl);
+    }
+    saveSupabaseConfig(cleanUrl || supabaseUrlInput, supabaseKeyInput, supabaseAutoSync);
     const updated = getSupabaseConfig();
     setSupabaseConfigState(updated);
     playSound("success");
@@ -1879,12 +1908,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <label className="text-[10px] font-black uppercase text-emerald-300 tracking-wider flex items-center gap-1.5">
                       <Key size={12} /> VITE_SUPABASE_URL (URL du Projet)
                     </label>
-                    <span className="text-[8px] text-white/40">Ex: https://xyzcompany.supabase.co</span>
+                    {derivedJwtUrl ? (
+                      <span className="text-[8px] font-black text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                        ✨ Détectée depuis votre clé Anon
+                      </span>
+                    ) : (
+                      <span className="text-[8px] text-white/40">Ex: https://xyzcompany.supabase.co</span>
+                    )}
                   </div>
                   <input
                     type="url"
                     value={supabaseUrlInput}
-                    onChange={(e) => setSupabaseUrlInput(e.target.value.trim())}
+                    onChange={(e) => handleSupabaseUrlChange(e.target.value)}
                     placeholder="https://votre-projet.supabase.co"
                     className="w-full p-4 bg-black/40 rounded-2xl text-white font-mono text-xs border border-emerald-500/30 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/50 transition-all placeholder:text-white/20"
                   />
@@ -1909,7 +1944,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <input
                       type={showSupabaseKey ? "text" : "password"}
                       value={supabaseKeyInput}
-                      onChange={(e) => setSupabaseKeyInput(e.target.value.trim())}
+                      onChange={(e) => handleSupabaseKeyChange(e.target.value)}
                       placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                       className="w-full p-4 pr-12 bg-black/40 rounded-2xl text-white font-mono text-xs border border-emerald-500/30 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/50 transition-all placeholder:text-white/20"
                     />
@@ -1922,7 +1957,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </button>
                   </div>
                   <p className="text-[8.5px] text-white/40">
-                    Trouvez ces clés dans votre tableau de bord Supabase : <strong>Project Settings &gt; API &gt; Project API keys</strong>.
+                    Astuce : Collez simplement votre clé <strong>anon (public)</strong> ici — l'URL de votre projet Supabase sera remplie automatiquement !
                   </p>
                 </div>
 
@@ -2010,18 +2045,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className={`p-5 rounded-2xl border ${
                     supabaseTestReport.success
                       ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-200"
+                      : supabaseTestReport.details?.missingTables
+                      ? "bg-amber-500/15 border-amber-500/40 text-amber-200"
                       : "bg-red-500/15 border-red-500/40 text-red-200"
                   } space-y-3 animate-fade-in`}
                 >
                   <div className="flex items-center gap-2.5">
                     {supabaseTestReport.success ? (
                       <CheckCircle className="text-emerald-400 shrink-0" size={20} />
+                    ) : supabaseTestReport.details?.missingTables ? (
+                      <AlertCircle className="text-amber-400 shrink-0" size={20} />
                     ) : (
                       <AlertCircle className="text-red-400 shrink-0" size={20} />
                     )}
                     <div>
                       <h5 className="font-black text-xs uppercase tracking-wide">
-                        {supabaseTestReport.success ? "Connexion Réussie avec Supabase Cloud !" : "Échec du Test de Connexion"}
+                        {supabaseTestReport.success
+                          ? "Connexion Réussie avec Supabase Cloud !"
+                          : supabaseTestReport.details?.missingTables
+                          ? "Serveur Connecté — Tables SQL à Créer"
+                          : "Échec du Test de Connexion"}
                       </h5>
                       <p className="text-[10px] opacity-90 mt-0.5">{supabaseTestReport.message}</p>
                     </div>
@@ -2031,14 +2074,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-white/10 text-[9px]">
                       <div className="bg-black/30 p-2.5 rounded-xl">
                         <span className="opacity-60 block">Table menu_items</span>
-                        <strong className={supabaseTestReport.details.hasMenuItemsTable ? "text-emerald-400" : "text-amber-400"}>
-                          {supabaseTestReport.details.hasMenuItemsTable ? "✅ Opérationnelle" : "⚠️ Manquante"}
+                        <strong
+                          className={
+                            supabaseTestReport.details.menuTableStatus === "ok"
+                              ? "text-emerald-400"
+                              : supabaseTestReport.details.menuTableStatus === "missing"
+                              ? "text-amber-400"
+                              : "text-red-400"
+                          }
+                        >
+                          {supabaseTestReport.details.menuTableStatus === "ok"
+                            ? "✅ Opérationnelle"
+                            : supabaseTestReport.details.menuTableStatus === "missing"
+                            ? "⚠️ Table à créer (SQL)"
+                            : "❌ Injoignable"}
                         </strong>
                       </div>
                       <div className="bg-black/30 p-2.5 rounded-xl">
                         <span className="opacity-60 block">Table orders</span>
-                        <strong className={supabaseTestReport.details.hasOrdersTable ? "text-emerald-400" : "text-amber-400"}>
-                          {supabaseTestReport.details.hasOrdersTable ? "✅ Opérationnelle" : "⚠️ Manquante"}
+                        <strong
+                          className={
+                            supabaseTestReport.details.ordersTableStatus === "ok"
+                              ? "text-emerald-400"
+                              : supabaseTestReport.details.ordersTableStatus === "missing"
+                              ? "text-amber-400"
+                              : "text-red-400"
+                          }
+                        >
+                          {supabaseTestReport.details.ordersTableStatus === "ok"
+                            ? "✅ Opérationnelle"
+                            : supabaseTestReport.details.ordersTableStatus === "missing"
+                            ? "⚠️ Table à créer (SQL)"
+                            : "❌ Injoignable"}
                         </strong>
                       </div>
                       <div className="bg-black/30 p-2.5 rounded-xl">
@@ -2048,14 +2115,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
                   )}
 
-                  {!supabaseTestReport.success && (
+                  {supabaseTestReport.details?.missingTables && (
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSqlSchemaModal(true);
+                          handleCopySqlSchema();
+                        }}
+                        className="w-full bg-brand-gold hover:bg-amber-400 text-brand-brown py-3 px-4 rounded-xl font-black text-[10px] uppercase italic shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all"
+                      >
+                        <Copy size={15} /> Copier & Voir le Script SQL à coller dans Supabase
+                      </button>
+                    </div>
+                  )}
+
+                  {!supabaseTestReport.success && !supabaseTestReport.details?.missingTables && (
                     <div className="text-[9px] bg-black/40 p-3 rounded-xl border border-white/5 space-y-1">
                       <p className="font-bold text-white">Astuce de dépannage :</p>
                       <p>
-                        1. Vérifiez que l'URL commence bien par <code>https://</code> et se termine par <code>.supabase.co</code>.
+                        1. Collez votre clé <strong>anon (public)</strong> commençant par <code>eyJ...</code> : l'URL exacte du projet sera détectée automatiquement.
                       </p>
                       <p>
-                        2. Si l'erreur indique une table inexistante, cliquez sur <strong>"Script SQL (Schema)"</strong> ci-dessus, puis collez-le dans le SQL Editor de Supabase.
+                        2. Vérifiez sur <strong>supabase.com/dashboard</strong> que votre projet est bien <strong>Active</strong> (et non <em>Paused</em>).
                       </p>
                     </div>
                   )}
@@ -2881,13 +2963,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="space-y-1.5">
                 <label className="text-[9px] font-black uppercase tracking-wider text-white/60 flex items-center justify-between">
                   <span>URL du Projet Supabase (VITE_SUPABASE_URL)</span>
-                  <span className="text-[8px] text-brand-gold">Obligatoire</span>
+                  {derivedJwtUrl ? (
+                    <span className="text-[8px] font-black text-emerald-400">✨ Auto-détectée depuis la clé</span>
+                  ) : (
+                    <span className="text-[8px] text-brand-gold">Obligatoire</span>
+                  )}
                 </label>
                 <div className="relative">
                   <input
                     type="url"
                     value={supabaseUrlInput}
-                    onChange={(e) => setSupabaseUrlInput(e.target.value)}
+                    onChange={(e) => handleSupabaseUrlChange(e.target.value)}
                     placeholder="https://votre-projet.supabase.co"
                     className="w-full p-4 pr-10 bg-white/5 rounded-2xl text-white text-xs border border-white/15 outline-none focus:border-emerald-400 font-mono transition-colors"
                   />
@@ -2905,7 +2991,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <input
                     type={showSupabaseKey ? "text" : "password"}
                     value={supabaseKeyInput}
-                    onChange={(e) => setSupabaseKeyInput(e.target.value)}
+                    onChange={(e) => handleSupabaseKeyChange(e.target.value)}
                     placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
                     className="w-full p-4 pr-12 bg-white/5 rounded-2xl text-white text-xs border border-white/15 outline-none focus:border-emerald-400 font-mono transition-colors"
                   />
@@ -2951,12 +3037,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className={`p-4 rounded-2xl border ${
                     supabaseTestReport.success
                       ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-200"
+                      : supabaseTestReport.details?.missingTables
+                      ? "bg-amber-500/15 border-amber-500/40 text-amber-200"
                       : "bg-red-500/15 border-red-500/40 text-red-200"
                   } space-y-2.5 animate-fade-in`}
                 >
                   <div className="flex items-center gap-2.5">
                     {supabaseTestReport.success ? (
                       <CheckCircle className="text-emerald-400 shrink-0" size={20} />
+                    ) : supabaseTestReport.details?.missingTables ? (
+                      <AlertCircle className="text-amber-400 shrink-0" size={20} />
                     ) : (
                       <AlertCircle className="text-red-400 shrink-0" size={20} />
                     )}
@@ -2964,6 +3054,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <h5 className="font-black text-xs uppercase tracking-wide">
                         {supabaseTestReport.success
                           ? "Connexion Réussie avec Supabase Cloud !"
+                          : supabaseTestReport.details?.missingTables
+                          ? "Serveur Connecté — Tables SQL à Créer"
                           : "Échec du Test de Connexion"}
                       </h5>
                       <p className="text-[10px] opacity-90 mt-0.5">{supabaseTestReport.message}</p>
@@ -2976,32 +3068,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <span className="opacity-60 block">Table menu_items</span>
                         <strong
                           className={
-                            supabaseTestReport.details.hasMenuItemsTable ||
-                            supabaseTestReport.details.menuTableFound
+                            supabaseTestReport.details.menuTableStatus === "ok"
                               ? "text-emerald-400"
-                              : "text-amber-400"
+                              : supabaseTestReport.details.menuTableStatus === "missing"
+                              ? "text-amber-400"
+                              : "text-red-400"
                           }
                         >
-                          {supabaseTestReport.details.hasMenuItemsTable ||
-                          supabaseTestReport.details.menuTableFound
+                          {supabaseTestReport.details.menuTableStatus === "ok"
                             ? "✅ Opérationnelle"
-                            : "⚠️ Manquante"}
+                            : supabaseTestReport.details.menuTableStatus === "missing"
+                            ? "⚠️ Table à créer (SQL)"
+                            : "❌ Injoignable"}
                         </strong>
                       </div>
                       <div className="bg-black/30 p-2 rounded-xl">
                         <span className="opacity-60 block">Table orders</span>
                         <strong
                           className={
-                            supabaseTestReport.details.hasOrdersTable ||
-                            supabaseTestReport.details.ordersTableFound
+                            supabaseTestReport.details.ordersTableStatus === "ok"
                               ? "text-emerald-400"
-                              : "text-amber-400"
+                              : supabaseTestReport.details.ordersTableStatus === "missing"
+                              ? "text-amber-400"
+                              : "text-red-400"
                           }
                         >
-                          {supabaseTestReport.details.hasOrdersTable ||
-                          supabaseTestReport.details.ordersTableFound
+                          {supabaseTestReport.details.ordersTableStatus === "ok"
                             ? "✅ Opérationnelle"
-                            : "⚠️ Manquante"}
+                            : supabaseTestReport.details.ordersTableStatus === "missing"
+                            ? "⚠️ Table à créer (SQL)"
+                            : "❌ Injoignable"}
                         </strong>
                       </div>
                       <div className="bg-black/30 p-2 rounded-xl">
@@ -3013,16 +3109,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
                   )}
 
-                  {!supabaseTestReport.success && (
+                  {supabaseTestReport.details?.missingTables && (
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSqlSchemaModal(true);
+                          handleCopySqlSchema();
+                        }}
+                        className="w-full bg-brand-gold hover:bg-amber-400 text-brand-brown py-3 px-4 rounded-xl font-black text-[10px] uppercase italic shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all"
+                      >
+                        <Copy size={15} /> Copier & Voir le Script SQL à coller dans Supabase
+                      </button>
+                    </div>
+                  )}
+
+                  {!supabaseTestReport.success && !supabaseTestReport.details?.missingTables && (
                     <div className="text-[9px] bg-black/40 p-3 rounded-xl border border-white/5 space-y-1">
                       <p className="font-bold text-white">Astuce de dépannage :</p>
                       <p>
-                        1. Vérifiez que l'URL commence bien par <code>https://</code> et se termine par{" "}
-                        <code>.supabase.co</code>.
+                        1. Collez votre clé <strong>anon (public)</strong> commençant par <code>eyJ...</code> : l'URL exacte du projet sera détectée automatiquement.
                       </p>
                       <p>
-                        2. Si l'erreur indique une table manquante, cliquez sur{" "}
-                        <strong>"Script SQL"</strong> ci-dessous, puis collez-le dans le SQL Editor de Supabase.
+                        2. Vérifiez sur <strong>supabase.com/dashboard</strong> que votre projet est bien <strong>Active</strong> (et non <em>Paused</em>).
                       </p>
                     </div>
                   )}
