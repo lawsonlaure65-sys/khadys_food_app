@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS menu_items (
 );
 
 -- Mise à jour automatique si la table existait déjà dans une ancienne version
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS rating NUMERIC DEFAULT 5;
 ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_plat_du_jour BOOLEAN DEFAULT false;
 ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_specialite_maison BOOLEAN DEFAULT false;
 ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_spicy BOOLEAN DEFAULT false;
@@ -72,4 +73,7 @@ FOR INSERT WITH CHECK (true);
 -- Autoriser la lecture et mise à jour des commandes
 CREATE POLICY "Accès aux commandes" ON orders 
 FOR ALL USING (true) WITH CHECK (true);
+
+-- Rafraîchir immédiatement le cache de l'API Supabase (PostgREST)
+NOTIFY pgrst, 'reload schema';
 `;

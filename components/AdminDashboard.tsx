@@ -448,6 +448,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         setSupabaseKeyInput(result.details.correctedKey);
       }
       setSupabaseConfigState(getSupabaseConfig());
+
+      // Si la connexion est réussie et qu'il y a des plats, les synchroniser automatiquement tout de suite !
+      if (result.success && items.length > 0) {
+        const pushRes = await pushAllMenuItemsToSupabase(
+          items,
+          result.details?.correctedUrl || effectiveUrl || supabaseUrlInput,
+          result.details?.correctedKey || cleanKey || supabaseKeyInput
+        );
+        if (pushRes.success) {
+          setSupabaseTestReport({
+            ...result,
+            message: `${result.message} 🚀 Vos ${pushRes.count} plats ont été synchronisés automatiquement dans Supabase !`,
+          });
+          playSound("success");
+          return;
+        }
+      }
+
       setSupabaseTestReport(result);
       if (result.success) {
         playSound("success");
@@ -518,6 +536,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handlePushAllMenuToSupabase = async () => {
     setIsPushingMenuToSupabase(true);
     setPushMenuSummary(null);
+    setSupabaseTestReport(null);
 
     // 1. Toujours sauvegarder immédiatement tous les plats dans la mémoire persistante locale (IndexedDB + LocalStorage)
     try {
@@ -3034,20 +3053,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* Modal Dédié Paramètres & Clés Supabase */}
+      {/* Modal Dédié Paramètres & Clés Supabase (Optimisé Mobile Sans Scroll Caché) */}
       {showSupabaseSettingsModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[150] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-[#18110F] border-2 border-emerald-500/40 rounded-[2.5rem] w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-scale-up my-auto">
-            {/* Header */}
-            <div className="p-5 sm:p-6 border-b border-white/10 flex items-center justify-between bg-black/50">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-emerald-500 text-black rounded-2xl font-black">
-                  <Cloud size={24} />
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
+          <div className="bg-[#18110F] border-2 border-emerald-500/40 rounded-[2rem] w-full max-w-xl max-h-[95vh] flex flex-col shadow-2xl overflow-hidden animate-scale-up my-auto">
+            {/* Header Compact Mobile */}
+            <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between bg-black/60 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-500 text-black rounded-xl font-black">
+                  <Cloud size={18} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-black text-emerald-300 text-base uppercase italic">
-                      Paramètres Supabase Cloud
+                    <h3 className="font-black text-emerald-300 text-xs sm:text-sm uppercase italic">
+                      Connexion Supabase
                     </h3>
                     <span
                       className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border ${
@@ -3056,285 +3075,165 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           : "bg-amber-500/20 text-amber-300 border-amber-500/40"
                       }`}
                     >
-                      {isCloudConnected ? "🟢 Connecté" : "⚠️ Clés Requises"}
+                      {isCloudConnected ? "🟢 Clé Valide" : "⚠️ Clé à corriger"}
                     </span>
                   </div>
-                  <p className="text-[9px] text-white/60">
-                    Connectez votre base de données PostgreSQL Supabase pour Khady's Food
-                  </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowSupabaseSettingsModal(false)}
-                className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl active:scale-95"
+                className="p-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl active:scale-95"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            {/* Corps Modal */}
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1 no-scrollbar">
-              {/* Instructions rapides */}
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-[10px] space-y-2">
-                <div className="flex items-center justify-between text-brand-gold font-black uppercase text-[10px]">
-                  <span>Où trouver vos clés Supabase ?</span>
-                  <a
-                    href="https://supabase.com/dashboard"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-emerald-400 hover:underline flex items-center gap-1 font-bold"
-                  >
-                    Ouvrir Supabase.com <ExternalLink size={12} />
-                  </a>
-                </div>
-                <p className="text-white/70 leading-relaxed">
-                  1. Allez sur <strong>supabase.com</strong> &gt; Ouvrez votre Projet.<br />
-                  2. Cliquez sur <strong>Project Settings (roue crantée)</strong> &gt; <strong>Data API</strong> (ou API Keys).<br />
-                  3. Copiez l'<strong>URL du projet</strong> et la clé <strong>anon (public)</strong> ci-dessous.
-                </p>
-              </div>
+            {/* Corps Modal : Champs immédiatement visibles en haut sur mobile */}
+            <div className="p-3.5 sm:p-5 overflow-y-auto space-y-3 flex-1">
+              {/* Bouton Rapide : Sauvegarder sans Supabase (Déblocage en 1 clic) */}
+              <button
+                type="button"
+                onClick={handleEnableStandaloneMode}
+                className="w-full bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 py-2.5 px-3 rounded-xl font-black text-[9.5px] uppercase italic flex items-center justify-center gap-2 active:scale-95 transition-all"
+              >
+                <CheckCircle size={15} className="text-emerald-400 shrink-0" />
+                <span>Garder mes {items.length} plats sur le téléphone (Sans Supabase)</span>
+              </button>
 
-              {/* URL Supabase */}
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-black uppercase tracking-wider text-white/60 flex items-center justify-between">
-                  <span>URL du Projet Supabase (VITE_SUPABASE_URL)</span>
-                  {derivedJwtUrl ? (
-                    <span className="text-[8px] font-black text-emerald-400">✨ Auto-détectée depuis la clé</span>
-                  ) : (
-                    <span className="text-[8px] text-brand-gold">Obligatoire</span>
-                  )}
-                </label>
-                <div className="relative">
-                  <input
-                    type="url"
-                    value={supabaseUrlInput}
-                    onChange={(e) => handleSupabaseUrlChange(e.target.value)}
-                    placeholder="https://votre-projet.supabase.co"
-                    className="w-full p-4 pr-10 bg-white/5 rounded-2xl text-white text-xs border border-white/15 outline-none focus:border-emerald-400 font-mono transition-colors"
-                  />
-                  <Cloud className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/30" size={18} />
-                </div>
-              </div>
-
-              {/* Clé Anon Supabase */}
-              <div className="space-y-1.5">
-                <div className="text-[9px] font-black uppercase tracking-wider text-white/60 flex items-center justify-between">
-                  <span>Clé Anonyme Publique (VITE_SUPABASE_ANON_KEY)</span>
-                  <div className="flex items-center gap-2">
+              {/* CHAMP 1 : CLÉ API SUPABASE (Mis en N°1 car il remplit aussi l'URL automatiquement !) */}
+              <div className="bg-white/5 border border-white/15 rounded-2xl p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-[9.5px] font-black uppercase text-brand-gold flex items-center gap-1">
+                    <Key size={12} /> 1. Votre Clé API Supabase (Anon / Publishable)
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          if (text) handleSupabaseKeyChange(text);
+                        } catch {
+                          // Si le navigateur bloque clipboard.readText, l'utilisateur peut coller manuellement
+                        }
+                      }}
+                      className="bg-emerald-500 text-black px-2.5 py-1 rounded-lg text-[8.5px] font-black uppercase flex items-center gap-1 active:scale-95"
+                    >
+                      <Copy size={11} /> Coller
+                    </button>
                     {supabaseKeyInput && (
                       <button
                         type="button"
                         onClick={() => setSupabaseKeyInput("")}
-                        className="text-[9px] text-red-400 hover:text-red-300 font-black uppercase"
+                        className="bg-red-500/20 text-red-300 border border-red-500/30 px-2 py-1 rounded-lg text-[8.5px] font-black uppercase active:scale-95"
                       >
-                        Vider le champ
+                        Vider
                       </button>
                     )}
-                    <span className="text-[8px] text-brand-gold">Obligatoire pour Cloud</span>
                   </div>
                 </div>
-                <div className="relative">
-                  <input
-                    type={showSupabaseKey ? "text" : "password"}
-                    value={supabaseKeyInput}
-                    onChange={(e) => handleSupabaseKeyChange(e.target.value)}
-                    placeholder="Collez votre clé eyJhbGci... ou sb_publishable_..."
-                    className={`w-full p-4 pr-12 bg-white/5 rounded-2xl text-white text-xs border outline-none font-mono transition-colors ${
-                      supabaseKeyInput && !keyValidation.isValidFormat
-                        ? "border-amber-500 focus:border-amber-400"
-                        : "border-white/15 focus:border-emerald-400"
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowSupabaseKey(!showSupabaseKey)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white p-1"
-                    title={showSupabaseKey ? "Masquer la clé" : "Afficher la clé"}
-                  >
-                    {showSupabaseKey ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
 
-                {/* Diagnostic en direct de la clé saisie */}
+                <input
+                  type="text"
+                  value={supabaseKeyInput}
+                  onChange={(e) => handleSupabaseKeyChange(e.target.value)}
+                  placeholder="Collez ici la clé eyJhbGci... ou sb_publishable_..."
+                  className={`w-full p-3 bg-black/50 rounded-xl text-white text-[11px] border outline-none font-mono transition-colors ${
+                    supabaseKeyInput && !keyValidation.isValidFormat
+                      ? "border-amber-500 focus:border-amber-400"
+                      : "border-emerald-500/40 focus:border-emerald-400"
+                  }`}
+                />
+
+                {/* Diagnostic en direct de ce qui est dans le champ Clé */}
                 {supabaseKeyInput && !keyValidation.isValidFormat && (
-                  <div className="p-3 rounded-xl bg-amber-500/20 border border-amber-500/50 text-amber-200 text-[9.5px] space-y-2 animate-fade-in">
-                    <p className="font-bold leading-relaxed">{keyValidation.warningMessage}</p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setSupabaseKeyInput("")}
-                        className="bg-amber-500 hover:bg-amber-400 text-black px-3 py-1.5 rounded-lg font-black uppercase text-[8.5px]"
-                      >
-                        1. Effacer cette clé invalide
-                      </button>
-                      <span className="text-[8.5px] text-white/70">
-                        puis collez la clé <code>eyJ...</code> ou <code>sb_publishable_...</code> depuis Supabase.
-                      </span>
-                    </div>
+                  <div className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-500/50 text-amber-200 text-[9px] space-y-1.5">
+                    <p className="font-bold leading-snug">{keyValidation.warningMessage}</p>
+                    <button
+                      type="button"
+                      onClick={() => setSupabaseKeyInput("")}
+                      className="bg-amber-500 text-black px-3 py-1 rounded-lg font-black uppercase text-[8px]"
+                    >
+                      Effacer ce texte incorrect
+                    </button>
                   </div>
                 )}
 
                 {supabaseKeyInput && keyValidation.isValidFormat && (
-                  <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[9px] font-bold flex items-center gap-2">
-                    <CheckCircle size={14} className="text-emerald-400 shrink-0" />
+                  <div className="p-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[9px] font-bold flex items-center gap-1.5">
+                    <CheckCircle size={13} className="text-emerald-400 shrink-0" />
                     <span>
-                      Format de clé reconnu ({keyValidation.keyType === "publishable" ? "Publishable Key" : "JWT Anon Key"})
+                      ✅ Clé reconnue ({keyValidation.keyType === "publishable" ? "Publishable Key" : "Clé Anon JWT"})
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Interrupteur Auto-Push */}
-              <div className="bg-emerald-950/30 border border-emerald-500/20 p-4 rounded-2xl flex items-center justify-between gap-4">
-                <div>
-                  <h5 className="font-black text-xs text-white uppercase italic">
-                    Synchronisation Automatique (Auto-Push)
-                  </h5>
-                  <p className="text-[9px] text-white/60 mt-0.5">
-                    Pousse immédiatement chaque plat créé ou modifié vers Supabase.
-                  </p>
+              {/* CHAMP 2 : URL DU PROJET SUPABASE */}
+              <div className="bg-white/5 border border-white/15 rounded-2xl p-3 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[9.5px] font-black uppercase text-white/70">
+                    2. URL du Projet (https://...supabase.co)
+                  </label>
+                  {derivedJwtUrl ? (
+                    <span className="text-[8px] font-black text-emerald-400">✨ Remplie automatiquement</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          if (text) handleSupabaseUrlChange(text);
+                        } catch {
+                          // Ignorer
+                        }
+                      }}
+                      className="text-[8.5px] font-black text-emerald-400 uppercase"
+                    >
+                      Coller l'URL
+                    </button>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleToggleAutoSync(!supabaseAutoSync)}
-                  className={`w-14 h-8 rounded-full p-1 transition-colors relative shrink-0 ${
-                    supabaseAutoSync ? "bg-emerald-500" : "bg-white/10"
-                  }`}
-                >
-                  <div
-                    className={`w-6 h-6 rounded-full bg-white transition-transform ${
-                      supabaseAutoSync ? "translate-x-6" : "translate-x-0"
-                    }`}
-                  />
-                </button>
+                <input
+                  type="url"
+                  value={supabaseUrlInput}
+                  onChange={(e) => handleSupabaseUrlChange(e.target.value)}
+                  placeholder="https://votre-projet.supabase.co"
+                  className="w-full p-2.5 bg-black/50 rounded-xl text-white text-[11px] border border-white/15 outline-none focus:border-emerald-400 font-mono"
+                />
               </div>
 
-              {/* Rapport de Test Live */}
-              {supabaseTestReport && (
-                <div
-                  className={`p-4 rounded-2xl border ${
-                    supabaseTestReport.success
-                      ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-200"
-                      : supabaseTestReport.details?.missingTables
-                      ? "bg-amber-500/15 border-amber-500/40 text-amber-200"
-                      : "bg-red-500/15 border-red-500/40 text-red-200"
-                  } space-y-2.5 animate-fade-in`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    {supabaseTestReport.success ? (
-                      <CheckCircle className="text-emerald-400 shrink-0" size={20} />
-                    ) : supabaseTestReport.details?.missingTables ? (
-                      <AlertCircle className="text-amber-400 shrink-0" size={20} />
-                    ) : (
-                      <AlertCircle className="text-red-400 shrink-0" size={20} />
-                    )}
-                    <div>
-                      <h5 className="font-black text-xs uppercase tracking-wide">
-                        {supabaseTestReport.success
-                          ? "Connexion Réussie avec Supabase Cloud !"
-                          : supabaseTestReport.details?.missingTables
-                          ? "Serveur Connecté — Tables SQL à Créer"
-                          : "Échec du Test de Connexion"}
-                      </h5>
-                      <p className="text-[10px] opacity-90 mt-0.5">{supabaseTestReport.message}</p>
-                    </div>
-                  </div>
-
-                  {supabaseTestReport.details && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-white/10 text-[9px]">
-                      <div className="bg-black/30 p-2 rounded-xl">
-                        <span className="opacity-60 block">Table menu_items</span>
-                        <strong
-                          className={
-                            supabaseTestReport.details.menuTableStatus === "ok"
-                              ? "text-emerald-400"
-                              : supabaseTestReport.details.menuTableStatus === "missing"
-                              ? "text-amber-400"
-                              : "text-red-400"
-                          }
-                        >
-                          {supabaseTestReport.details.menuTableStatus === "ok"
-                            ? "✅ Opérationnelle"
-                            : supabaseTestReport.details.menuTableStatus === "missing"
-                            ? "⚠️ Table à créer (SQL)"
-                            : "❌ Injoignable"}
-                        </strong>
-                      </div>
-                      <div className="bg-black/30 p-2 rounded-xl">
-                        <span className="opacity-60 block">Table orders</span>
-                        <strong
-                          className={
-                            supabaseTestReport.details.ordersTableStatus === "ok"
-                              ? "text-emerald-400"
-                              : supabaseTestReport.details.ordersTableStatus === "missing"
-                              ? "text-amber-400"
-                              : "text-red-400"
-                          }
-                        >
-                          {supabaseTestReport.details.ordersTableStatus === "ok"
-                            ? "✅ Opérationnelle"
-                            : supabaseTestReport.details.ordersTableStatus === "missing"
-                            ? "⚠️ Table à créer (SQL)"
-                            : "❌ Injoignable"}
-                        </strong>
-                      </div>
-                      <div className="bg-black/30 p-2 rounded-xl">
-                        <span className="opacity-60 block">Temps de Réponse</span>
-                        <strong className="text-white">
-                          {supabaseTestReport.latencyMs || "< 100"} ms
-                        </strong>
-                      </div>
-                    </div>
-                  )}
-
-                  {supabaseTestReport.details?.missingTables && (
-                    <div className="pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowSqlSchemaModal(true);
-                          handleCopySqlSchema();
-                        }}
-                        className="w-full bg-brand-gold hover:bg-amber-400 text-brand-brown py-3 px-4 rounded-xl font-black text-[10px] uppercase italic shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all"
-                      >
-                        <Copy size={15} /> Copier & Voir le Script SQL à coller dans Supabase
-                      </button>
-                    </div>
-                  )}
-
-                  {!supabaseTestReport.success && !supabaseTestReport.details?.missingTables && (
-                    <div className="text-[9px] bg-black/40 p-3 rounded-xl border border-white/5 space-y-1">
-                      <p className="font-bold text-white">Astuce de dépannage :</p>
-                      <p>
-                        1. Collez votre clé <strong>anon (public)</strong> commençant par <code>eyJ...</code> : l'URL exacte du projet sera détectée automatiquement.
-                      </p>
-                      <p>
-                        2. Vérifiez sur <strong>supabase.com/dashboard</strong> que votre projet est bien <strong>Active</strong> (et non <em>Paused</em>).
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Guide Ultra-Simple adapté à l'écran mobile Supabase de l'utilisateur */}
+              <div className="bg-brand-gold/10 border border-brand-gold/30 rounded-2xl p-3 text-[9.5px] space-y-1.5">
+                <p className="font-black uppercase text-brand-gold text-[9.5px]">
+                  💡 Comment copier votre clé sur votre écran Supabase :
+                </p>
+                <p className="text-white/85 leading-snug">
+                  1. Sur votre page Supabase, tout en haut à droite du nom <strong>khadys-food</strong>, appuyez sur le bouton rond <strong>🔌 (Prise)</strong>.<br />
+                  2. Appuyez sur l'onglet <strong>App Frameworks</strong> (ou allez dans <strong>☰ &gt; Project Settings &gt; API Keys</strong>).<br />
+                  3. Copiez l'<strong>URL</strong> et la <strong>Clé (Anon ou Publishable)</strong> puis appuyez sur <strong>Coller</strong> ci-dessus.
+                </p>
+              </div>
 
               {/* Rapport de Push Live */}
               {pushMenuSummary && (
                 <div
-                  className={`p-3.5 rounded-2xl border ${
+                  className={`p-3 rounded-2xl border ${
                     pushMenuSummary.success
                       ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-200"
                       : pushMenuSummary.localSaved
                       ? "bg-amber-500/15 border-amber-500/40 text-amber-200"
                       : "bg-red-500/15 border-red-500/40 text-red-200"
-                  } space-y-2.5 text-[10px] animate-fade-in`}
+                  } space-y-2 text-[9.5px] animate-fade-in`}
                 >
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       {pushMenuSummary.success ? (
-                        <CheckCircle size={16} className="text-emerald-400 shrink-0" />
+                        <CheckCircle size={15} className="text-emerald-400 shrink-0" />
                       ) : (
-                        <CloudUpload size={16} className="text-amber-400 shrink-0" />
+                        <CloudUpload size={15} className="text-amber-400 shrink-0" />
                       )}
-                      <span className="font-bold">{pushMenuSummary.message}</span>
+                      <span className="font-bold leading-snug">{pushMenuSummary.message}</span>
                     </div>
                     <button
                       onClick={() => setPushMenuSummary(null)}
@@ -3343,85 +3242,75 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <X size={14} />
                     </button>
                   </div>
+                </div>
+              )}
 
-                  {pushMenuSummary.missingTables && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowSqlSchemaModal(true);
-                        handleCopySqlSchema();
-                      }}
-                      className="w-full bg-brand-gold hover:bg-amber-400 text-brand-brown py-2.5 px-4 rounded-xl font-black text-[9.5px] uppercase italic shadow-lg flex items-center justify-center gap-2"
-                    >
-                      <Copy size={14} /> Copier & Voir le Script SQL à coller dans Supabase
-                    </button>
-                  )}
-
-                  {!pushMenuSummary.success && (
-                    <button
-                      type="button"
-                      onClick={handleEnableStandaloneMode}
-                      className="w-full bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 py-2.5 px-4 rounded-xl font-black text-[9.5px] uppercase italic flex items-center justify-center gap-2"
-                    >
-                      <CheckCircle size={14} /> Continuer en Mode Autonome (Mes {items.length} plats sont déjà sauvegardés)
-                    </button>
-                  )}
+              {/* Rapport de Test Live */}
+              {supabaseTestReport && (
+                <div
+                  className={`p-3 rounded-2xl border ${
+                    supabaseTestReport.success
+                      ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-200"
+                      : supabaseTestReport.details?.missingTables
+                      ? "bg-amber-500/15 border-amber-500/40 text-amber-200"
+                      : "bg-red-500/15 border-red-500/40 text-red-200"
+                  } space-y-2 animate-fade-in`}
+                >
+                  <div className="flex items-center gap-2">
+                    {supabaseTestReport.success ? (
+                      <CheckCircle className="text-emerald-400 shrink-0" size={18} />
+                    ) : (
+                      <AlertCircle className="text-amber-400 shrink-0" size={18} />
+                    )}
+                    <div>
+                      <h5 className="font-black text-[10px] uppercase">
+                        {supabaseTestReport.success
+                          ? "✅ Connexion Réussie avec Supabase !"
+                          : "Diagnostic de Connexion"}
+                      </h5>
+                      <p className="text-[9.5px] opacity-95 mt-0.5 leading-snug">{supabaseTestReport.message}</p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Footer Boutons d'Action */}
-            <div className="p-4 sm:p-5 border-t border-white/10 bg-black/50 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleSaveSupabaseConfig}
-                  className="bg-brand-gold hover:bg-amber-400 text-brand-brown px-5 py-3 rounded-2xl font-black text-[10px] uppercase italic shadow-xl flex items-center gap-2 active:scale-95 transition-all"
-                >
-                  <Key size={14} /> Enregistrer les Clés
-                </button>
-
+            {/* Footer Compact en Grille 2x2 pour Mobile */}
+            <div className="p-3 border-t border-white/10 bg-black/70 shrink-0 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={handleTestSupabaseConnection}
                   disabled={isTestingSupabase}
-                  className="bg-white/10 hover:bg-white/20 text-emerald-300 border border-emerald-500/30 px-4 py-3 rounded-2xl font-black text-[10px] uppercase italic flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+                  className="bg-white/10 hover:bg-white/20 text-emerald-300 border border-emerald-500/40 py-2.5 px-3 rounded-xl font-black text-[9.5px] uppercase italic flex items-center justify-center gap-1.5 active:scale-95 transition-all disabled:opacity-50"
                 >
-                  <Cloud size={14} className={isTestingSupabase ? "animate-spin" : ""} />
-                  {isTestingSupabase ? "Test en cours..." : "Tester la Connexion"}
+                  <Cloud size={13} className={isTestingSupabase ? "animate-spin" : ""} />
+                  {isTestingSupabase ? "Test..." : "1. Tester"}
                 </button>
 
                 <button
                   type="button"
                   onClick={handlePushAllMenuToSupabase}
                   disabled={isPushingMenuToSupabase}
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-4 py-3 rounded-2xl font-black text-[10px] uppercase italic border border-emerald-400/30 flex items-center gap-2 shadow-xl active:scale-95 transition-all disabled:opacity-50"
+                  className="bg-emerald-500 hover:bg-emerald-400 text-black py-2.5 px-3 rounded-xl font-black text-[9.5px] uppercase italic flex items-center justify-center gap-1.5 shadow-lg active:scale-95 transition-all disabled:opacity-50"
                 >
-                  <CloudUpload size={14} className={isPushingMenuToSupabase ? "animate-bounce" : ""} />
-                  {isPushingMenuToSupabase ? "Envoi..." : `Pousser les Plats (${items.length})`}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowSqlSchemaModal(true)}
-                  className="bg-white/10 hover:bg-white/20 text-white px-3.5 py-3 rounded-2xl font-black text-[9px] uppercase italic border border-white/10 flex items-center gap-1.5 active:scale-95 transition-all"
-                >
-                  <Database size={13} /> Script SQL
+                  <CloudUpload size={13} className={isPushingMenuToSupabase ? "animate-bounce" : ""} />
+                  {isPushingMenuToSupabase ? "Envoi..." : `2. Pousser (${items.length})`}
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2">
                 <button
                   type="button"
-                  onClick={handleResetSupabaseConfig}
-                  className="text-white/40 hover:text-white px-3 py-2 text-[9px] font-black uppercase italic transition-colors"
+                  onClick={handleSaveSupabaseConfig}
+                  className="flex-1 bg-brand-gold hover:bg-amber-400 text-brand-brown py-2 px-3 rounded-xl font-black text-[9px] uppercase italic flex items-center justify-center gap-1.5 active:scale-95"
                 >
-                  Réinitialiser
+                  <Key size={12} /> Enregistrer
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowSupabaseSettingsModal(false)}
-                  className="bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-2xl text-[10px] font-black uppercase italic active:scale-95"
+                  className="bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-xl text-[9px] font-black uppercase italic active:scale-95"
                 >
                   Fermer
                 </button>

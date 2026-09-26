@@ -583,32 +583,175 @@ export function clearSupabaseConfig(): void {
   isSupabaseConfigured = checkSupabaseConfigured();
 }
 
-function isTableMissingError(err: any): boolean {
-  if (!err) return false;
-  const code = String(err.code || '').toUpperCase();
-  const msg = String(err.message || '').toLowerCase();
-  const details = String(err.details || '').toLowerCase();
-  return (
-    code === '42P01' ||
-    code === 'PGRST205' ||
-    (code === 'PGRST204' && !msg.includes('column')) ||
-    (msg.includes('does not exist') && !msg.includes('column')) ||
-    msg.includes('schema cache') ||
-    msg.includes('could not find the table') ||
-    details.includes('does not exist') ||
-    details.includes('schema cache')
-  );
-}
-
 function isColumnMissingError(err: any): boolean {
   if (!err) return false;
   const code = String(err.code || '').toUpperCase();
   const msg = String(err.message || '').toLowerCase();
   return (
     code === '42703' ||
-    (code === 'PGRST204' && msg.includes('column')) ||
-    (msg.includes('column') && (msg.includes('does not exist') || msg.includes('schema cache')))
+    code === 'PGRST204' ||
+    (msg.includes('column') && (msg.includes('does not exist') || msg.includes('schema cache') || msg.includes('could not find')))
   );
+}
+
+function extractMissingColumnName(err: any): string | null {
+  if (!err) return null;
+  const msg = String(err.message || '');
+  const details = String(err.details || '');
+  const combined = `${msg} ${details}`;
+
+  // Format PostgREST PGRST204 : "Could not find the 'is_plat_du_jour' column of 'menu_items' in the schema cache"
+  const pgrstMatch = combined.match(/Could not find the '([^']+)' column/i) || combined.match(/'([^']+)' column of/i);
+  if (pgrstMatch?.[1]) return pgrstMatch[1];
+
+  // Format PostgreSQL 42703 : column "is_plat_du_jour" of relation "menu_items" does not exist
+  const pgMatch = combined.match(/column "([^"]+)"/i) || combined.match(/column [a-z0-9_]+\.([a-z0-9_]+) does not exist/i);
+  if (pgMatch?.[1]) return pgMatch[1];
+
+  return null;
+}
+
+function isTableMissingError(err: any): boolean {
+  if (!err) return false;
+  // IMPORTANT : Ne jamais confondre une colonne manquante (PGRST204) avec une table manquante (PGRST205) !
+  if (isColumnMissingError(err)) return false;
+
+  const code = String(err.code || '').toUpperCase();
+  const msg = String(err.message || '').toLowerCase();
+  const details = String(err.details || '').toLowerCase();
+  return (
+    code === '42P01' ||
+    code === 'PGRST205' ||
+    msg.includes('could not find the table') ||
+    (msg.includes('relation') && msg.includes('does not exist') && !msg.includes('column')) ||
+    details.includes('could not find the table')
+  );
+}
+
+function stringToDeterministicUuid(input: string): string {
+  const clean = String(input || 'item');
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean)) {
+    return clean.toLowerCase();
+  }
+  let h1 = 0xdeadbeef ^ clean.length;
+  let h2 = 0x41c6ce57 ^ clean.length;
+  for (let i = 0; i < clean.length; i++) {
+    const ch = clean.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  const hex1 = (h1 >>> 0).toString(16).padStart(8, '0');
+  const hex2 = (h2 >>> 0).toString(16).padStart(8, '0');
+  const hex3 = ((h1 ^ h2) >>> 0).toString(16).padStart(8, '0');
+  return `${hex1}-${hex2.slice(0, 4)}-4${hex2.slice(5, 8)}-8${hex3.slice(1, 4)}-${hex1.slice(0, 4)}${hex3}`;
+}
+
+function stringToDeterministicInt(input: string, fallbackIndex: number): number {
+  const asNum = Number(input);
+  if (Number.isInteger(asNum) && asNum > 0) return asNum;
+  let hash = 0;
+  const str = String(input || fallbackIndex);
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) % 100000000;
+  }
+  return Math.abs(hash) + 1000 + fallbackIndex;
+}
+
+/**
+ * Insère ou met à jour des plats dans `menu_items` en s'adaptant automatiquement
+ * aux colonnes et aux types réellement présents dans la table Supabase de l'utilisateur.
+ * Si la table a été créée avec une ancienne version du schéma SQL (sans `is_plat_du_jour`,
+ * `is_specialite_maison`, etc.) ou avec un ID numérique/UUID, l'adaptation est 100% automatique !
+ */
+async function upsertMenuItemsAdaptive(
+  client: SupabaseClient,
+  rows: Record<string, any>[]
+): Promise<{ data: any; error: any }> {
+  let currentRows = rows.map((r) => ({ ...r }));
+  const strippedColumns = new Set<string>();
+  let useInsertFallback = false;
+
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const res = useInsertFallback
+      ? await client.from('menu_items').insert(currentRows)
+      : await client.from('menu_items').upsert(currentRows, { onConflict: 'id' });
+
+    if (!res.error) {
+      return { data: res.data, error: null };
+    }
+
+    const errCode = String(res.error.code || '').toUpperCase();
+    const errMsg = String(res.error.message || '').toLowerCase();
+
+    // 1. Colonne précise non trouvée dans la table de l'utilisateur -> on la retire et on réessaie
+    const missingCol = extractMissingColumnName(res.error);
+    if (missingCol && !strippedColumns.has(missingCol) && missingCol !== 'id' && missingCol !== 'name') {
+      strippedColumns.add(missingCol);
+      currentRows = currentRows.map((row) => {
+        const next = { ...row };
+        delete next[missingCol];
+        return next;
+      });
+      continue;
+    }
+
+    // 2. Erreur générique de colonne manquante -> retirer progressivement les colonnes optionnelles
+    if (isColumnMissingError(res.error)) {
+      if (!strippedColumns.has('__tier1__')) {
+        strippedColumns.add('__tier1__');
+        currentRows = currentRows.map(({ is_plat_du_jour, is_specialite_maison, ...rest }) => rest);
+        continue;
+      }
+      if (!strippedColumns.has('__tier2__')) {
+        strippedColumns.add('__tier2__');
+        currentRows = currentRows.map(({ is_spicy, is_available, rating, ...rest }) => rest);
+        continue;
+      }
+      if (!strippedColumns.has('__tier3__')) {
+        strippedColumns.add('__tier3__');
+        currentRows = currentRows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          description: row.description,
+          price: row.price,
+          image: row.image,
+          category: row.category,
+        }));
+        continue;
+      }
+    }
+
+    // 3. Si la colonne `id` de l'utilisateur a été créée en UUID ou en BIGINT/INTEGER au lieu de TEXT
+    if (errCode === '22P02' && !strippedColumns.has('__id_converted__')) {
+      strippedColumns.add('__id_converted__');
+      if (errMsg.includes('uuid')) {
+        currentRows = currentRows.map((row) => ({
+          ...row,
+          id: stringToDeterministicUuid(String(row.id)),
+        }));
+        continue;
+      }
+      if (errMsg.includes('int') || errMsg.includes('numeric')) {
+        currentRows = currentRows.map((row, idx) => ({
+          ...row,
+          id: stringToDeterministicInt(String(row.id), idx + 1),
+        }));
+        continue;
+      }
+    }
+
+    // 4. Si la table n'a pas de contrainte primaire/unique sur `id` pour ON CONFLICT
+    if ((errCode === '42P10' || errMsg.includes('on conflict')) && !useInsertFallback) {
+      useInsertFallback = true;
+      continue;
+    }
+
+    return { data: null, error: res.error };
+  }
+
+  return { data: null, error: { message: "Trop de tentatives d'adaptation des colonnes" } };
 }
 
 function isNetworkFetchError(err: any): boolean {
@@ -722,9 +865,11 @@ export async function testSupabaseConnection(
   const runProbe = async (probeUrl: string) => {
     const client = createSupabaseClientInstance(probeUrl, targetKey, false);
 
+    // Utiliser GET (.select('*').limit(1)) au lieu de HEAD pour que PostgREST renvoie toujours
+    // le corps JSON complet des erreurs éventuelles (PGRST205, PGRST204, etc.)
     const [menuRes, ordersRes] = await Promise.all([
-      client.from('menu_items').select('id', { count: 'exact', head: true }),
-      client.from('orders').select('id', { count: 'exact', head: true }),
+      client.from('menu_items').select('*', { count: 'exact' }).limit(1),
+      client.from('orders').select('*', { count: 'exact' }).limit(1),
     ]);
 
     return {
@@ -993,15 +1138,7 @@ export async function pushAllMenuItemsToSupabase(
 
     for (let i = 0; i < payload.length; i += BATCH_SIZE) {
       const batch = payload.slice(i, i + BATCH_SIZE);
-      let { error } = await client.from('menu_items').upsert(batch, { onConflict: 'id' });
-
-      // Si la table menu_items existe mais n'a pas encore la colonne is_plat_du_jour (ancien schéma SQL),
-      // réessayer automatiquement sans la colonne is_plat_du_jour !
-      if (error && isColumnMissingError(error)) {
-        const legacyBatch = batch.map(({ is_plat_du_jour, ...rest }) => rest);
-        const retry = await client.from('menu_items').upsert(legacyBatch, { onConflict: 'id' });
-        error = retry.error;
-      }
+      const { error } = await upsertMenuItemsAdaptive(client, batch);
 
       if (error) {
         if (isAuthKeyError(error)) {
@@ -1060,17 +1197,23 @@ export const db = {
     const client = getSupabaseClient();
     if (!client) return null;
     try {
-      const { data, error } = await client
+      let { data, error } = await client
         .from('menu_items')
         .select('*')
         .order('category', { ascending: true });
+
+      if (error) {
+        const retry = await client.from('menu_items').select('*');
+        data = retry.data;
+        error = retry.error;
+      }
 
       if (error || !data) {
         return null;
       }
 
       return data.map((item: any) => ({
-        id: item.id,
+        id: String(item.id),
         name: item.name || '',
         description: item.description || '',
         price: Number(item.price) || 0,
@@ -1099,29 +1242,25 @@ export const db = {
     }
 
     try {
-      const { data, error } = await client
-        .from('menu_items')
-        .upsert(
-          {
-            id: item.id,
-            name: item.name,
-            description: item.description || '',
-            price: Number(item.price) || 0,
-            image: item.image || '',
-            category: item.category || 'Plat Africain',
-            rating: Number(item.rating) || 5,
-            is_available: item.isAvailable ?? true,
-            is_spicy: Boolean(item.isSpicy),
-            is_specialite_maison: Boolean(item.isSpécialitéMaison),
-            is_plat_du_jour: Boolean(
-              item.isPlatDuJour ||
-              item.category === 'Plat du Jour' ||
-              item.category === 'Menu du Jour'
-            ),
-          },
-          { onConflict: 'id' }
-        )
-        .select();
+      const { data, error } = await upsertMenuItemsAdaptive(client, [
+        {
+          id: item.id,
+          name: item.name,
+          description: item.description || '',
+          price: Number(item.price) || 0,
+          image: item.image || '',
+          category: item.category || 'Plat Africain',
+          rating: Number(item.rating) || 5,
+          is_available: item.isAvailable ?? true,
+          is_spicy: Boolean(item.isSpicy),
+          is_specialite_maison: Boolean(item.isSpécialitéMaison),
+          is_plat_du_jour: Boolean(
+            item.isPlatDuJour ||
+            item.category === 'Plat du Jour' ||
+            item.category === 'Menu du Jour'
+          ),
+        },
+      ]);
 
       if (error) {
         return { success: false, error: error.message };
