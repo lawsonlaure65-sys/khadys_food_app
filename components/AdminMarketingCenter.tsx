@@ -21,7 +21,8 @@ import {
   PLAT_DU_JOUR_PRESETS, generatePlatDuJourMarketingTexts, PlatDuJourStyle,
   shareToSocialPlatform,
   getMarketingTemplates, MARKETING_TEMPLATES, broadcastToWhatsApp,
-  DEFAULT_MENU_DU_JOUR_DISHES, MenuDuJourDishItem
+  DEFAULT_MENU_DU_JOUR_DISHES, MenuDuJourDishItem,
+  syncMenuDuJourWithMenuItems, resolveTrioDishImage
 } from '../utils/marketing';
 import { RESTAURANT_INFO } from '../constants';
 import { compressImage } from '../utils/imageCompressor';
@@ -109,12 +110,19 @@ export const AdminMarketingCenter: React.FC<AdminMarketingCenterProps> = ({
   useEffect(() => {
     const handlePlatUpdated = (e: any) => {
       if (e.detail && e.detail.dishName) {
-        setPlatDuJour(e.detail);
+        setPlatDuJour(syncMenuDuJourWithMenuItems(e.detail, items));
       }
     };
     window.addEventListener('khadys_plat_du_jour_updated', handlePlatUpdated);
     return () => window.removeEventListener('khadys_plat_du_jour_updated', handlePlatUpdated);
-  }, []);
+  }, [items]);
+
+  // Automatically sync Trio dishes (Doukounou, Attiéké, Plat du Jour) with restaurant's own images when items load
+  useEffect(() => {
+    if (items && items.length > 0) {
+      setPlatDuJour(prev => syncMenuDuJourWithMenuItems(prev, items));
+    }
+  }, [items]);
 
   // AI Insights State
   const [aiStrategyResult, setAiStrategyResult] = useState('');
@@ -784,9 +792,13 @@ Sois précis, concret, orienté chiffre d'affaires et rédigé avec professionna
 
           {/* SUB-VIEW 2: RECIPE & MULTI-CHANNEL TEXTS CONFIGURATION */}
           {platSubView === 'RECIPE_CHANNELS' && (() => {
-            const safeDishes = platDuJour.dishes && platDuJour.dishes.length >= 3 
+            const rawDishes = platDuJour.dishes && platDuJour.dishes.length >= 3 
               ? platDuJour.dishes 
               : DEFAULT_MENU_DU_JOUR_DISHES;
+            const safeDishes = rawDishes.map((d, idx) => ({
+              ...d,
+              dishImage: resolveTrioDishImage(d, idx, items)
+            }));
             const currentDish = safeDishes[selectedDishIndex] || safeDishes[0];
 
             const updateCurrentDish = (updates: Partial<typeof currentDish>) => {

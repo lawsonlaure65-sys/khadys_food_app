@@ -64,11 +64,11 @@ export const MENU_ITEMS: MenuItem[] = [
     description: 'L\'incontournable gâteau de maïs vapeur traditionnel au Sahel, cuit à point, tendre et moelleux, servi avec sa sauce mijotée de la maison, piment vert doux et poisson frit ou poulet braisé.', 
     price: 3000, 
     image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800', 
-    category: 'Menu du Jour', 
+    category: 'Spécialité Maison', 
     rating: 5, 
     isAvailable: true, 
     isSpécialitéMaison: true, 
-    isPlatDuJour: true, 
+    isPlatDuJour: false, 
     isPromo: true 
   },
   { 
@@ -77,11 +77,11 @@ export const MENU_ITEMS: MenuItem[] = [
     description: 'La semoule de manioc attiéké fraîche et aérée de la maison Khady, servie avec darne de poisson capitaine braisée ou poulet croustillant, oignons doux marinés, tomates et piment vert maison.', 
     price: 4500, 
     image: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=800', 
-    category: 'Menu du Jour', 
+    category: 'Spécialité Maison', 
     rating: 5, 
     isAvailable: true, 
     isSpécialitéMaison: true, 
-    isPlatDuJour: true 
+    isPlatDuJour: false 
   },
   { 
     id: 'sp1', 
@@ -103,11 +103,11 @@ export const MENU_ITEMS: MenuItem[] = [
     description: 'Riz blanc délicatement mijoté aux herbes et bouillon de poisson frais, servi avec darne de thiof dorée, légumes glacés au jus et sauce beugueudj / bissap blanc acidulée.',
     price: 5000,
     image: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=800',
-    category: 'Menu du Jour',
+    category: 'Spécialité Maison',
     rating: 5,
     isAvailable: true,
     isSpécialitéMaison: true,
-    isPlatDuJour: true
+    isPlatDuJour: false
   },
   { 
     id: 'dj1', 
@@ -115,12 +115,12 @@ export const MENU_ITEMS: MenuItem[] = [
     description: 'Couscous traditionnel de moringa frais aux arachides grillées pilées et oignons caramélisés, servi avec son poulet braisé croustillant et sauce pimentée douce.', 
     price: 2500, 
     image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800', 
-    category: 'Menu du Jour', 
+    category: 'Plat Africain', 
     rating: 4.9, 
     isAvailable: true, 
     isVegetarian: false, 
     isLowPrice: true, 
-    isPlatDuJour: true 
+    isPlatDuJour: false 
   },
   { 
     id: 'dj2', 
@@ -128,11 +128,11 @@ export const MENU_ITEMS: MenuItem[] = [
     description: 'Riz rouge savoureux mijoté à cœur dans un bouillon riche de bœuf et épices locales du désert, servi avec morceaux de viande braisée et piment vert.', 
     price: 2000, 
     image: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=800', 
-    category: 'Menu du Jour', 
+    category: 'Plat Africain', 
     rating: 4.8, 
     isAvailable: true, 
     isLowPrice: true, 
-    isPlatDuJour: true 
+    isPlatDuJour: false 
   },
   {
     id: 'dj3',
@@ -140,11 +140,11 @@ export const MENU_ITEMS: MenuItem[] = [
     description: 'Foutou traditionnel de bananes plantains douces pilées, servi avec une sauce graine de palme onctueuse mijotée avec viande de bœuf tendre et poisson fumé.',
     price: 4500,
     image: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800',
-    category: 'Menu du Jour',
+    category: 'Plat Africain',
     rating: 4.9,
     isAvailable: true,
     isSpécialitéMaison: true,
-    isPlatDuJour: true
+    isPlatDuJour: false
   },
   {
     id: 'dj4',
@@ -152,7 +152,7 @@ export const MENU_ITEMS: MenuItem[] = [
     description: 'Bananes plantains mûres découpées en dés et frites dorées, accompagnées d\'une darne de carpe croustillante, sauce aux oignons et piment vert écrasé maison.',
     price: 3500,
     image: 'https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?w=800',
-    category: 'Menu du Jour',
+    category: 'Plat Africain',
     rating: 5,
     isAvailable: true,
     isPromo: true
@@ -163,7 +163,7 @@ export const MENU_ITEMS: MenuItem[] = [
     description: 'Riz parfumé doré au curcuma et laurier, cuisse de poulet fermier rôtie au feu de braise, quartier de citron vert et sauce d\'accompagnement mijotée.',
     price: 3000,
     image: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=800',
-    category: 'Menu du Jour',
+    category: 'Plat Africain',
     rating: 4.8,
     isAvailable: true,
     isLowPrice: true
@@ -177,7 +177,7 @@ export const MENU_ITEMS: MenuItem[] = [
     category: 'Déjeuner', 
     rating: 5, 
     isAvailable: true, 
-    isPlatDuJour: true, 
+    isPlatDuJour: false, 
     isPromo: true 
   },
 

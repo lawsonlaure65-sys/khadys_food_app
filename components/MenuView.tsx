@@ -68,8 +68,24 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
            name.includes('attiéké') || 
            name.includes('attieke') ||
            item.id === 'douk-royal' || 
-           item.id === 'attieke-royal';
+           item.id === 'attieke-royal' ||
+           item.id === 'af3';
   };
+
+  // Helper: Attiéké & Doukounou must NEVER become automatic Plat du Jour
+  const isDishPlatDuJour = (item: MenuItem) => {
+    if (isDishIncontournable(item)) return false;
+    return Boolean(item.isPlatDuJour || item.category === 'Menu du Jour' || item.category === 'Plat du Jour');
+  };
+
+  // Permanent specialties & Incontournables (Part 2 of the Menu)
+  const permanentSpecialties = useMemo(() => {
+    return items.filter(item =>
+      item.category !== 'Box Sauce' &&
+      item.category !== 'Pack-Buffet' &&
+      (isDishIncontournable(item) || item.isSpécialitéMaison || item.category === 'Spécialité Maison')
+    ).slice(0, 8);
+  }, [items]);
 
   // Dynamically calculate match counts for each tag filter
   const tagCounts = useMemo(() => {
@@ -85,7 +101,7 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
 
     items.forEach(item => {
       if (isDishIncontournable(item)) counts.INCONTOURNABLE++;
-      if (item.isPlatDuJour || item.category === 'Menu du Jour' || item.category === 'Plat du Jour') counts.PLAT_DU_JOUR++;
+      if (isDishPlatDuJour(item)) counts.PLAT_DU_JOUR++;
       if (item.isSpécialitéMaison || item.category === 'Spécialité Maison') counts.SPECIALITE++;
       if (item.isSpicy) counts.EPICE++;
       if (item.isVegetarian) counts.VEGETARIEN++;
@@ -104,7 +120,7 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
       if (selectedTagFilter === 'INCONTOURNABLE') {
         matchesTag = isDishIncontournable(item);
       } else if (selectedTagFilter === 'PLAT_DU_JOUR') {
-        matchesTag = Boolean(item.isPlatDuJour || item.category === 'Menu du Jour' || item.category === 'Plat du Jour');
+        matchesTag = isDishPlatDuJour(item);
       } else if (selectedTagFilter === 'SPECIALITE') {
         matchesTag = Boolean(item.isSpécialitéMaison || item.category === 'Spécialité Maison');
       } else if (selectedTagFilter === 'EPICE') {
@@ -288,8 +304,8 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
         )}
       </header>
 
-      {/* NOTIFICATION PRÉCOMMANDE WHATSAPP */}
-      <div className="px-6 mb-6">
+      {/* NOTIFICATION PRÉCOMMANDE WHATSAPP & CATALOGUE SÉPARÉ */}
+      <div className="px-6 mb-6 space-y-2">
         <div 
           onClick={() => {
             playSound('pop');
@@ -303,22 +319,39 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
               <MessageSquare size={20} className="animate-pulse" />
             </div>
             <div>
-              <span className="text-[8px] font-black uppercase text-emerald-300 tracking-wider block">Service Restaurant</span>
+              <span className="text-[8px] font-black uppercase text-emerald-300 tracking-wider block">Commande Directe WhatsApp</span>
               <h4 className="text-xs font-black uppercase italic text-white">Précommande sur le numéro WhatsApp du restaurant</h4>
               <p className="text-[9px] text-emerald-200/80 font-bold mt-0.5">
-                WhatsApp : <span className="text-brand-gold font-mono">{RESTAURANT_INFO.whatsapp}</span>
+                Contact direct : <span className="text-brand-gold font-mono">{RESTAURANT_INFO.whatsapp}</span>
               </p>
             </div>
           </div>
           <span className="bg-emerald-500 hover:bg-emerald-400 text-white text-[8px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-colors shrink-0 flex items-center gap-1">
-            Précommander <ArrowRight size={10} />
+            Commander <ArrowRight size={10} />
           </span>
+        </div>
+        <div className="flex items-center justify-between px-2 text-[9px] text-brand-brown/70 font-bold">
+          <span>Ligne directe : <strong className="font-mono text-brand-brown">{RESTAURANT_INFO.whatsapp}</strong></span>
+          <a
+            href={RESTAURANT_INFO.whatsappCatalogUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-emerald-700 hover:text-emerald-600 underline font-black uppercase"
+          >
+            Consulter le Catalogue WhatsApp séparé →
+          </a>
         </div>
       </div>
 
-      {/* MENU DU JOUR SPOTLIGHT BANNER — LE TRIO GOURMAND (PLAT DU JOUR + DOUKOUNOU + ATTIÉKÉ) */}
+      {/* PARTIE 1 : PLAT DU JOUR */}
       {platDuJour && platDuJour.isActive && (selectedTagFilter === 'ALL' || selectedTagFilter === 'PLAT_DU_JOUR') && selectedCategory === 'TOUT' && searchQuery === '' && (
         <div className="px-4 sm:px-6 mb-8">
+          <div className="flex items-center gap-2 mb-3 px-2">
+            <span className="bg-brand-orange text-white text-[9px] font-black uppercase px-2.5 py-1 rounded-full">1</span>
+            <h3 className="text-sm sm:text-base font-black italic uppercase text-brand-brown tracking-wide">
+              Plat du Jour & Sélection Quotidienne
+            </h3>
+          </div>
           <MenuDuJourTrio
             items={items}
             onSelectItem={onSelectItem}
@@ -326,6 +359,68 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
           />
         </div>
       )}
+
+      {/* PARTIE 2 : INCONTOURNABLES & SPÉCIALITÉS PERMANENTES (Doukounou, Attiéké, Spécialités) */}
+      {activeSection === 'CARTE' && selectedTagFilter === 'ALL' && selectedCategory === 'TOUT' && searchQuery === '' && permanentSpecialties.length > 0 && (
+        <div className="px-4 sm:px-6 mb-10">
+          <div className="flex items-center justify-between mb-3 px-2">
+            <div className="flex items-center gap-2">
+              <span className="bg-amber-600 text-white text-[9px] font-black uppercase px-2.5 py-1 rounded-full">2</span>
+              <div>
+                <h3 className="text-sm sm:text-base font-black italic uppercase text-brand-brown tracking-wide">
+                  Incontournables & Spécialités Permanentes
+                </h3>
+                <p className="text-[10px] text-brand-brown/60 font-bold">
+                  Doukounou, Attiéké & grands classiques maison — toujours disponibles à la carte
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+            {permanentSpecialties.map((item) => {
+              const isIncontournable = isDishIncontournable(item);
+              return (
+                <div
+                  key={`perm-${item.id}`}
+                  onClick={() => { playSound('pop'); onSelectItem(item); }}
+                  className="bg-gradient-to-b from-amber-50/80 to-white rounded-[2rem] p-3.5 border-2 border-amber-500/40 shadow-sm hover:shadow-md cursor-pointer flex flex-col justify-between transition-all active:scale-95"
+                >
+                  <div>
+                    <div className="relative h-28 w-full mb-2.5 overflow-hidden rounded-2xl">
+                      <img src={item.image} className="w-full h-full object-cover" alt={item.name} />
+                      <span className="absolute top-2 left-2 bg-gradient-to-r from-amber-600 to-orange-600 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow flex items-center gap-1">
+                        <Crown size={9} className="text-yellow-200 fill-yellow-200" />
+                        {isIncontournable ? 'Carte Permanente' : 'Spécialité'}
+                      </span>
+                    </div>
+                    <h4 className="text-[11px] font-black text-brand-brown uppercase italic leading-tight line-clamp-2">
+                      {item.name}
+                    </h4>
+                  </div>
+                  <div className="flex justify-between items-center mt-2 pt-2 border-t border-amber-500/10">
+                    <span className="text-xs font-black text-brand-orange">{item.price.toLocaleString('fr-FR')} F</span>
+                    <div className="w-7 h-7 bg-brand-brown text-brand-gold rounded-xl flex items-center justify-center shadow">
+                      <Plus size={14} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* PARTIE 3 : CARTE COMPLÈTE PAR CATÉGORIE */}
+      <div className="px-6 mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="bg-brand-brown text-brand-gold text-[9px] font-black uppercase px-2.5 py-1 rounded-full">3</span>
+          <h3 className="text-sm sm:text-base font-black italic uppercase text-brand-brown tracking-wide">
+            {selectedCategory === 'TOUT' ? 'Carte Complète par Catégorie' : `Catégorie : ${selectedCategory}`}
+          </h3>
+        </div>
+        <span className="text-[10px] font-mono font-bold text-brand-brown/60">{filteredItems.length} plats</span>
+      </div>
 
       {/* Grid of Dishes with fluid scale and opacity animations */}
       <motion.div 
@@ -335,7 +430,7 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
         <AnimatePresence mode="popLayout">
           {filteredItems.map((item, index) => {
              const isIncontournable = isDishIncontournable(item);
-             const isPlatDuJour = item.isPlatDuJour || item.category === 'Menu du Jour' || item.category === 'Plat du Jour';
+             const isPlatDuJour = isDishPlatDuJour(item);
              const isSpecialite = item.isSpécialitéMaison || item.category === 'Spécialité Maison';
              const isPromo = item.isPromo || item.isLowPrice;
 

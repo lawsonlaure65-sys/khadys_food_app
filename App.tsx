@@ -44,7 +44,7 @@ import {
   clearPendingOrdersFromIDB 
 } from './utils/offlineDB';
 
-import { getStoredBanner, AnnouncementBanner } from './utils/marketing';
+import { getStoredBanner, AnnouncementBanner, getStoredPlatDuJour, syncMenuDuJourWithMenuItems } from './utils/marketing';
 import { decodeSharedCartWithMeta, mergeCartItems, SharedCartMetadata } from './utils/cartShare';
 
 const App: React.FC = () => {
@@ -297,6 +297,7 @@ const App: React.FC = () => {
         const config = getSupabaseConfig();
         if (config.isValid) {
           // A. Synchronisation du Menu Cloud (avec FUSION strictly additive pour ne JAMAIS écraser de plats locaux)
+          let latestMergedMenu: MenuItem[] = [];
           try {
             const cloudMenu = await db.fetchMenu();
             if (cloudMenu && cloudMenu.length > 0) {
@@ -307,6 +308,7 @@ const App: React.FC = () => {
                 // 2. Enrichissement depuis le Cloud
                 cloudMenu.forEach(i => map.set(i.id, i));
                 const merged = Array.from(map.values());
+                latestMergedMenu = merged;
                 saveMenuToIDB(merged);
                 try {
                   localStorage.setItem('khadys_menu_items', JSON.stringify(merged));
@@ -318,13 +320,14 @@ const App: React.FC = () => {
             console.warn('Erreur fetch cloud menu:', e);
           }
 
-          // B. Synchronisation du Plat du Jour Cloud
+          // B. Synchronisation du Plat du Jour Cloud + Photos Restaurant (Doukounou, Attiéké, Plat du Jour)
           try {
             const cloudPlat = await db.fetchPlatDuJour();
-            if (cloudPlat && cloudPlat.dishName) {
-              localStorage.setItem('khadys_plat_du_jour', JSON.stringify(cloudPlat));
-              window.dispatchEvent(new CustomEvent('khadys_plat_du_jour_updated', { detail: cloudPlat }));
-            }
+            const basePlat = cloudPlat && cloudPlat.dishName ? cloudPlat : getStoredPlatDuJour();
+            const syncedPlat = syncMenuDuJourWithMenuItems(basePlat, latestMergedMenu.length > 0 ? latestMergedMenu : undefined);
+            localStorage.setItem('khadys_plat_du_jour', JSON.stringify(syncedPlat));
+            localStorage.setItem('khadys_menu_du_jour', JSON.stringify(syncedPlat));
+            window.dispatchEvent(new CustomEvent('khadys_plat_du_jour_updated', { detail: syncedPlat }));
           } catch (e) {}
 
           // C. Synchronisation de la Photo de Profil Admin Cloud

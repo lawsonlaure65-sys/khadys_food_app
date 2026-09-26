@@ -7,7 +7,7 @@ import {
 import { MenuItem, MenuCategory } from '../types';
 import { 
   getStoredPlatDuJour, MenuDuJourConfig, MenuDuJourDishItem, 
-  DEFAULT_MENU_DU_JOUR_DISHES 
+  DEFAULT_MENU_DU_JOUR_DISHES, resolveTrioDishImage 
 } from '../utils/marketing';
 import { RESTAURANT_INFO } from '../constants';
 import { playSound } from '../utils/audio';
@@ -49,7 +49,7 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
     return null;
   }
 
-  const dishesList: MenuDuJourDishItem[] = (menuDuJour.dishes && menuDuJour.dishes.length >= 3)
+  const rawDishesList: MenuDuJourDishItem[] = (menuDuJour.dishes && menuDuJour.dishes.length >= 3)
     ? menuDuJour.dishes
     : [
         {
@@ -71,6 +71,11 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
         DEFAULT_MENU_DU_JOUR_DISHES[1],
         DEFAULT_MENU_DU_JOUR_DISHES[2]
       ];
+
+  const dishesList: MenuDuJourDishItem[] = rawDishesList.map((dish, idx) => ({
+    ...dish,
+    dishImage: resolveTrioDishImage(dish, idx, items)
+  }));
 
   const handleDishClick = (dish: MenuDuJourDishItem, index: number) => {
     playSound('pop');

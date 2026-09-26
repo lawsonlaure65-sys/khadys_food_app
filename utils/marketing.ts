@@ -628,6 +628,163 @@ export const generateMenuDuJourMarketingTexts = (
 // Backward compatibility alias
 export const generatePlatDuJourMarketingTexts = generateMenuDuJourMarketingTexts;
 
+// Helper to check if an image URL is a custom photo uploaded/registered by the restaurant (not a generic Unsplash stock URL)
+export const isCustomRestaurantImage = (img?: string): boolean => {
+  if (!img || typeof img !== 'string') return false;
+  const trimmed = img.trim();
+  if (!trimmed) return false;
+  if (trimmed.includes('unsplash.com')) return false;
+  return true;
+};
+
+// Helper to retrieve all saved menu items from localStorage when not passed via props
+export const getStoredRestaurantMenuItems = (): MenuItem[] => {
+  const map = new Map<string, MenuItem>();
+  try {
+    const rawMain = localStorage.getItem('khadys_menu_items') || localStorage.getItem('khadys_menu_emergency_backup');
+    if (rawMain) {
+      const parsed = JSON.parse(rawMain);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((m: MenuItem) => {
+          if (m && m.id) map.set(m.id, m);
+        });
+      }
+    }
+    const rawCustom = localStorage.getItem('khadys_custom_user_dishes');
+    if (rawCustom) {
+      const parsedCustom = JSON.parse(rawCustom);
+      if (Array.isArray(parsedCustom)) {
+        parsedCustom.forEach((m: MenuItem) => {
+          if (m && m.id) map.set(m.id, m);
+        });
+      }
+    }
+  } catch (e) {}
+  return Array.from(map.values());
+};
+
+// Resolve the authentic restaurant image for any of the 3 Trio Gourmand slots (0: Plat du Jour, 1: Doukounou, 2: Attiéké)
+export const resolveTrioDishImage = (
+  dish: Partial<MenuDuJourDishItem> | undefined,
+  slotIndex: number,
+  menuItems?: MenuItem[]
+): string => {
+  const allItems = menuItems && menuItems.length > 0 ? menuItems : getStoredRestaurantMenuItems();
+  const currentImg = dish?.dishImage || '';
+  const dishNameLower = (dish?.dishName || '').toLowerCase().trim();
+
+  // Slot 1: Le Fameux Doukounou
+  if (slotIndex === 1 || dish?.type === 'DOUKOUNOU' || dishNameLower.includes('doukounou')) {
+    // Look in the restaurant's menu for Doukounou with a custom restaurant photo
+    const doukCustom =
+      allItems.find(i => i.id === 'douk-royal' && isCustomRestaurantImage(i.image)) ||
+      allItems.find(i => i.name.toLowerCase().includes('fameux doukounou') && isCustomRestaurantImage(i.image)) ||
+      allItems.find(i => i.name.toLowerCase().includes('doukounou') && isCustomRestaurantImage(i.image));
+
+    if (doukCustom && doukCustom.image) {
+      // If dishImage is still an Unsplash stock image (or empty), use the restaurant's own registered Doukounou photo
+      if (!isCustomRestaurantImage(currentImg)) {
+        return doukCustom.image;
+      }
+    }
+    if (isCustomRestaurantImage(currentImg)) return currentImg;
+    if (doukCustom?.image) return doukCustom.image;
+    return currentImg || DEFAULT_MENU_DU_JOUR_DISHES[1].dishImage;
+  }
+
+  // Slot 2: L'Incontournable Attiéké
+  if (
+    slotIndex === 2 ||
+    dish?.type === 'ATTIEKE' ||
+    dishNameLower.includes('attiéké') ||
+    dishNameLower.includes('attieke')
+  ) {
+    // Look in the restaurant's menu for Attiéké with a custom restaurant photo
+    const attiekeCustom =
+      allItems.find(i => i.id === 'attieke-royal' && isCustomRestaurantImage(i.image)) ||
+      allItems.find(i => i.id === 'af3' && isCustomRestaurantImage(i.image)) ||
+      allItems.find(
+        i =>
+          (i.name.toLowerCase().includes('attiéké') || i.name.toLowerCase().includes('attieke')) &&
+          isCustomRestaurantImage(i.image)
+      );
+
+    if (attiekeCustom && attiekeCustom.image) {
+      if (!isCustomRestaurantImage(currentImg)) {
+        return attiekeCustom.image;
+      }
+    }
+    if (isCustomRestaurantImage(currentImg)) return currentImg;
+    if (attiekeCustom?.image) return attiekeCustom.image;
+    return currentImg || DEFAULT_MENU_DU_JOUR_DISHES[2].dishImage;
+  }
+
+  // Slot 0: Plat Cuisiné du Jour
+  if (isCustomRestaurantImage(currentImg)) {
+    return currentImg;
+  }
+
+  if (dishNameLower && allItems.length > 0) {
+    const exactOrPartialMatch =
+      allItems.find(
+        i => i.name.toLowerCase().trim() === dishNameLower && isCustomRestaurantImage(i.image)
+      ) ||
+      allItems.find(
+        i =>
+          (dishNameLower.includes(i.name.toLowerCase().trim()) ||
+            i.name.toLowerCase().trim().includes(dishNameLower)) &&
+          isCustomRestaurantImage(i.image)
+      );
+    if (exactOrPartialMatch && exactOrPartialMatch.image) {
+      return exactOrPartialMatch.image;
+    }
+  }
+
+  return currentImg || DEFAULT_MENU_DU_JOUR_DISHES[0].dishImage;
+};
+
+// Synchronize all 3 Trio dishes in MenuDuJourConfig with the restaurant's own images from the menu
+export const syncMenuDuJourWithMenuItems = (
+  config: MenuDuJourConfig,
+  menuItems?: MenuItem[]
+): MenuDuJourConfig => {
+  const baseDishes =
+    config.dishes && config.dishes.length >= 3
+      ? [...config.dishes]
+      : [
+          {
+            ...DEFAULT_MENU_DU_JOUR_DISHES[0],
+            dishName: config.dishName || DEFAULT_MENU_DU_JOUR_DISHES[0].dishName,
+            tagline: config.tagline || DEFAULT_MENU_DU_JOUR_DISHES[0].tagline,
+            description: config.description || DEFAULT_MENU_DU_JOUR_DISHES[0].description,
+            accompaniments: config.accompaniments || DEFAULT_MENU_DU_JOUR_DISHES[0].accompaniments,
+            price: config.price || DEFAULT_MENU_DU_JOUR_DISHES[0].price,
+            promoPrice: config.promoPrice || DEFAULT_MENU_DU_JOUR_DISHES[0].promoPrice,
+            dishImage: config.dishImage || DEFAULT_MENU_DU_JOUR_DISHES[0].dishImage,
+            remainingStock: config.remainingStock || DEFAULT_MENU_DU_JOUR_DISHES[0].remainingStock
+          },
+          { ...DEFAULT_MENU_DU_JOUR_DISHES[1] },
+          { ...DEFAULT_MENU_DU_JOUR_DISHES[2] }
+        ];
+
+  const syncedDishes = baseDishes.map((d, idx) => ({
+    ...d,
+    dishImage: resolveTrioDishImage(
+      idx === 0 && !isCustomRestaurantImage(d.dishImage) && isCustomRestaurantImage(config.dishImage)
+        ? { ...d, dishImage: config.dishImage }
+        : d,
+      idx,
+      menuItems
+    )
+  }));
+
+  return {
+    ...config,
+    dishes: syncedDishes,
+    dishImage: syncedDishes[0]?.dishImage || config.dishImage
+  };
+};
+
 // Storage for Menu du Jour / Plat du Jour
 export const getStoredMenuDuJour = (): MenuDuJourConfig => {
   try {
@@ -657,12 +814,12 @@ export const getStoredMenuDuJour = (): MenuDuJourConfig => {
           };
           dishes = [
             primaryDish,
-            DEFAULT_MENU_DU_JOUR_DISHES[1], // Doukounou
-            DEFAULT_MENU_DU_JOUR_DISHES[2]  // Attiéké
+            { ...DEFAULT_MENU_DU_JOUR_DISHES[1] }, // Doukounou
+            { ...DEFAULT_MENU_DU_JOUR_DISHES[2] }  // Attiéké
           ];
         }
 
-        const synced: MenuDuJourConfig = {
+        const syncedRaw: MenuDuJourConfig = {
           ...INITIAL_MENU_DU_JOUR,
           ...parsed,
           posterLayout: parsed.posterLayout || 'TRIO_POSTER',
@@ -677,6 +834,8 @@ export const getStoredMenuDuJour = (): MenuDuJourConfig => {
           remainingStock: dishes[0]?.remainingStock || parsed.remainingStock || DEFAULT_MENU_DU_JOUR_DISHES[0].remainingStock,
         };
 
+        const synced = syncMenuDuJourWithMenuItems(syncedRaw);
+
         // Regenerate texts if needed
         const texts = generateMenuDuJourMarketingTexts(synced, 'GOURMAND');
         synced.marketingTextWhatsApp = synced.marketingTextWhatsApp || texts.whatsapp;
@@ -690,32 +849,34 @@ export const getStoredMenuDuJour = (): MenuDuJourConfig => {
       }
     }
   } catch (e) {}
-  return INITIAL_MENU_DU_JOUR;
+  return syncMenuDuJourWithMenuItems(INITIAL_MENU_DU_JOUR);
 };
 
 export const getStoredPlatDuJour = getStoredMenuDuJour;
 
-export const saveStoredMenuDuJour = (menu: MenuDuJourConfig): void => {
+export const saveStoredMenuDuJour = (menu: MenuDuJourConfig, menuItems?: MenuItem[]): void => {
   try {
+    const syncedMenu = syncMenuDuJourWithMenuItems(menu, menuItems);
+
     // Keep dish 0 in sync with primary fields
-    if (menu.dishes && menu.dishes.length > 0) {
-      menu.dishName = menu.dishes[0].dishName;
-      menu.description = menu.dishes[0].description;
-      menu.accompaniments = menu.dishes[0].accompaniments;
-      menu.price = menu.dishes[0].price;
-      menu.promoPrice = menu.dishes[0].promoPrice;
-      menu.dishImage = menu.dishes[0].dishImage;
-      menu.remainingStock = menu.dishes[0].remainingStock;
+    if (syncedMenu.dishes && syncedMenu.dishes.length > 0) {
+      syncedMenu.dishName = syncedMenu.dishes[0].dishName;
+      syncedMenu.description = syncedMenu.dishes[0].description;
+      syncedMenu.accompaniments = syncedMenu.dishes[0].accompaniments;
+      syncedMenu.price = syncedMenu.dishes[0].price;
+      syncedMenu.promoPrice = syncedMenu.dishes[0].promoPrice;
+      syncedMenu.dishImage = syncedMenu.dishes[0].dishImage;
+      syncedMenu.remainingStock = syncedMenu.dishes[0].remainingStock;
     }
 
-    localStorage.setItem('khadys_plat_du_jour', JSON.stringify(menu));
-    localStorage.setItem('khadys_menu_du_jour', JSON.stringify(menu));
+    localStorage.setItem('khadys_plat_du_jour', JSON.stringify(syncedMenu));
+    localStorage.setItem('khadys_menu_du_jour', JSON.stringify(syncedMenu));
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('khadys_plat_du_jour_updated', { detail: menu }));
-      window.dispatchEvent(new CustomEvent('khadys_menu_du_jour_updated', { detail: menu }));
+      window.dispatchEvent(new CustomEvent('khadys_plat_du_jour_updated', { detail: syncedMenu }));
+      window.dispatchEvent(new CustomEvent('khadys_menu_du_jour_updated', { detail: syncedMenu }));
     }
     // Background cloud sync
-    db.savePlatDuJour(menu).catch(() => {});
+    db.savePlatDuJour(syncedMenu).catch(() => {});
   } catch (e) {}
 };
 

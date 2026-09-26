@@ -439,6 +439,23 @@ export const testSupabaseConnection = async (
  * SERVICE DE DONNÉES KHADY'S ELITE
  * Gère la synchronisation bidirectionnelle Cloud, Plat du Jour, Photo Admin, Menu & Commandes
  */
+export const isExcludedFromAutomaticPlatDuJour = (name?: string, id?: string): boolean => {
+  const n = (name || '').toLowerCase();
+  const i = (id || '').toLowerCase();
+  return (
+    n.includes('doukounou') ||
+    n.includes('attiéké') ||
+    n.includes('attieke') ||
+    i === 'douk-royal' ||
+    i === 'attieke-royal' ||
+    i === 'af3'
+  );
+};
+
+/**
+ * SERVICE DE DONNÉES KHADY'S ELITE (Compatible Khady's Food & Allôresto)
+ * Gère la synchronisation bidirectionnelle Cloud, Plat du Jour, Photo Admin, Menu & Commandes
+ */
 export const db = {
   // --- MENU ---
   fetchMenu: async (): Promise<MenuItem[] | null> => {
@@ -459,7 +476,16 @@ export const db = {
         error = retry.error;
       }
 
-      if (error || !data || data.length === 0) {
+      // If Allôresto 'dishes' table exists, also read from it for full harmonization
+      let allorestoDishes: any[] = [];
+      try {
+        const dishesRes = await client.from('dishes').select('*');
+        if (!dishesRes.error && Array.isArray(dishesRes.data) && dishesRes.data.length > 0) {
+          allorestoDishes = dishesRes.data;
+        }
+      } catch {}
+
+      if ((error || !data || data.length === 0) && allorestoDishes.length === 0) {
         return fullMenuBackup || null;
       }
 
@@ -468,23 +494,56 @@ export const db = {
         fullMenuBackup.forEach((item) => backupMap.set(item.id, item));
       }
 
-      return data.map((row: any) => {
+      const combinedRows = [...(data || [])];
+      const existingIds = new Set(combinedRows.map((r: any) => String(r.id)));
+      for (const d of allorestoDishes) {
+        if (d && d.id && !existingIds.has(String(d.id))) {
+          combinedRows.push(d);
+          existingIds.add(String(d.id));
+        }
+      }
+
+      let foundPrimaryPlatDuJour = false;
+
+      return combinedRows.map((row: any) => {
         const cached = backupMap.get(row.id) || {};
+        const excludedFromDaily = isExcludedFromAutomaticPlatDuJour(row.name, row.id);
+        const rawCategory = row.category || cached.category || 'Plat Africain';
+        const finalCategory =
+          excludedFromDaily && (rawCategory === 'Menu du Jour' || rawCategory === 'Plat du Jour')
+            ? 'Spécialité Maison'
+            : rawCategory;
+
+        let isDaily = excludedFromDaily
+          ? false
+          : Boolean(row.is_plat_du_jour ?? row.isPlatDuJour ?? cached.isPlatDuJour ?? false);
+
+        // Enforce single published Plat du Jour rule
+        if (isDaily) {
+          if (!foundPrimaryPlatDuJour) {
+            foundPrimaryPlatDuJour = true;
+          } else {
+            isDaily = false;
+          }
+        }
+
         return {
           id: String(row.id),
           name: row.name,
           description: row.description || '',
           price: Number(row.price),
-          image: row.image,
-          category: row.category || cached.category || 'Plat Africain',
+          image: row.image || row.image_url,
+          category: finalCategory,
           rating: row.rating ? Number(row.rating) : (cached.rating ?? 5),
           isAvailable: row.is_available ?? row.isAvailable ?? cached.isAvailable ?? true,
           isSpicy: row.is_spicy ?? row.isSpicy ?? cached.isSpicy ?? false,
           isVegetarian: row.is_vegetarian ?? row.isVegetarian ?? cached.isVegetarian ?? false,
           isLowPrice: row.is_low_price ?? row.isLowPrice ?? cached.isLowPrice ?? false,
           isPromo: row.is_promo ?? row.isPromo ?? cached.isPromo ?? false,
-          isPlatDuJour: row.is_plat_du_jour ?? row.isPlatDuJour ?? cached.isPlatDuJour ?? false,
-          isSpécialitéMaison: row.is_specialite_maison ?? row.isSpécialitéMaison ?? cached.isSpécialitéMaison ?? false
+          isPlatDuJour: isDaily,
+          isSpécialitéMaison:
+            excludedFromDaily ||
+            Boolean(row.is_specialite_maison ?? row.isSpécialitéMaison ?? cached.isSpécialitéMaison ?? false)
         };
       }) as MenuItem[];
     } catch {
@@ -497,23 +556,50 @@ export const db = {
     if (!client) return { success: false, error: 'Supabase non configuré' };
 
     try {
+      const excludedFromDaily = isExcludedFromAutomaticPlatDuJour(item.name, item.id);
+      const safeCategory =
+        excludedFromDaily && (item.category === 'Menu du Jour' || item.category === 'Plat du Jour')
+          ? 'Spécialité Maison'
+          : item.category;
+
       const payload: Record<string, any> = {
         id: item.id,
         name: item.name,
         description: item.description || '',
         price: item.price,
         image: item.image,
-        category: item.category,
+        category: safeCategory,
         is_available: item.isAvailable ?? true,
         is_spicy: item.isSpicy ?? false,
-        is_specialite_maison: item.isSpécialitéMaison ?? false,
-        is_plat_du_jour: Boolean((item as any).isPlatDuJour)
+        is_specialite_maison: excludedFromDaily ? true : (item.isSpécialitéMaison ?? false),
+        is_plat_du_jour: excludedFromDaily ? false : Boolean((item as any).isPlatDuJour)
       };
 
       const { error } = await upsertMenuItemsAdaptive(client, [payload]);
       if (error) {
         return { success: false, error: formatSupabaseErrorMessage(error.message || error) };
       }
+
+      // Optional mirror to Allôresto 'dishes' table if it exists in Supabase
+      try {
+        await client.from('dishes').upsert(
+          {
+            id: item.id,
+            restaurant_id: 'khadys-food',
+            name: item.name,
+            description: item.description || '',
+            price: item.price,
+            image: item.image,
+            category: safeCategory,
+            is_available: item.isAvailable ?? true,
+            is_spicy: item.isSpicy ?? false,
+            is_specialite_maison: excludedFromDaily ? true : (item.isSpécialitéMaison ?? false),
+            is_plat_du_jour: excludedFromDaily ? false : Boolean((item as any).isPlatDuJour)
+          },
+          { onConflict: 'id' }
+        );
+      } catch {}
+
       return { success: true, data: item };
     } catch (e: any) {
       return { success: false, error: formatSupabaseErrorMessage(e.message || 'Erreur inconnue') };
@@ -528,18 +614,33 @@ export const db = {
       // Backup complete list with rich metadata in app_settings
       await db.saveSetting('full_menu_items', items).catch(() => {});
 
-      const payloads = items.map((item) => ({
-        id: item.id,
-        name: item.name,
-        description: item.description || '',
-        price: item.price,
-        image: item.image,
-        category: item.category,
-        is_available: item.isAvailable ?? true,
-        is_spicy: item.isSpicy ?? false,
-        is_specialite_maison: item.isSpécialitéMaison ?? false,
-        is_plat_du_jour: Boolean((item as any).isPlatDuJour)
-      }));
+      let primaryDailyAssigned = false;
+      const payloads = items.map((item) => {
+        const excludedFromDaily = isExcludedFromAutomaticPlatDuJour(item.name, item.id);
+        const safeCategory =
+          excludedFromDaily && (item.category === 'Menu du Jour' || item.category === 'Plat du Jour')
+            ? 'Spécialité Maison'
+            : item.category;
+
+        let isDaily = excludedFromDaily ? false : Boolean((item as any).isPlatDuJour);
+        if (isDaily) {
+          if (!primaryDailyAssigned) primaryDailyAssigned = true;
+          else isDaily = false;
+        }
+
+        return {
+          id: item.id,
+          name: item.name,
+          description: item.description || '',
+          price: item.price,
+          image: item.image,
+          category: safeCategory,
+          is_available: item.isAvailable ?? true,
+          is_spicy: item.isSpicy ?? false,
+          is_specialite_maison: excludedFromDaily ? true : (item.isSpécialitéMaison ?? false),
+          is_plat_du_jour: isDaily
+        };
+      });
 
       const { error } = await upsertMenuItemsAdaptive(client, payloads);
       if (error) {
@@ -549,6 +650,15 @@ export const db = {
           count: 0
         };
       }
+
+      // Mirror to Allôresto 'dishes' table if present
+      try {
+        const dishesPayloads = payloads.map((p) => ({
+          ...p,
+          restaurant_id: 'khadys-food'
+        }));
+        await client.from('dishes').upsert(dishesPayloads, { onConflict: 'id' });
+      } catch {}
 
       return { success: true, count: items.length };
     } catch (e: any) {

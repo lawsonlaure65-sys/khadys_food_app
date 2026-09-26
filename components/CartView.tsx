@@ -4,7 +4,7 @@ import { Trash2, ShoppingBag, ArrowRight, MapPin, Smartphone, ChevronLeft, Shiel
 import { PhoneInput } from './PhoneInput';
 import { playSound } from '../utils/audio';
 import { BILLO_INFO, RESTAURANT_INFO, DISTRICTS, DISCOUNT_PER_100_POINTS } from '../constants';
-import { getStoredRestaurantWhatsApp, buildKitchenOrderMessage, openWhatsApp } from '../utils/whatsapp';
+import { getStoredRestaurantWhatsApp, buildKitchenOrderMessage, buildDirectWhatsAppCartMessage, openWhatsApp } from '../utils/whatsapp';
 import { applyPromoCode, PromoValidationResult, getStoredPromoCodes } from '../utils/marketing';
 import {
   generateCartShareUrl,
@@ -186,43 +186,19 @@ export const CartView: React.FC<CartViewProps> = ({
     setProofError(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customer.name || !customer.phone) {
-      setPhoneError("Veuillez renseigner votre nom et votre numéro de téléphone.");
-      playSound('error');
-      return;
-    }
-
-    if (!isPhoneValid) {
-      setPhoneError("Format de numéro de téléphone incorrect. Saisissez 8 chiffres.");
-      playSound('error');
-      return;
-    }
-
-    if (!isPhoneVerified) {
-      setPhoneError("Vérification obligatoire : Cliquez sur 'Envoyer Code de Vérification (SMS OTP)' et validez le code avant de confirmer votre commande.");
-      playSound('error');
-      return;
-    }
-
-    // Require Proof Screenshot/Receipt for Mobile Money Payments
-    if (isMobileMoney && !proofImage && !transactionId) {
-      setProofError(true);
-      playSound('error');
-      return;
-    }
+  const handleDirectWhatsAppOrder = () => {
+    if (cart.length === 0) return;
+    playSound('cash');
 
     const orderId = `KH-${Math.floor(1000 + Math.random() * 9000)}`;
-
     const newOrder: Order = {
       id: orderId,
-      customerName: customer.name,
-      phone: customer.phone,
-      address: customer.address,
+      customerName: customer.name.trim() || 'Client WhatsApp',
+      phone: customer.phone.trim() || RESTAURANT_INFO.whatsapp,
+      address: customer.address.trim(),
       district: customer.district,
       items: [...cart],
-      total: subtotal - discount,
+      total: Math.max(0, subtotal - discount),
       deliveryFee: deliveryFee,
       status: 'RECEIVED',
       paymentMethod: payment,
@@ -237,15 +213,27 @@ export const CartView: React.FC<CartViewProps> = ({
 
     onOrderPlace(newOrder);
 
-    // Forward receipt to Restaurant WhatsApp if selected
-    if (sendWhatsApp) {
-      const rest = getStoredRestaurantWhatsApp();
-      const waMsg = buildKitchenOrderMessage(newOrder);
-      openWhatsApp(rest.clean, waMsg);
-    }
+    const waMsg = buildDirectWhatsAppCartMessage({
+      cart,
+      customerName: customer.name,
+      customerPhone: customer.phone,
+      district: customer.district,
+      address: customer.address,
+      paymentMethod: payment,
+      subtotal,
+      discount,
+      deliveryFee,
+      total,
+      orderNote: groupNote
+    });
 
+    openWhatsApp(RESTAURANT_INFO.whatsappClean, waMsg);
     setCart([]);
-    playSound('cash');
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleDirectWhatsAppOrder();
   };
 
   const paymentMethods = [
@@ -434,71 +422,151 @@ export const CartView: React.FC<CartViewProps> = ({
             </div>
           </div>
 
-          {/* Cart items list with +/- quantity controls */}
-          <div className="space-y-3">
-             {cart.map((item, idx) => (
-               <div key={idx} className="bg-white p-4 sm:p-5 rounded-[2.5rem] flex items-center gap-4 shadow-sm border border-brand-brown/5 transition-all hover:shadow-md">
-                  <div className="relative w-16 h-16 rounded-2xl overflow-hidden shadow-md shrink-0">
-                     <img src={item.image} className="w-full h-full object-cover" alt={item.name} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                     <h4 className="font-black text-[10px] sm:text-xs text-brand-brown uppercase italic truncate mb-1">{item.name}</h4>
-                     <div className="flex flex-wrap items-center gap-2">
-                       <p className="text-[10px] font-black text-brand-orange bg-brand-orange/10 px-2.5 py-0.5 rounded-lg inline-block">
-                         {(item.price * item.quantity).toLocaleString('fr-FR')} F
-                       </p>
-                       <span className="text-[9px] text-gray-400 font-bold">
-                         ({item.price.toLocaleString('fr-FR')} F / unité)
-                       </span>
-                     </div>
-                     {item.instructions && (
-                       <p className="text-[9px] text-gray-500 italic truncate mt-1">Note : {item.instructions}</p>
-                     )}
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-2xl shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        playSound('pop');
-                        if (item.quantity <= 1) {
+          {/* Cart items list with +/- quantity, spice level & note controls */}
+          <div className="space-y-3.5">
+             {cart.map((item, idx) => {
+               const currentSpice = item.spiceLevel || (item.isSpicy ? 'Piment normal' : 'Sans piment');
+               const spiceOptions = ['Sans piment', 'Peu pimenté', 'Piment normal', 'Bien pimenté 🌶️'];
+               return (
+                 <div key={idx} className="bg-white p-4 sm:p-5 rounded-[2.2rem] shadow-sm border border-brand-brown/5 transition-all hover:shadow-md space-y-3">
+                    <div className="flex items-center gap-3.5">
+                      <div className="relative w-16 h-16 rounded-2xl overflow-hidden shadow-md shrink-0">
+                         <img src={item.image} className="w-full h-full object-cover" alt={item.name} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                         <h4 className="font-black text-[11px] sm:text-xs text-brand-brown uppercase italic truncate mb-1">{item.name}</h4>
+                         <div className="flex flex-wrap items-center gap-2">
+                           <p className="text-[10px] font-black text-brand-orange bg-brand-orange/10 px-2.5 py-0.5 rounded-lg inline-block">
+                             {(item.price * item.quantity).toLocaleString('fr-FR')} F CFA
+                           </p>
+                           <span className="text-[9px] text-gray-400 font-bold">
+                             ({item.price.toLocaleString('fr-FR')} F / unité)
+                           </span>
+                         </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-2xl shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSound('pop');
+                            if (item.quantity <= 1) {
+                              setCart(cart.filter((_, i) => i !== idx));
+                            } else {
+                              setCart(cart.map((c, i) => (i === idx ? { ...c, quantity: c.quantity - 1 } : c)));
+                            }
+                          }}
+                          className="w-7 h-7 rounded-xl bg-white text-brand-brown flex items-center justify-center shadow-sm hover:bg-rose-50 hover:text-rose-600 active:scale-90 transition-all"
+                          title="Diminuer la quantité"
+                        >
+                          <Minus size={13} />
+                        </button>
+                        <span className="w-6 text-center font-black text-xs text-brand-brown">
+                          {item.quantity}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSound('pop');
+                            setCart(cart.map((c, i) => (i === idx ? { ...c, quantity: c.quantity + 1 } : c)));
+                          }}
+                          className="w-7 h-7 rounded-xl bg-brand-orange text-white flex items-center justify-center shadow-sm hover:bg-amber-600 active:scale-90 transition-all"
+                          title="Augmenter la quantité"
+                        >
+                          <Plus size={13} />
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playSound('pop');
                           setCart(cart.filter((_, i) => i !== idx));
-                        } else {
-                          setCart(cart.map((c, i) => (i === idx ? { ...c, quantity: c.quantity - 1 } : c)));
-                        }
-                      }}
-                      className="w-7 h-7 rounded-xl bg-white text-brand-brown flex items-center justify-center shadow-sm hover:bg-rose-50 hover:text-rose-600 active:scale-90 transition-all"
-                      title="Diminuer la quantité"
-                    >
-                      <Minus size={13} />
-                    </button>
-                    <span className="w-6 text-center font-black text-xs text-brand-brown">
-                      {item.quantity}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        playSound('pop');
-                        setCart(cart.map((c, i) => (i === idx ? { ...c, quantity: c.quantity + 1 } : c)));
-                      }}
-                      className="w-7 h-7 rounded-xl bg-brand-orange text-white flex items-center justify-center shadow-sm hover:bg-amber-600 active:scale-90 transition-all"
-                      title="Augmenter la quantité"
-                    >
-                      <Plus size={13} />
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playSound('pop');
-                      setCart(cart.filter((_, i) => i !== idx));
-                    }}
-                    className="p-2.5 text-red-400 hover:text-red-600 transition-transform active:scale-90 shrink-0"
-                    title="Retirer du panier"
-                  >
-                    <Trash2 size={18}/>
-                  </button>
-               </div>
-             ))}
+                        }}
+                        className="p-2 text-red-400 hover:text-red-600 transition-transform active:scale-90 shrink-0"
+                        title="Retirer du panier"
+                      >
+                        <Trash2 size={17}/>
+                      </button>
+                    </div>
+
+                    {/* Option de piment & Note par plat */}
+                    <div className="pt-2.5 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="text-[8px] font-black uppercase tracking-wider text-brand-brown/60 block mb-1">
+                          🌶️ Option de piment :
+                        </label>
+                        <div className="flex flex-wrap gap-1">
+                          {spiceOptions.map((sp) => (
+                            <button
+                              key={sp}
+                              type="button"
+                              onClick={() => {
+                                playSound('pop');
+                                setCart(cart.map((c, i) => (i === idx ? { ...c, spiceLevel: sp } : c)));
+                              }}
+                              className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase transition-all border ${
+                                currentSpice === sp
+                                  ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                                  : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-brand-orange'
+                              }`}
+                            >
+                              {sp}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[8px] font-black uppercase tracking-wider text-brand-brown/60 block mb-1">
+                          📝 Note / Préférence cuisine :
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Bien cuit, sauce à part, sans oignon..."
+                          value={item.instructions || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCart(cart.map((c, i) => (i === idx ? { ...c, instructions: val } : c)));
+                          }}
+                          className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[10px] font-bold text-brand-brown outline-none focus:border-brand-orange"
+                        />
+                      </div>
+                    </div>
+                 </div>
+               );
+             })}
+          </div>
+
+          {/* Bouton Rapide : Commander sur WhatsApp immédiatement */}
+          <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-[#12261A] p-5 sm:p-6 rounded-[2.5rem] border-2 border-emerald-500/40 shadow-xl text-white space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="text-[8px] font-black uppercase tracking-widest text-emerald-300 block">
+                  Commande Directe Sans Attente
+                </span>
+                <h4 className="text-sm sm:text-base font-black uppercase italic text-white">
+                  Total Panier : <span className="text-brand-gold font-mono">{subtotal.toLocaleString('fr-FR')} F CFA</span>
+                  {deliveryFee > 0 && <span className="text-[10px] text-emerald-200 font-normal"> (+ {deliveryFee.toLocaleString('fr-FR')} F livraison)</span>}
+                </h4>
+              </div>
+              <a
+                href={RESTAURANT_INFO.whatsappCatalogUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[9px] font-black uppercase tracking-wider bg-white/10 hover:bg-white/20 text-emerald-200 px-3 py-1.5 rounded-xl border border-white/15 flex items-center gap-1 transition-all"
+              >
+                <ExternalLink size={11} /> Catalogue WhatsApp
+              </a>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleDirectWhatsAppOrder}
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-white py-4 px-5 rounded-2xl font-black uppercase italic tracking-wider text-xs sm:text-sm shadow-lg flex items-center justify-center gap-2.5 active:scale-95 transition-all"
+            >
+              <MessageSquare size={18} />
+              <span>Commander sur WhatsApp ({RESTAURANT_INFO.whatsapp})</span>
+              <ArrowRight size={18} />
+            </button>
           </div>
 
           {/* Delivery coordinates */}
@@ -887,25 +955,45 @@ export const CartView: React.FC<CartViewProps> = ({
             />
           </div>
 
-          {/* Total & Submit Button */}
-          <div className="bg-brand-brown p-8 sm:p-10 rounded-[4rem] text-brand-gold shadow-2xl relative overflow-hidden border-4 border-white">
-             <div className="space-y-4 mb-8">
-                <div className="flex justify-between text-white/40 text-[9px] font-black uppercase tracking-widest"><span>Sous-total Festin</span><span>{subtotal.toLocaleString('fr-FR')} F</span></div>
-                {loyaltyDiscount > 0 && <div className="flex justify-between text-brand-orange text-[9px] font-black uppercase tracking-widest"><span>Réduction Fidélité ({maxRedeemablePoints} pts)</span><span>- {loyaltyDiscount.toLocaleString('fr-FR')} F</span></div>}
-                {promoDiscount > 0 && <div className="flex justify-between text-emerald-400 text-[9px] font-black uppercase tracking-widest"><span>Code Promo ({appliedPromo?.promoCodeObj?.code})</span><span>- {promoDiscount.toLocaleString('fr-FR')} F</span></div>}
-                <div className="flex justify-between text-brand-gold text-[9px] font-black uppercase tracking-widest"><span>Service Billo ({DISTRICTS.find(d => d.name === customer.district)?.name})</span><span>{deliveryFee.toLocaleString('fr-FR')} F</span></div>
-                <div className="pt-6 border-t border-white/10 flex justify-between items-end"><span className="text-white font-black italic uppercase text-sm">Net à Payer</span><span className="text-4xl font-black">{total.toLocaleString('fr-FR')} F CFA</span></div>
+          {/* Total & Commander sur WhatsApp Button */}
+          <div className="bg-brand-brown p-6 sm:p-10 rounded-[3rem] sm:rounded-[4rem] text-brand-gold shadow-2xl relative overflow-hidden border-4 border-white">
+             <div className="space-y-3.5 mb-7">
+                <div className="flex justify-between text-white/60 text-[10px] font-black uppercase tracking-widest"><span>Sous-total Festin</span><span>{subtotal.toLocaleString('fr-FR')} F CFA</span></div>
+                {loyaltyDiscount > 0 && <div className="flex justify-between text-brand-orange text-[10px] font-black uppercase tracking-widest"><span>Réduction Fidélité ({maxRedeemablePoints} pts)</span><span>- {loyaltyDiscount.toLocaleString('fr-FR')} F CFA</span></div>}
+                {promoDiscount > 0 && <div className="flex justify-between text-emerald-400 text-[10px] font-black uppercase tracking-widest"><span>Code Promo ({appliedPromo?.promoCodeObj?.code})</span><span>- {promoDiscount.toLocaleString('fr-FR')} F CFA</span></div>}
+                <div className="flex justify-between text-brand-gold text-[10px] font-black uppercase tracking-widest"><span>Service Billo ({DISTRICTS.find(d => d.name === customer.district)?.name})</span><span>{deliveryFee.toLocaleString('fr-FR')} F CFA</span></div>
+                <div className="pt-5 border-t border-white/15 flex justify-between items-end gap-2"><span className="text-white font-black italic uppercase text-xs sm:text-sm">Total à Payer</span><span className="text-2xl sm:text-4xl font-black">{total.toLocaleString('fr-FR')} F CFA</span></div>
              </div>
              
-             <button type="submit" className="w-full bg-brand-orange text-white py-6 rounded-[2.5rem] font-black uppercase shadow-[0_20px_50px_rgba(255,111,0,0.3)] flex items-center justify-center gap-4 active:scale-95 transition-all italic tracking-widest text-xs">
-               Confirmer le Festin <ArrowRight size={22}/>
-             </button>
+             <div className="space-y-3">
+               <button
+                 type="button"
+                 onClick={handleDirectWhatsAppOrder}
+                 className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-5 sm:py-6 px-4 rounded-[2rem] font-black uppercase shadow-[0_20px_50px_rgba(16,185,129,0.35)] flex items-center justify-center gap-3 active:scale-95 transition-all italic tracking-wider text-xs sm:text-sm border-2 border-emerald-400/50"
+               >
+                 <MessageSquare size={20} className="shrink-0" />
+                 <span>Commander sur WhatsApp ({RESTAURANT_INFO.whatsapp})</span>
+                 <ArrowRight size={20} className="shrink-0" />
+               </button>
+
+               <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-[9px] text-white/70 font-bold">
+                 <span>Contact direct : <strong className="text-brand-gold font-mono">{RESTAURANT_INFO.whatsapp}</strong></span>
+                 <a
+                   href={RESTAURANT_INFO.whatsappCatalogUrl}
+                   target="_blank"
+                   rel="noreferrer"
+                   className="text-emerald-300 hover:text-emerald-200 underline flex items-center gap-1 font-black uppercase"
+                 >
+                   <ExternalLink size={11} /> Catalogue WhatsApp séparé
+                 </a>
+               </div>
+             </div>
+
              {!navigator.onLine && (
                <p className="text-center text-[9px] text-amber-300 font-black uppercase tracking-wider mt-3 bg-amber-950/60 p-2.5 rounded-xl border border-amber-500/30">
                  📦 Connexion absente : Votre commande sera enregistrée en mode Hors-ligne (IndexedDB)
                </p>
              )}
-             <p className="text-center text-[8px] text-white/20 font-black uppercase tracking-widest mt-6">Paiement Vérifié & Sécurisé par Khady's Terminal</p>
           </div>
         </form>
       )}

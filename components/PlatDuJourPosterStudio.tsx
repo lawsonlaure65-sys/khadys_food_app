@@ -10,7 +10,7 @@ import {
   PlatDuJourConfig, PosterTheme, PosterFormat, PosterLayout, PublicationTiming, 
   DEFAULT_MENU_DU_JOUR_DISHES,
   shareToSocialPlatform, broadcastToWhatsApp, shareImageAndText,
-  generatePlatDuJourMarketingTexts 
+  generatePlatDuJourMarketingTexts, resolveTrioDishImage, isCustomRestaurantImage
 } from '../utils/marketing';
 import { RESTAURANT_INFO } from '../constants';
 import { playSound } from '../utils/audio';
@@ -188,14 +188,27 @@ export const PlatDuJourPosterStudio: React.FC<PlatDuJourPosterStudioProps> = ({
     });
   };
 
-  // Helper to load image safely as a Promise
+  // Helper to load image safely as a Promise (supports both data:image/... base64 and external URLs)
   const loadImgSafe = (src?: string): Promise<HTMLImageElement> => {
     return new Promise((resolve) => {
+      const finalSrc = (src && src.trim()) || 'https://images.unsplash.com/photo-1544025162-d76694265947?w=1000';
       const img = new Image();
-      img.crossOrigin = 'anonymous';
+      if (!finalSrc.startsWith('data:') && !finalSrc.startsWith('blob:')) {
+        img.crossOrigin = 'anonymous';
+      }
       img.onload = () => resolve(img);
-      img.onerror = () => resolve(img);
-      img.src = src || 'https://images.unsplash.com/photo-1544025162-d76694265947?w=1000';
+      img.onerror = () => {
+        // Fallback if CORS fails on an external image
+        if (img.crossOrigin) {
+          const fallbackImg = new Image();
+          fallbackImg.onload = () => resolve(fallbackImg);
+          fallbackImg.onerror = () => resolve(fallbackImg);
+          fallbackImg.src = finalSrc;
+        } else {
+          resolve(img);
+        }
+      };
+      img.src = finalSrc;
     });
   };
 
@@ -219,7 +232,7 @@ export const PlatDuJourPosterStudio: React.FC<PlatDuJourPosterStudioProps> = ({
 
     // Retrieve the 3 dishes: 1 Plat Cuisiné du Jour + 2 Incontournables (Doukounou & Attiéké)
     const dishesList = plat.dishes && plat.dishes.length >= 3 ? plat.dishes : DEFAULT_MENU_DU_JOUR_DISHES;
-    const dish1 = dishesList[0] || {
+    const rawDish1 = dishesList[0] || {
       dishName: plat.dishName,
       dishImage: plat.dishImage,
       tagline: plat.tagline,
@@ -229,12 +242,32 @@ export const PlatDuJourPosterStudio: React.FC<PlatDuJourPosterStudioProps> = ({
       promoPrice: plat.promoPrice,
       remainingStock: plat.remainingStock
     };
-    const dish2 = dishesList[1] || DEFAULT_MENU_DU_JOUR_DISHES[1];
-    const dish3 = dishesList[2] || DEFAULT_MENU_DU_JOUR_DISHES[2];
+    const rawDish2 = dishesList[1] || DEFAULT_MENU_DU_JOUR_DISHES[1];
+    const rawDish3 = dishesList[2] || DEFAULT_MENU_DU_JOUR_DISHES[2];
+
+    // Resolve authentic restaurant images from the registered menu items (Doukounou, Attiéké, Plat du Jour)
+    const dish1 = {
+      ...rawDish1,
+      dishImage: resolveTrioDishImage(
+        !isCustomRestaurantImage(rawDish1.dishImage) && isCustomRestaurantImage(plat.dishImage)
+          ? { ...rawDish1, dishImage: plat.dishImage }
+          : rawDish1,
+        0,
+        items
+      )
+    };
+    const dish2 = {
+      ...rawDish2,
+      dishImage: resolveTrioDishImage(rawDish2, 1, items)
+    };
+    const dish3 = {
+      ...rawDish3,
+      dishImage: resolveTrioDishImage(rawDish3, 2, items)
+    };
 
     // Load all required images in parallel
     Promise.all([
-      loadImgSafe(dish1.dishImage || plat.dishImage),
+      loadImgSafe(dish1.dishImage),
       loadImgSafe(dish2.dishImage),
       loadImgSafe(dish3.dishImage)
     ]).then(([img1, img2, img3]) => {
@@ -387,7 +420,16 @@ export const PlatDuJourPosterStudio: React.FC<PlatDuJourPosterStudioProps> = ({
         ctx.clip();
 
         try {
-          ctx.drawImage(pImg, centerX - radius, centerY - radius, radius * 2, radius * 2);
+          const iw = pImg.naturalWidth || pImg.width || radius * 2;
+          const ih = pImg.naturalHeight || pImg.height || radius * 2;
+          if (iw > 0 && ih > 0) {
+            const minDim = Math.min(iw, ih);
+            const sx = (iw - minDim) / 2;
+            const sy = (ih - minDim) / 2;
+            ctx.drawImage(pImg, sx, sy, minDim, minDim, centerX - radius, centerY - radius, radius * 2, radius * 2);
+          } else {
+            ctx.drawImage(pImg, centerX - radius, centerY - radius, radius * 2, radius * 2);
+          }
         } catch {
           ctx.fillStyle = '#2A130C';
           ctx.fillRect(centerX - radius, centerY - radius, radius * 2, radius * 2);
@@ -1089,7 +1131,7 @@ export const PlatDuJourPosterStudio: React.FC<PlatDuJourPosterStudioProps> = ({
     }).catch(() => {
       setIsGeneratingCanvas(false);
     });
-  }, [plat, currentTheme]);
+  }, [plat, currentTheme, items]);
 
   // Redraw when plat or theme changes
   useEffect(() => {
@@ -1234,35 +1276,57 @@ export const PlatDuJourPosterStudio: React.FC<PlatDuJourPosterStudioProps> = ({
         {/* Left Column: Creative Controls & Publication Timing (5 cols) */}
         <div className="xl:col-span-5 space-y-6">
           
-          {/* Active Dish Quick-Card with Direct Switch to 100% Custom Edition */}
+          {/* Active Dish Quick-Card with Trio Preview & Direct Switch to 100% Custom Edition */}
           <div className="bg-gradient-to-r from-brand-orange/20 via-brand-gold/15 to-transparent p-5 rounded-[2rem] border-2 border-brand-gold/40 shadow-xl space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[9px] font-black uppercase tracking-wider text-brand-gold flex items-center gap-1.5">
-                <ChefHat size={14} className="text-brand-orange" /> Plat Actif sur l'Affiche
+                <ChefHat size={14} className="text-brand-orange" /> Photos Officielles du Trio sur l'Affiche
               </span>
-              <span className="text-[9px] font-mono font-black text-white bg-brand-orange/40 px-2 py-0.5 rounded-full border border-brand-orange/40">
-                {(plat.promoPrice || plat.price || 4500).toLocaleString('fr-FR')} F CFA
+              <span className="text-[9px] font-mono font-black text-emerald-300 bg-emerald-500/20 px-2.5 py-0.5 rounded-full border border-emerald-500/40">
+                ✓ Photos Restaurant Synchronisées
               </span>
             </div>
 
-            <div className="flex items-center gap-3">
-              <img
-                src={plat.dishImage || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80'}
-                alt={plat.dishName}
-                className="w-14 h-14 rounded-2xl object-cover border-2 border-brand-gold/40 shrink-0 shadow-md"
-              />
-              <div className="min-w-0 flex-1">
-                <h4 className="text-sm font-black text-white truncate">
-                  {plat.dishName}
-                </h4>
-                <p className="text-[10px] text-white/60 line-clamp-1">
-                  {plat.tagline || plat.description}
-                </p>
-                <p className="text-[9px] font-bold text-brand-gold mt-0.5">
-                  📅 {plat.targetDayLabel || 'Demain Midi'}
-                </p>
-              </div>
-            </div>
+            {(() => {
+              const dishesList = plat.dishes && plat.dishes.length >= 3 ? plat.dishes : DEFAULT_MENU_DU_JOUR_DISHES;
+              const img1Url = resolveTrioDishImage(dishesList[0] || { dishName: plat.dishName, dishImage: plat.dishImage }, 0, items);
+              const img2Url = resolveTrioDishImage(dishesList[1] || DEFAULT_MENU_DU_JOUR_DISHES[1], 1, items);
+              const img3Url = resolveTrioDishImage(dishesList[2] || DEFAULT_MENU_DU_JOUR_DISHES[2], 2, items);
+
+              return (
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  <div className="bg-black/40 p-2 rounded-2xl border border-brand-orange/40 flex flex-col items-center text-center gap-1">
+                    <img
+                      src={img1Url}
+                      alt={plat.dishName}
+                      className="w-12 h-12 rounded-full object-cover border-2 border-brand-orange shadow-md"
+                    />
+                    <span className="text-[8px] font-black uppercase text-brand-orange">1. Plat du Jour</span>
+                    <span className="text-[9px] font-bold text-white truncate w-full">{plat.dishName}</span>
+                  </div>
+
+                  <div className="bg-black/40 p-2 rounded-2xl border border-amber-500/40 flex flex-col items-center text-center gap-1">
+                    <img
+                      src={img2Url}
+                      alt="Le Fameux Doukounou"
+                      className="w-12 h-12 rounded-full object-cover border-2 border-amber-500 shadow-md"
+                    />
+                    <span className="text-[8px] font-black uppercase text-amber-400">2. Doukounou</span>
+                    <span className="text-[9px] font-bold text-white truncate w-full">Le Fameux Doukounou</span>
+                  </div>
+
+                  <div className="bg-black/40 p-2 rounded-2xl border border-emerald-500/40 flex flex-col items-center text-center gap-1">
+                    <img
+                      src={img3Url}
+                      alt="L'Incontournable Attiéké"
+                      className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500 shadow-md"
+                    />
+                    <span className="text-[8px] font-black uppercase text-emerald-400">3. Attiéké</span>
+                    <span className="text-[9px] font-bold text-white truncate w-full">Attiéké Royal</span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Direct Button to 100% Custom Edition Form */}
             {onSwitchToRecipeTab && (
@@ -1272,7 +1336,7 @@ export const PlatDuJourPosterStudio: React.FC<PlatDuJourPosterStudioProps> = ({
                 className="w-full bg-brand-gold hover:bg-amber-400 text-brand-brown py-2.5 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
               >
                 <Edit3 size={13} />
-                <span>✍️ Modifier la Recette, Photo, Prix & Ingrédients ➔</span>
+                <span>✍️ Modifier les 3 Plats, Photos, Prix & Ingrédients ➔</span>
               </button>
             )}
           </div>

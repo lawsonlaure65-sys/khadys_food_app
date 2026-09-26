@@ -78,6 +78,7 @@ export interface Review {
 export interface CartItem extends MenuItem {
   quantity: number;
   instructions?: string;
+  spiceLevel?: string;
 }
 
 export interface Order {
