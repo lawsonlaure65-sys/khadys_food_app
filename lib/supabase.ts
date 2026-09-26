@@ -1,77 +1,18 @@
-
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { MenuItem, Order } from '../types';
+import { PlatDuJourConfig } from '../utils/marketing';
+import { compressImage } from '../utils/imageCompressor';
 
-export const KHADY_SUPABASE_URL_KEY = 'khadys_custom_supabase_url';
-export const KHADY_SUPABASE_ANON_KEY = 'khadys_custom_supabase_anon_key';
-export const KHADY_SUPABASE_AUTO_SYNC_KEY = 'khadys_supabase_auto_sync';
-export const KHADY_STANDALONE_MODE_KEY = 'khadys_standalone_local_mode';
+export const DEFAULT_SUPABASE_URL = 'https://veygphkhehdnxefnnlwo.supabase.co';
+export const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZleWdwaGtoZWhkbnhlZm5ubHdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MTE0MjgsImV4cCI6MjEwMTA4NzQyOH0.FsSg9wjrvVZ1zNHZH_D7qVxPd3EC1h1yM1mDMvxfAqw';
 
-export interface SupabaseKeyValidation {
-  isValidFormat: boolean;
-  keyType:
-    | 'jwt_anon'
-    | 'jwt_service'
-    | 'publishable'
-    | 'empty'
-    | 'url_pasted'
-    | 'project_id'
-    | 'pat_token'
-    | 'secret_key'
-    | 'truncated_jwt'
-    | 'unknown';
-  cleanKey: string;
-  projectRef?: string;
-  derivedUrl?: string;
-  warningMessage?: string;
-}
-
-/**
- * Nettoie et extrait intelligemment une clé API Supabase (JWT eyJ... ou sb_publishable_...)
- * même si l'utilisateur a collé un bloc .env complet, des guillemets, "Bearer ", ou des espaces.
- */
-export function sanitizeSupabaseKey(rawKey?: string): string {
-  if (!rawKey) return '';
-
-  // Supprimer les caractères invisibles (zero-width) fréquents lors du copier-coller mobile
-  let cleaned = rawKey.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
-
-  // 1. Si le texte contient un JWT Supabase complet (Header eyJ... . Payload eyJ... . Signature)
-  // Fonctionne même si précédé de VITE_SUPABASE_ANON_KEY=, Bearer, guillemets ou URL
-  const jwtMatch = cleaned.match(/(eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{20,})/);
-  if (jwtMatch?.[1]) {
-    return jwtMatch[1];
-  }
-
-  // 2. Si le texte contient une nouvelle clé publique Supabase (sb_publishable_...)
-  const pubMatch = cleaned.match(/(sb_publishable_[A-Za-z0-9_-]{15,})/);
-  if (pubMatch?.[1]) {
-    return pubMatch[1];
-  }
-
-  // 3. Nettoyage des préfixes .env ou en-têtes HTTP éventuels
-  cleaned = cleaned
-    .replace(/^(?:export\s+)?(?:VITE_|NEXT_PUBLIC_|REACT_APP_|EXPO_PUBLIC_)?SUPABASE_(?:ANON_KEY|PUBLISHABLE_KEY|KEY|API_KEY)\s*=\s*/i, '')
-    .replace(/^(?:apikey|authorization)\s*:\s*/i, '')
-    .replace(/^Bearer\s+/i, '')
-    .replace(/^['"`]+|['"`]+$/g, '')
-    .replace(/\s+/g, '');
-
-  // 4. Si "Bearer" a été collé sans espace devant eyJ... (ex: BearereyJhbG...)
-  if (/^Bearer(eyJ[A-Za-z0-9_-]+)/i.test(cleaned)) {
-    cleaned = cleaned.replace(/^Bearer/i, '');
-  }
-
-  return cleaned;
-}
-
-// Extraction automatique de l'identifiant du projet (ref) depuis la clé JWT Anon Supabase
-export function extractProjectRefFromJwt(token?: string): string | null {
-  if (!token) return null;
-  const clean = sanitizeSupabaseKey(token);
-  const parts = clean.split('.');
+// Helper to extract project URL directly from a Supabase JWT anon key (eyJ...)
+export const deriveSupabaseUrlFromKey = (rawKey?: string): string | null => {
+  if (!rawKey || typeof rawKey !== 'string') return null;
+  const trimmed = rawKey.trim();
+  if (!trimmed.startsWith('eyJ')) return null;
+  const parts = trimmed.split('.');
   if (parts.length !== 3) return null;
-
   try {
     const base64Url = parts[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -82,1121 +23,431 @@ export function extractProjectRefFromJwt(token?: string): string | null {
         .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
         .join('')
     );
-    const parsed = JSON.parse(jsonPayload);
-
-    if (parsed && typeof parsed.ref === 'string' && /^[a-z0-9]{12,32}$/i.test(parsed.ref)) {
-      return parsed.ref.toLowerCase();
-    }
-
-    if (parsed && typeof parsed.iss === 'string' && parsed.iss.includes('.supabase.co')) {
-      const match = parsed.iss.match(/https?:\/\/([a-z0-9-]+)\.supabase\.co/i);
-      if (match?.[1]) return match[1].toLowerCase();
+    const payload = JSON.parse(jsonPayload);
+    if (payload && typeof payload.ref === 'string' && /^[a-z0-9]{12,32}$/i.test(payload.ref)) {
+      return `https://${payload.ref.toLowerCase()}.supabase.co`;
     }
   } catch {
-    // Ignorer si ce n'est pas un JWT standard
+    // Ignore decode errors
   }
   return null;
-}
+};
 
-export function deriveSupabaseUrlFromKey(anonKey?: string): string | null {
-  const ref = extractProjectRefFromJwt(anonKey);
-  return ref ? `https://${ref}.supabase.co` : null;
-}
-
-/**
- * Analyse précise de la clé saisie pour expliquer immédiatement à l'utilisateur
- * pourquoi une clé est valide ou pourquoi elle est refusée ("Invalid API key").
- */
-export function validateSupabaseKeyFormat(rawKey?: string, rawUrl?: string): SupabaseKeyValidation {
-  const cleanKey = sanitizeSupabaseKey(rawKey);
-
-  if (!cleanKey) {
-    return {
-      isValidFormat: false,
-      keyType: 'empty',
-      cleanKey: '',
-      warningMessage: 'Aucune clé saisie dans le champ Clé Anonyme.',
-    };
+// Helper to clean and normalize Supabase URLs (removes trailing /rest/v1, slashes, etc.)
+export const cleanSupabaseUrl = (rawUrl: string, associatedKey?: string): string => {
+  const derived = deriveSupabaseUrlFromKey(associatedKey);
+  let url = (rawUrl || '').trim();
+  url = url.replace(/\/rest\/v1\/?$/, '');
+  url = url.replace(/\/+$/, '');
+  if ((!url || !url.startsWith('https://')) && derived) {
+    return derived;
   }
+  return url;
+};
 
-  const lower = cleanKey.toLowerCase();
-
-  // Cas 1 : L'utilisateur a collé l'URL dans le champ de la clé
-  if (
-    lower.startsWith('http://') ||
-    lower.startsWith('https://') ||
-    lower.endsWith('.supabase.co') ||
-    lower.includes('supabase.com/dashboard')
-  ) {
-    return {
-      isValidFormat: false,
-      keyType: 'url_pasted',
-      cleanKey,
-      warningMessage:
-        "⚠️ Vous avez collé une URL (https://...) dans le champ de la clé Anon ! Ce 2ème champ doit contenir la clé API qui commence par « eyJ... » ou « sb_publishable_... ».",
-    };
-  }
-
-  // Cas 2 : L'utilisateur a collé le Reference ID court du projet (ex: 20 caractères alphanumériques)
-  if (/^[a-z0-9]{15,24}$/i.test(cleanKey) && !lower.startsWith('eyj') && !lower.startsWith('sb_')) {
-    return {
-      isValidFormat: false,
-      keyType: 'project_id',
-      cleanKey,
-      projectRef: cleanKey.toLowerCase(),
-      derivedUrl: `https://${cleanKey.toLowerCase()}.supabase.co`,
-      warningMessage: `⚠️ Vous avez collé l'identifiant court du projet (« ${cleanKey} », ${cleanKey.length} caractères) au lieu de la clé API ! Dans Supabase > Project Settings > API Keys, copiez la longue clé « anon public » (eyJ...) ou « Publishable key » (sb_publishable_...).`,
-    };
-  }
-
-  // Cas 3 : Personal Access Token (sbp_...)
-  if (lower.startsWith('sbp_') || lower.startsWith('sba_')) {
-    return {
-      isValidFormat: false,
-      keyType: 'pat_token',
-      cleanKey,
-      warningMessage:
-        "⚠️ Ceci est un jeton personnel (sbp_...), pas la clé publique du projet. Allez dans Project Settings > API Keys et copiez la clé « anon public » (eyJ...) ou « Publishable key » (sb_publishable_...).",
-    };
-  }
-
-  // Cas 4 : Clé secrète sb_secret_...
-  if (lower.startsWith('sb_secret_')) {
-    return {
-      isValidFormat: false,
-      keyType: 'secret_key',
-      cleanKey,
-      warningMessage:
-        "⚠️ Vous avez collé une clé secrète (sb_secret_...). Utilisez plutôt la clé publique « Publishable key » (sb_publishable_...) ou « anon public » (eyJ...).",
-    };
-  }
-
-  // Cas 5 : Nouvelle clé publique Supabase (sb_publishable_...)
-  if (lower.startsWith('sb_publishable_')) {
-    if (cleanKey.length < 25 || cleanKey.includes('...')) {
-      return {
-        isValidFormat: false,
-        keyType: 'truncated_jwt',
-        cleanKey,
-        warningMessage:
-          "⚠️ Votre clé « sb_publishable_... » semble coupée ou incomplète. Cliquez sur le bouton « Copy » dans Supabase.",
-      };
-    }
-    return {
-      isValidFormat: true,
-      keyType: 'publishable',
-      cleanKey,
-    };
-  }
-
-  // Cas 6 : Clé JWT Supabase (commence par eyJ)
-  if (cleanKey.startsWith('eyJ') || lower.startsWith('eyj')) {
-    if (cleanKey.includes('...') || cleanKey.includes('…')) {
-      return {
-        isValidFormat: false,
-        keyType: 'truncated_jwt',
-        cleanKey,
-        warningMessage:
-          "⚠️ Votre clé « eyJ... » contient des points de suspension (...) : vous avez copié un aperçu abrégé ! Sur Supabase, cliquez sur le bouton « Copy » à droite de la clé.",
-      };
-    }
-
-    const parts = cleanKey.split('.');
-    if (parts.length !== 3) {
-      return {
-        isValidFormat: false,
-        keyType: 'truncated_jwt',
-        cleanKey,
-        warningMessage: `⚠️ Votre clé « eyJ... » est incomplète (${parts.length} partie(s) au lieu de 3 séparées par des points). Recopiez la clé entière avec le bouton « Copy » dans Supabase.`,
-      };
-    }
-
-    const ref = extractProjectRefFromJwt(cleanKey);
-    const sig = parts[2] || '';
-
-    // Une signature HMAC-SHA256 en base64url fait exactement 43 caractères
-    if (sig.length < 40 || !/^[A-Za-z0-9_-]+$/.test(sig)) {
-      return {
-        isValidFormat: false,
-        keyType: 'truncated_jwt',
-        cleanKey,
-        projectRef: ref || undefined,
-        derivedUrl: ref ? `https://${ref}.supabase.co` : undefined,
-        warningMessage: `⚠️ La fin de votre clé « eyJ... » est coupée (signature de ${sig.length} caractères au lieu de 43). Cliquez sur le bouton « Copy » dans Supabase pour copier toute la clé.`,
-      };
-    }
-
-    return {
-      isValidFormat: true,
-      keyType: 'jwt_anon',
-      cleanKey,
-      projectRef: ref || undefined,
-      derivedUrl: ref ? `https://${ref}.supabase.co` : undefined,
-    };
-  }
-
-  // Cas 7 : Autre texte (mot de passe, placeholder, texte court...)
-  const preview = cleanKey.length > 12 ? `${cleanKey.slice(0, 8)}...${cleanKey.slice(-3)}` : cleanKey;
-  return {
-    isValidFormat: false,
-    keyType: 'unknown',
-    cleanKey,
-    warningMessage: `⚠️ Le texte actuellement dans le champ Clé (« ${preview} », ${cleanKey.length} caractères) N'EST PAS une clé API Supabase. Une vraie clé commence obligatoirement par « eyJ... » (~200 caractères) ou « sb_publishable_... ».`,
-  };
-}
-
-// Extraction et assainissement automatique de l'origine exacte (ex: https://xxxx.supabase.co)
-export function sanitizeSupabaseUrl(urlStr: string, anonKey?: string): string {
-  let effectiveKey = sanitizeSupabaseKey(anonKey);
-  if (!effectiveKey) {
-    try {
-      effectiveKey = sanitizeSupabaseKey(localStorage.getItem(KHADY_SUPABASE_ANON_KEY) || '');
-    } catch {
-      effectiveKey = '';
-    }
-  }
-
-  const jwtRef = extractProjectRefFromJwt(effectiveKey);
-  const jwtDerivedUrl = jwtRef ? `https://${jwtRef}.supabase.co` : null;
-
-  if (!urlStr || !urlStr.trim()) {
-    return jwtDerivedUrl || '';
-  }
-
-  // Si l'utilisateur a collé un bloc .env complet contenant https://xxx.supabase.co
-  const envUrlMatch = urlStr.match(/https?:\/\/([a-z0-9-]{12,32})\.supabase\.(?:co|com|in|io)/i);
-  if (envUrlMatch?.[1]) {
-    const extractedOrigin = `https://${envUrlMatch[1].toLowerCase()}.supabase.co`;
-    if (jwtDerivedUrl && extractedOrigin.toLowerCase() !== jwtDerivedUrl.toLowerCase()) {
-      return jwtDerivedUrl;
-    }
-    return extractedOrigin;
-  }
-
-  // Supprimer tous les espaces, retours à la ligne ou guillemets accidentels (fréquent sur mobile)
-  let raw = urlStr.replace(/[\u200B-\u200D\uFEFF]/g, '').trim().replace(/['"\s]+/g, '');
-  raw = raw.replace(/^(?:export\s+)?(?:VITE_|NEXT_PUBLIC_|REACT_APP_)?SUPABASE_URL\s*=\s*/i, '');
-
-  // Si l'utilisateur a collé par erreur un JWT dans le champ URL
-  if (raw.startsWith('eyJ') && raw.split('.').length === 3) {
-    const refFromUrlJwt = extractProjectRefFromJwt(raw);
-    if (refFromUrlJwt) return `https://${refFromUrlJwt}.supabase.co`;
-  }
-
-  // Si l'utilisateur a collé le lien du Dashboard Supabase (ex: https://supabase.com/dashboard/project/xyz123...)
-  const dashboardMatch = raw.match(/(?:app\.)?supabase\.(?:com|co|io)\/(?:dashboard\/)?project\/([a-z0-9]{12,32})/i);
-  if (dashboardMatch?.[1]) {
-    return `https://${dashboardMatch[1].toLowerCase()}.supabase.co`;
-  }
-
-  // Si l'utilisateur a collé uniquement le Reference ID du projet (ex: xyz1234567890abcdef)
-  if (/^[a-z0-9]{15,30}$/i.test(raw) && !raw.toLowerCase().startsWith('sb_')) {
-    return `https://${raw.toLowerCase()}.supabase.co`;
-  }
-
-  // Corriger les fautes de frappe fréquentes du domaine (.supabase.com, .supabase.in, .supabase.io -> .supabase.co)
-  raw = raw.replace(/\.supabase\.(com|in|io|net|org)(?=[/:?#]|$)/i, '.supabase.co');
-
-  let origin = '';
+// Helper to inspect all possible environment variable names
+const getEnv = (key: string): string => {
   try {
-    const formatted = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-    const parsed = new URL(formatted);
-    origin = parsed.origin.replace(/^http:\/\//i, 'https://');
-  } catch {
-    origin = raw.replace(/\/+$/, '').replace(/\/(rest|ret)\/v1\/?$/i, '');
-  }
+    const meta = (import.meta as any).env;
+    if (meta && meta[key]) return String(meta[key]).trim();
+  } catch (e) {}
 
-  const originLower = origin.toLowerCase();
-  const isInvalidOrGenericHost =
-    !originLower ||
-    originLower === 'https://supabase.com' ||
-    originLower === 'https://app.supabase.com' ||
-    originLower === 'https://supabase.co' ||
-    originLower.includes('votre_projet') ||
-    originLower.includes('votre-projet') ||
-    originLower.includes('your-project') ||
-    originLower.includes('placeholder') ||
-    !originLower.includes('.');
+  try {
+    if (typeof process !== 'undefined' && process.env && process.env[key]) {
+      return String(process.env[key]).trim();
+    }
+  } catch (e) {}
 
-  if (isInvalidOrGenericHost && jwtDerivedUrl) {
-    return jwtDerivedUrl;
-  }
+  try {
+    if (typeof window !== 'undefined' && (window as any)[key]) {
+      return String((window as any)[key]).trim();
+    }
+  } catch (e) {}
 
-  // Si la clé JWT Anon contient la référence exacte du projet et que l'URL vise .supabase.co
-  // mais avec une faute de frappe dans le sous-domaine, corriger automatiquement avec la réf du JWT
-  if (jwtDerivedUrl && originLower.endsWith('.supabase.co') && originLower !== jwtDerivedUrl.toLowerCase()) {
-    return jwtDerivedUrl;
-  }
+  return '';
+};
 
-  return origin;
-}
+const isObsoleteProject = (str: string): boolean => {
+  if (!str) return false;
+  return (
+    str.includes('ldlwtoktwubucmbsfurw') ||
+    str.includes('xqzjkhbqxwzvjkhbqxwz') ||
+    str.includes('votre_projet') ||
+    str.includes('votre_cle') ||
+    str.includes('example.supabase.co')
+  );
+};
 
-/**
- * Crée un client Supabase compatible à la fois avec les clés JWT classiques (eyJ...)
- * et les nouvelles clés publiques Supabase 2025/2026 (sb_publishable_...)
- */
-function createSupabaseClientInstance(url: string, key: string, persistSession: boolean = true): SupabaseClient {
-  const isOpaquePublishableKey = /^sb_publishable_/i.test(key);
-
-  return createClient(url, key, {
-    auth: {
-      persistSession,
-      autoRefreshToken: persistSession,
-    },
-    global: isOpaquePublishableKey
-      ? {
-          fetch: async (input, init) => {
-            const headers = new Headers(init?.headers);
-            const authHeader = headers.get('Authorization') || headers.get('authorization');
-            // Dans @supabase/supabase-js < 2.49, l'envoi de "Authorization: Bearer sb_publishable_..."
-            // provoque une erreur "Invalid API key" / JWT invalide sur PostgREST.
-            if (authHeader && /Bearer\s+sb_publishable_/i.test(authHeader)) {
-              headers.delete('Authorization');
-              headers.delete('authorization');
-            }
-            return fetch(input, { ...init, headers });
-          },
-        }
-      : undefined,
-  });
-}
-
-/**
- * Récupère les identifiants Supabase actifs :
- * 1. Priorité aux clés personnalisées saisies par l'Admin (localStorage)
- * 2. Repli sur les variables d'environnement Vite (import.meta.env)
- */
-export function getActiveSupabaseCredentials(): { url: string; anonKey: string; isCustom: boolean } {
+export const getSupabaseConfig = () => {
   let customUrl = '';
   let customKey = '';
 
-  try {
-    customUrl = localStorage.getItem(KHADY_SUPABASE_URL_KEY) || '';
-    customKey = localStorage.getItem(KHADY_SUPABASE_ANON_KEY) || '';
-  } catch {
-    // localStorage inaccessible
-  }
+  if (typeof window !== 'undefined') {
+    try {
+      customUrl =
+        localStorage.getItem('khadys_custom_supabase_url') ||
+        localStorage.getItem('khadys_supabase_url') ||
+        '';
+      customKey =
+        localStorage.getItem('khadys_custom_supabase_key') ||
+        localStorage.getItem('khadys_supabase_anon_key') ||
+        '';
 
-  let cleanCustomKey = sanitizeSupabaseKey(customKey);
-
-  // Si l'utilisateur avait collé sa clé JWT dans le champ URL par erreur, la récupérer !
-  if (!validateSupabaseKeyFormat(cleanCustomKey).isValidFormat && customUrl) {
-    const rescuedKeyFromUrl = sanitizeSupabaseKey(customUrl);
-    if (validateSupabaseKeyFormat(rescuedKeyFromUrl).isValidFormat) {
-      cleanCustomKey = rescuedKeyFromUrl;
-    }
-  }
-
-  // Si l'utilisateur avait collé l'URL dans le champ Clé par erreur et que l'URL est vide
-  if (!customUrl && customKey && customKey.includes('.supabase.')) {
-    customUrl = customKey;
-  }
-
-  const cleanCustomUrl = sanitizeSupabaseUrl(customUrl, cleanCustomKey);
-
-  if (cleanCustomUrl || cleanCustomKey) {
-    if (cleanCustomUrl && cleanCustomUrl !== customUrl.trim()) {
-      try {
-        localStorage.setItem(KHADY_SUPABASE_URL_KEY, cleanCustomUrl);
-      } catch {
-        // Ignorer
+      // If localStorage contains obsolete placeholder projects, auto-clear them so it uses the active project
+      if (isObsoleteProject(customUrl) || isObsoleteProject(customKey)) {
+        localStorage.removeItem('khadys_custom_supabase_url');
+        localStorage.removeItem('khadys_custom_supabase_key');
+        localStorage.removeItem('khadys_supabase_url');
+        localStorage.removeItem('khadys_supabase_anon_key');
+        customUrl = '';
+        customKey = '';
       }
-    }
-    if (cleanCustomKey && cleanCustomKey !== customKey.trim()) {
-      try {
-        localStorage.setItem(KHADY_SUPABASE_ANON_KEY, cleanCustomKey);
-      } catch {
-        // Ignorer
-      }
-    }
-    return {
-      url: cleanCustomUrl,
-      anonKey: cleanCustomKey,
-      isCustom: true,
-    };
+    } catch {}
   }
 
-  const envKey = sanitizeSupabaseKey((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '');
-  const envUrl = sanitizeSupabaseUrl(((import.meta as any).env?.VITE_SUPABASE_URL || '').trim(), envKey);
+  let envUrl =
+    getEnv('VITE_SUPABASE_URL') ||
+    getEnv('VITE_PUBLIC_SUPABASE_URL') ||
+    getEnv('NEXT_PUBLIC_SUPABASE_URL') ||
+    getEnv('SUPABASE_URL') ||
+    getEnv('REACT_APP_SUPABASE_URL') ||
+    DEFAULT_SUPABASE_URL;
+
+  let envKey =
+    getEnv('VITE_SUPABASE_ANON_KEY') ||
+    getEnv('VITE_SUPABASE_KEY') ||
+    getEnv('VITE_SUPABASE_PUBLISHABLE_KEY') ||
+    getEnv('VITE_PUBLIC_SUPABASE_ANON_KEY') ||
+    getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY') ||
+    getEnv('SUPABASE_ANON_KEY') ||
+    getEnv('SUPABASE_KEY') ||
+    getEnv('REACT_APP_SUPABASE_ANON_KEY') ||
+    DEFAULT_SUPABASE_KEY;
+
+  if (isObsoleteProject(envUrl)) {
+    envUrl = DEFAULT_SUPABASE_URL;
+  }
+  if (isObsoleteProject(envKey)) {
+    envKey = DEFAULT_SUPABASE_KEY;
+  }
+
+  let key = (customKey || envKey).trim();
+  if (isObsoleteProject(key)) {
+    key = DEFAULT_SUPABASE_KEY;
+  }
+
+  let rawUrl = (customUrl || envUrl).trim();
+  if (isObsoleteProject(rawUrl)) {
+    rawUrl = DEFAULT_SUPABASE_URL;
+  }
+
+  // If the key is a valid JWT with a project ref, ensure the URL matches the key's project ref
+  const derivedFromKey = deriveSupabaseUrlFromKey(key);
+  const url = derivedFromKey || cleanSupabaseUrl(rawUrl, key);
+
+  const isValid =
+    Boolean(url) &&
+    url.startsWith('https://') &&
+    !isObsoleteProject(url) &&
+    Boolean(key) &&
+    key.length > 20 &&
+    !isObsoleteProject(key);
 
   return {
-    url: envUrl,
-    anonKey: envKey,
-    isCustom: false,
+    url,
+    key,
+    anonKey: key,
+    isValid,
+    isConfigured: isValid,
+    isCustom: Boolean(customUrl && customKey && !isObsoleteProject(customUrl))
   };
-}
+};
 
-/**
- * Vérifie si la configuration Supabase actuelle est valide
- */
-export function checkSupabaseConfigured(url?: string, key?: string): boolean {
-  const creds =
-    url !== undefined && key !== undefined
-      ? { url: sanitizeSupabaseUrl(url, key), anonKey: sanitizeSupabaseKey(key) }
-      : getActiveSupabaseCredentials();
-
-  const urlLower = (creds.url || '').toLowerCase();
-  const keyValidation = validateSupabaseKeyFormat(creds.anonKey, creds.url);
-
-  return (
-    Boolean(creds.url) &&
-    creds.url.startsWith('https://') &&
-    creds.url.includes('.') &&
-    !urlLower.includes('votre_projet') &&
-    !urlLower.includes('votre-projet') &&
-    !urlLower.includes('your-project') &&
-    !urlLower.includes('xxx') &&
-    !urlLower.includes('placeholder') &&
-    !urlLower.includes('example.com') &&
-    urlLower !== 'https://supabase.com' &&
-    urlLower !== 'https://supabase.co' &&
-    keyValidation.isValidFormat
-  );
-}
-
-// Instance singleton dynamique
 let cachedClient: SupabaseClient | null = null;
-let lastClientUrl = '';
-let lastClientKey = '';
+let lastUsedUrl = '';
+let lastUsedKey = '';
 
-export function getSupabaseClient(): SupabaseClient | null {
-  const creds = getActiveSupabaseCredentials();
-  const configured = checkSupabaseConfigured(creds.url, creds.anonKey);
+export const getSupabaseClient = (): SupabaseClient | null => {
+  const config = getSupabaseConfig();
+  if (!config.isValid) return null;
 
-  if (!configured) {
+  if (!cachedClient || lastUsedUrl !== config.url || lastUsedKey !== config.key) {
+    try {
+      cachedClient = createClient(config.url, config.key, {
+        auth: { persistSession: true, autoRefreshToken: true },
+        realtime: { params: { eventsPerSecond: 10 } }
+      });
+      lastUsedUrl = config.url;
+      lastUsedKey = config.key;
+    } catch (e) {
+      console.warn('Erreur initialisation Supabase:', e);
+      return null;
+    }
+  }
+  return cachedClient;
+};
+
+// Legacy exports for backward compatibility
+export const isSupabaseConfigured = getSupabaseConfig().isValid;
+export const getIsSupabaseConfigured = () => getSupabaseConfig().isValid;
+export const supabase: SupabaseClient | null = getSupabaseClient();
+
+/**
+ * Configure credentials manually (saves to localStorage and notifies the app)
+ */
+export const setCustomSupabaseCredentials = (url: string, key: string): { success: boolean; message: string } => {
+  const cleanKey = (key || '').trim();
+  const derivedUrl = deriveSupabaseUrlFromKey(cleanKey);
+  const cleanUrl = cleanSupabaseUrl(url || derivedUrl || '', cleanKey);
+
+  if (!cleanUrl && !cleanKey) {
+    try {
+      localStorage.removeItem('khadys_custom_supabase_url');
+      localStorage.removeItem('khadys_custom_supabase_key');
+      localStorage.removeItem('khadys_supabase_url');
+      localStorage.removeItem('khadys_supabase_anon_key');
+    } catch {}
     cachedClient = null;
-    return null;
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('khadys_supabase_config_changed', { detail: { configured: false } }));
+    }
+    return { success: true, message: 'Clés Supabase personnalisées réinitialisées sur le projet officiel.' };
   }
 
-  if (cachedClient && lastClientUrl === creds.url && lastClientKey === creds.anonKey) {
-    return cachedClient;
+  if (cleanKey.length < 20) {
+    return { success: false, message: "La clé anon Supabase est trop courte (doit être un token JWT valide commençant par eyJ...)." };
+  }
+
+  const finalUrl = derivedUrl || cleanUrl;
+  if (!finalUrl.startsWith('https://')) {
+    return { success: false, message: "L'URL Supabase doit commencer par https:// (ex: https://xyzcompany.supabase.co)" };
   }
 
   try {
-    cachedClient = createSupabaseClientInstance(creds.url, creds.anonKey, true);
-    lastClientUrl = creds.url;
-    lastClientKey = creds.anonKey;
-    return cachedClient;
-  } catch (err) {
-    console.error('Erreur initialisation Supabase Client:', err);
-    cachedClient = null;
-    return null;
+    localStorage.setItem('khadys_custom_supabase_url', finalUrl);
+    localStorage.setItem('khadys_custom_supabase_key', cleanKey);
+    localStorage.setItem('khadys_supabase_url', finalUrl);
+    localStorage.setItem('khadys_supabase_anon_key', cleanKey);
+  } catch {}
+
+  cachedClient = null;
+  const client = getSupabaseClient();
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('khadys_supabase_config_changed', { detail: { configured: true, url: finalUrl } }));
   }
-}
 
-// Variable exportée pour rétrocompatibilité directe avec App.tsx et AdminDashboard.tsx
-export let isSupabaseConfigured = checkSupabaseConfigured();
-
-export function getIsSupabaseConfigured(): boolean {
-  isSupabaseConfigured = checkSupabaseConfigured();
-  return isSupabaseConfigured;
-}
-
-// Proxy pour compatibilité avec l'export existant `supabase`
-export const supabase = new Proxy({} as SupabaseClient, {
-  get(_target, prop) {
-    const client = getSupabaseClient();
-    if (!client) return undefined;
-    const value = (client as any)[prop];
-    if (typeof value === 'function') {
-      return value.bind(client);
-    }
-    return value;
-  },
-});
-
-/**
- * Paramètres Supabase complets pour l'Admin
- */
-export function getSupabaseConfig(): {
-  url: string;
-  anonKey: string;
-  isConfigured: boolean;
-  isCustom: boolean;
-  autoSync: boolean;
-} {
-  const creds = getActiveSupabaseCredentials();
-  const autoSync = isAutoSyncEnabled();
-  const isConfigured = checkSupabaseConfigured(creds.url, creds.anonKey);
   return {
-    url: creds.url,
-    anonKey: creds.anonKey,
-    isConfigured,
-    isCustom: creds.isCustom,
-    autoSync,
+    success: Boolean(client),
+    message: client ? `✅ Clés Supabase enregistrées et connectées avec succès (${finalUrl}) !` : '⚠️ Erreur lors de la création du client Supabase.'
   };
-}
-
-export function isAutoSyncEnabled(): boolean {
-  try {
-    const val = localStorage.getItem(KHADY_SUPABASE_AUTO_SYNC_KEY);
-    // Par défaut activé (true)
-    return val !== 'false';
-  } catch {
-    return true;
-  }
-}
-
-export function saveAutoSyncSetting(enabled: boolean): void {
-  try {
-    localStorage.setItem(KHADY_SUPABASE_AUTO_SYNC_KEY, enabled ? 'true' : 'false');
-  } catch (err) {
-    console.warn('Impossible de sauvegarder autoSync:', err);
-  }
-}
-
-export function saveSupabaseConfig(url: string, anonKey: string, autoSync: boolean = true): void {
-  let cleanKey = sanitizeSupabaseKey(anonKey);
-  if (!validateSupabaseKeyFormat(cleanKey).isValidFormat && url) {
-    const rescuedFromUrl = sanitizeSupabaseKey(url);
-    if (validateSupabaseKeyFormat(rescuedFromUrl).isValidFormat) {
-      cleanKey = rescuedFromUrl;
-    }
-  }
-  const clean = sanitizeSupabaseUrl(url, cleanKey);
-  try {
-    localStorage.setItem(KHADY_SUPABASE_URL_KEY, clean);
-    localStorage.setItem(KHADY_SUPABASE_ANON_KEY, cleanKey);
-    localStorage.setItem(KHADY_SUPABASE_AUTO_SYNC_KEY, autoSync ? 'true' : 'false');
-  } catch (err) {
-    console.warn('Impossible de sauvegarder la configuration Supabase:', err);
-  }
-
-  // Réinitialiser le client en cache
-  cachedClient = null;
-  lastClientUrl = '';
-  lastClientKey = '';
-  isSupabaseConfigured = checkSupabaseConfigured(clean, cleanKey);
-}
-
-export function clearSupabaseConfig(): void {
-  try {
-    localStorage.removeItem(KHADY_SUPABASE_URL_KEY);
-    localStorage.removeItem(KHADY_SUPABASE_ANON_KEY);
-  } catch (err) {
-    console.warn('Impossible de réinitialiser la configuration Supabase:', err);
-  }
-
-  cachedClient = null;
-  lastClientUrl = '';
-  lastClientKey = '';
-  isSupabaseConfigured = checkSupabaseConfigured();
-}
-
-function isColumnMissingError(err: any): boolean {
-  if (!err) return false;
-  const code = String(err.code || '').toUpperCase();
-  const msg = String(err.message || '').toLowerCase();
-  return (
-    code === '42703' ||
-    code === 'PGRST204' ||
-    (msg.includes('column') && (msg.includes('does not exist') || msg.includes('schema cache') || msg.includes('could not find')))
-  );
-}
-
-function extractMissingColumnName(err: any): string | null {
-  if (!err) return null;
-  const msg = String(err.message || '');
-  const details = String(err.details || '');
-  const combined = `${msg} ${details}`;
-
-  // Format PostgREST PGRST204 : "Could not find the 'is_plat_du_jour' column of 'menu_items' in the schema cache"
-  const pgrstMatch = combined.match(/Could not find the '([^']+)' column/i) || combined.match(/'([^']+)' column of/i);
-  if (pgrstMatch?.[1]) return pgrstMatch[1];
-
-  // Format PostgreSQL 42703 : column "is_plat_du_jour" of relation "menu_items" does not exist
-  const pgMatch = combined.match(/column "([^"]+)"/i) || combined.match(/column [a-z0-9_]+\.([a-z0-9_]+) does not exist/i);
-  if (pgMatch?.[1]) return pgMatch[1];
-
-  return null;
-}
-
-function isTableMissingError(err: any): boolean {
-  if (!err) return false;
-  // IMPORTANT : Ne jamais confondre une colonne manquante (PGRST204) avec une table manquante (PGRST205) !
-  if (isColumnMissingError(err)) return false;
-
-  const code = String(err.code || '').toUpperCase();
-  const msg = String(err.message || '').toLowerCase();
-  const details = String(err.details || '').toLowerCase();
-  return (
-    code === '42P01' ||
-    code === 'PGRST205' ||
-    msg.includes('could not find the table') ||
-    (msg.includes('relation') && msg.includes('does not exist') && !msg.includes('column')) ||
-    details.includes('could not find the table')
-  );
-}
-
-function stringToDeterministicUuid(input: string): string {
-  const clean = String(input || 'item');
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean)) {
-    return clean.toLowerCase();
-  }
-  let h1 = 0xdeadbeef ^ clean.length;
-  let h2 = 0x41c6ce57 ^ clean.length;
-  for (let i = 0; i < clean.length; i++) {
-    const ch = clean.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  const hex1 = (h1 >>> 0).toString(16).padStart(8, '0');
-  const hex2 = (h2 >>> 0).toString(16).padStart(8, '0');
-  const hex3 = ((h1 ^ h2) >>> 0).toString(16).padStart(8, '0');
-  return `${hex1}-${hex2.slice(0, 4)}-4${hex2.slice(5, 8)}-8${hex3.slice(1, 4)}-${hex1.slice(0, 4)}${hex3}`;
-}
-
-function stringToDeterministicInt(input: string, fallbackIndex: number): number {
-  const asNum = Number(input);
-  if (Number.isInteger(asNum) && asNum > 0) return asNum;
-  let hash = 0;
-  const str = String(input || fallbackIndex);
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash * 31 + str.charCodeAt(i)) % 100000000;
-  }
-  return Math.abs(hash) + 1000 + fallbackIndex;
-}
+};
 
 /**
- * Insère ou met à jour des plats dans `menu_items` en s'adaptant automatiquement
- * aux colonnes et aux types réellement présents dans la table Supabase de l'utilisateur.
- * Si la table a été créée avec une ancienne version du schéma SQL (sans `is_plat_du_jour`,
- * `is_specialite_maison`, etc.) ou avec un ID numérique/UUID, l'adaptation est 100% automatique !
+ * Helper to identify network / DNS / fetch failures across all browsers (including Safari iOS 'Load failed')
  */
-async function upsertMenuItemsAdaptive(
+export const isSupabaseNetworkError = (errorOrMsg: any): boolean => {
+  if (!errorOrMsg) return false;
+  const msg = typeof errorOrMsg === 'string'
+    ? errorOrMsg
+    : (errorOrMsg.message || errorOrMsg.details || errorOrMsg.hint || String(errorOrMsg));
+  const lower = msg.toLowerCase();
+  return (
+    lower.includes('load failed') ||
+    lower.includes('failed to fetch') ||
+    lower.includes('networkerror') ||
+    lower.includes('network error') ||
+    lower.includes('network request failed') ||
+    lower.includes('could not resolve') ||
+    lower.includes('enotfound') ||
+    lower.includes('fetch failed') ||
+    lower.includes('err_name_not_resolved') ||
+    lower.includes('connection refused') ||
+    lower.includes('abort') ||
+    lower.includes('timeout')
+  );
+};
+
+export const formatSupabaseErrorMessage = (errorOrMsg: any, targetUrl?: string): string => {
+  if (!errorOrMsg) return '';
+  const rawMsg = typeof errorOrMsg === 'string' ? errorOrMsg : (errorOrMsg.message || String(errorOrMsg));
+
+  if (isSupabaseNetworkError(rawMsg)) {
+    return `Serveur Supabase injoignable (${targetUrl || 'URL active'}). Projet en PAUSE sur Supabase ou URL inexistante.`;
+  }
+  if (rawMsg.includes('42P01') || (rawMsg.toLowerCase().includes('relation') && rawMsg.toLowerCase().includes('does not exist'))) {
+    return "Table inexistante dans la base Supabase. Veuillez exécuter le script SQL d'initialisation.";
+  }
+  if (rawMsg.includes('42501') || rawMsg.toLowerCase().includes('permission denied')) {
+    return "Accès refusé par les règles RLS Supabase (exécutez le script SQL fourni).";
+  }
+  return rawMsg;
+};
+
+const extractMissingColumnName = (error: any): string | null => {
+  const msg = String(error?.message || error?.details || error?.hint || error || '');
+  const m1 = msg.match(/Could not find the ['"`]([^'"`]+)['"`] column/i);
+  if (m1?.[1]) return m1[1];
+  const m2 = msg.match(/column ['"`]?([a-zA-Z0-9_]+)['"`]? of relation ['"`]?menu_items['"`]? does not exist/i);
+  if (m2?.[1]) return m2[1];
+  const m3 = msg.match(/column menu_items\.([a-zA-Z0-9_]+) does not exist/i);
+  if (m3?.[1]) return m3[1];
+  return null;
+};
+
+const upsertMenuItemsAdaptive = async (
   client: SupabaseClient,
   rows: Record<string, any>[]
-): Promise<{ data: any; error: any }> {
+): Promise<{ error: any }> => {
+  if (!rows || rows.length === 0) return { error: null };
+
   let currentRows = rows.map((r) => ({ ...r }));
-  const strippedColumns = new Set<string>();
-  let useInsertFallback = false;
+  const removedCols = new Set<string>();
 
-  for (let attempt = 0; attempt < 12; attempt++) {
-    const res = useInsertFallback
-      ? await client.from('menu_items').insert(currentRows)
-      : await client.from('menu_items').upsert(currentRows, { onConflict: 'id' });
-
-    if (!res.error) {
-      return { data: res.data, error: null };
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const { error } = await client.from('menu_items').upsert(currentRows, { onConflict: 'id' });
+    if (!error) {
+      return { error: null };
+    }
+    if (isSupabaseNetworkError(error)) {
+      return { error };
     }
 
-    const errCode = String(res.error.code || '').toUpperCase();
-    const errMsg = String(res.error.message || '').toLowerCase();
-
-    // 1. Colonne précise non trouvée dans la table de l'utilisateur -> on la retire et on réessaie
-    const missingCol = extractMissingColumnName(res.error);
-    if (missingCol && !strippedColumns.has(missingCol) && missingCol !== 'id' && missingCol !== 'name') {
-      strippedColumns.add(missingCol);
-      currentRows = currentRows.map((row) => {
-        const next = { ...row };
-        delete next[missingCol];
-        return next;
+    const missingCol = extractMissingColumnName(error);
+    if (missingCol && !removedCols.has(missingCol) && missingCol !== 'id') {
+      removedCols.add(missingCol);
+      currentRows = currentRows.map((r) => {
+        const copy = { ...r };
+        delete copy[missingCol];
+        return copy;
       });
       continue;
     }
 
-    // 2. Erreur générique de colonne manquante -> retirer progressivement les colonnes optionnelles
-    if (isColumnMissingError(res.error)) {
-      if (!strippedColumns.has('__tier1__')) {
-        strippedColumns.add('__tier1__');
-        currentRows = currentRows.map(({ is_plat_du_jour, is_specialite_maison, ...rest }) => rest);
-        continue;
-      }
-      if (!strippedColumns.has('__tier2__')) {
-        strippedColumns.add('__tier2__');
-        currentRows = currentRows.map(({ is_spicy, is_available, rating, ...rest }) => rest);
-        continue;
-      }
-      if (!strippedColumns.has('__tier3__')) {
-        strippedColumns.add('__tier3__');
-        currentRows = currentRows.map((row) => ({
-          id: row.id,
-          name: row.name,
-          description: row.description,
-          price: row.price,
-          image: row.image,
-          category: row.category,
-        }));
-        continue;
-      }
-    }
-
-    // 3. Si la colonne `id` de l'utilisateur a été créée en UUID ou en BIGINT/INTEGER au lieu de TEXT
-    if (errCode === '22P02' && !strippedColumns.has('__id_converted__')) {
-      strippedColumns.add('__id_converted__');
-      if (errMsg.includes('uuid')) {
-        currentRows = currentRows.map((row) => ({
-          ...row,
-          id: stringToDeterministicUuid(String(row.id)),
-        }));
-        continue;
-      }
-      if (errMsg.includes('int') || errMsg.includes('numeric')) {
-        currentRows = currentRows.map((row, idx) => ({
-          ...row,
-          id: stringToDeterministicInt(String(row.id), idx + 1),
-        }));
-        continue;
-      }
-    }
-
-    // 4. Si la table n'a pas de contrainte primaire/unique sur `id` pour ON CONFLICT
-    if ((errCode === '42P10' || errMsg.includes('on conflict')) && !useInsertFallback) {
-      useInsertFallback = true;
-      continue;
-    }
-
-    return { data: null, error: res.error };
+    break;
   }
 
-  return { data: null, error: { message: "Trop de tentatives d'adaptation des colonnes" } };
-}
+  // Fallback tiers if column mismatch wasn't explicitly named
+  const tierCols = [
+    ['id', 'name', 'description', 'price', 'category', 'image', 'is_plat_du_jour', 'is_specialite_maison', 'is_spicy', 'is_available'],
+    ['id', 'name', 'description', 'price', 'category', 'image', 'is_plat_du_jour'],
+    ['id', 'name', 'description', 'price', 'category', 'image'],
+    ['id', 'name', 'price']
+  ];
 
-function isNetworkFetchError(err: any): boolean {
-  if (!err) return false;
-  const msg = String(err.message || '').toLowerCase();
-  const details = String(err.details || '').toLowerCase();
-  return (
-    msg.includes('failed to fetch') ||
-    msg.includes('networkerror') ||
-    msg.includes('load failed') ||
-    msg.includes('fetch failed') ||
-    details.includes('failed to fetch')
-  );
-}
+  let lastError: any = null;
+  for (const cols of tierCols) {
+    const tierPayload = rows.map((r) => {
+      const filtered: Record<string, any> = {};
+      for (const c of cols) {
+        if (r[c] !== undefined && !removedCols.has(c)) {
+          filtered[c] = r[c];
+        }
+      }
+      return filtered;
+    });
+    const res = await client.from('menu_items').upsert(tierPayload, { onConflict: 'id' });
+    if (!res.error) {
+      return { error: null };
+    }
+    lastError = res.error;
+  }
 
-function isAuthKeyError(err: any): boolean {
-  if (!err) return false;
-  const code = String(err.code || '').toUpperCase();
-  const msg = String(err.message || '').toLowerCase();
-  return (
-    code === 'PGRST301' ||
-    code === '401' ||
-    msg.includes('invalid api key') ||
-    msg.includes('apikey') ||
-    msg.includes('jwt')
-  );
-}
+  return { error: lastError };
+};
 
 /**
- * TESTEUR DE CONNEXION SUPABASE
- * Effectue un diagnostic complet en direct :
- * 1. Validation et réparation intelligente de l'URL et de la clé (notamment via le JWT Anon)
- * 2. Requête de test vers l'instance
- * 3. Vérification précise de l'existence de la table `menu_items`
- * 4. Vérification précise de l'existence de la table `orders`
+ * Test connectivity with Supabase database with timeout & detailed diagnosis
  */
-export async function testSupabaseConnection(
-  testUrl?: string,
-  testKey?: string
-): Promise<{
-  success: boolean;
-  latencyMs?: number;
-  message: string;
-  details?: {
-    menuTableFound: boolean;
-    ordersTableFound: boolean;
-    hasMenuItemsTable?: boolean;
-    hasOrdersTable?: boolean;
-    menuTableStatus?: 'ok' | 'missing' | 'unreachable' | 'error';
-    ordersTableStatus?: 'ok' | 'missing' | 'unreachable' | 'error';
-    networkError?: boolean;
-    authError?: boolean;
-    missingTables?: boolean;
-    correctedUrl?: string;
-    correctedKey?: string;
-    menuCount?: number;
-    error?: string;
-  };
-}> {
-  const activeCreds = getActiveSupabaseCredentials();
-  let targetKey = sanitizeSupabaseKey(testKey !== undefined ? testKey : activeCreds.anonKey);
-
-  // Si l'utilisateur a collé sa clé JWT dans le champ URL par erreur, la récupérer !
-  if (!validateSupabaseKeyFormat(targetKey).isValidFormat && testUrl) {
-    const rescuedKey = sanitizeSupabaseKey(testUrl);
-    if (validateSupabaseKeyFormat(rescuedKey).isValidFormat) {
-      targetKey = rescuedKey;
-    }
-  }
-
-  let targetUrl = sanitizeSupabaseUrl(testUrl !== undefined ? testUrl : activeCreds.url, targetKey);
-  const jwtDerivedUrl = deriveSupabaseUrlFromKey(targetKey);
-
-  if (!targetUrl && jwtDerivedUrl) {
-    targetUrl = jwtDerivedUrl;
-  }
-
-  const keyValidation = validateSupabaseKeyFormat(targetKey, targetUrl);
-  if (!targetUrl && keyValidation.derivedUrl) {
-    targetUrl = keyValidation.derivedUrl;
-  }
-
-  if (!targetUrl || !targetUrl.startsWith('https://') || !targetUrl.includes('.')) {
-    return {
-      success: false,
-      message: "L'URL Supabase doit être valide et commencer par https:// (ex: https://xyz.supabase.co)",
-    };
-  }
-
-  if (!keyValidation.isValidFormat) {
-    return {
-      success: false,
-      message:
-        keyValidation.warningMessage ||
-        "La clé Anon saisie n'est pas valide. Dans Supabase > Project Settings > API Keys, copiez la clé publique « anon » (eyJ...) ou « Publishable key » (sb_publishable_...).",
-      details: {
-        menuTableFound: false,
-        ordersTableFound: false,
-        hasMenuItemsTable: false,
-        hasOrdersTable: false,
-        menuTableStatus: 'error',
-        ordersTableStatus: 'error',
-        authError: true,
-        correctedUrl: targetUrl,
-        correctedKey: targetKey,
-        error: 'Format de clé API invalide',
-      },
-    };
-  }
-
-  const runProbe = async (probeUrl: string) => {
-    const client = createSupabaseClientInstance(probeUrl, targetKey, false);
-
-    // Utiliser GET (.select('*').limit(1)) au lieu de HEAD pour que PostgREST renvoie toujours
-    // le corps JSON complet des erreurs éventuelles (PGRST205, PGRST204, etc.)
-    const [menuRes, ordersRes] = await Promise.all([
-      client.from('menu_items').select('*', { count: 'exact' }).limit(1),
-      client.from('orders').select('*', { count: 'exact' }).limit(1),
-    ]);
-
-    return {
-      menuCount: menuRes.count ?? undefined,
-      menuError: menuRes.error,
-      ordersError: ordersRes.error,
-    };
-  };
-
-  const startTime = Date.now();
-
-  try {
-    let { menuCount, menuError, ordersError } = await runProbe(targetUrl);
-
-    // Si l'URL échoue au niveau réseau ou clé et que le JWT Anon contient une URL officielle différente,
-    // basculer automatiquement sur l'URL dérivée du JWT !
-    if (
-      (isNetworkFetchError(menuError) ||
-        isNetworkFetchError(ordersError) ||
-        isAuthKeyError(menuError) ||
-        isAuthKeyError(ordersError)) &&
-      jwtDerivedUrl &&
-      jwtDerivedUrl.toLowerCase() !== targetUrl.toLowerCase()
-    ) {
-      targetUrl = jwtDerivedUrl;
-      const retryRes = await runProbe(targetUrl);
-      menuCount = retryRes.menuCount;
-      menuError = retryRes.menuError;
-      ordersError = retryRes.ordersError;
-    }
-
-    const latencyMs = Date.now() - startTime;
-
-    // Cas 1 : Erreur réseau (Failed to fetch / DNS / Projet en pause)
-    if (isNetworkFetchError(menuError) || isNetworkFetchError(ordersError)) {
-      return {
-        success: false,
-        latencyMs,
-        message: `Impossible de joindre le serveur Supabase (${targetUrl}). Vérifiez que : 1) L'URL correspond bien à votre projet, 2) Votre projet Supabase est actif (non mis en pause sur supabase.com), et 3) Votre connexion Internet fonctionne.`,
-        details: {
-          menuTableFound: false,
-          ordersTableFound: false,
-          hasMenuItemsTable: false,
-          hasOrdersTable: false,
-          menuTableStatus: 'unreachable',
-          ordersTableStatus: 'unreachable',
-          networkError: true,
-          correctedUrl: targetUrl,
-          correctedKey: targetKey,
-          error: menuError?.message || ordersError?.message || 'Failed to fetch',
-        },
-      };
-    }
-
-    // Cas 2 : Clé API invalide ou refusée
-    if (isAuthKeyError(menuError) || isAuthKeyError(ordersError)) {
-      return {
-        success: false,
-        latencyMs,
-        message:
-          keyValidation.warningMessage ||
-          `Le serveur Supabase (${targetUrl}) a refusé cette clé (« Invalid API key »). Assurez-vous d'avoir copié la clé publique « anon » (commençant par eyJ...) ou « Publishable key » (sb_publishable_...) appartenant bien au projet ${targetUrl.replace('https://', '')}.`,
-        details: {
-          menuTableFound: false,
-          ordersTableFound: false,
-          hasMenuItemsTable: false,
-          hasOrdersTable: false,
-          menuTableStatus: 'error',
-          ordersTableStatus: 'error',
-          authError: true,
-          correctedUrl: targetUrl,
-          correctedKey: targetKey,
-          error: menuError?.message || ordersError?.message,
-        },
-      };
-    }
-
-    // Le serveur a répondu avec une clé valide : sauvegarder automatiquement l'URL réparée et la clé
-    saveSupabaseConfig(targetUrl, targetKey, isAutoSyncEnabled());
-
-    const menuMissing = isTableMissingError(menuError);
-    const ordersMissing = isTableMissingError(ordersError);
-    const menuOk = !menuError;
-    const ordersOk = !ordersError;
-
-    // Cas 3 : Connexion serveur OK mais une ou plusieurs tables n'existent pas encore
-    if (menuMissing || ordersMissing) {
-      const missingList = [
-        !menuOk ? "'menu_items'" : null,
-        !ordersOk ? "'orders'" : null,
-      ]
-        .filter(Boolean)
-        .join(' et ');
-
-      return {
-        success: false,
-        latencyMs,
-        message: `Connexion établie avec votre projet Supabase (${latencyMs} ms), mais ${missingList.includes('et') ? 'les tables' : 'la table'} ${missingList} n'existe${missingList.includes('et') ? 'nt' : ''} pas encore. Cliquez sur « Copier & Voir le Script SQL » ci-dessous et exécutez-le dans SQL Editor sur Supabase.`,
-        details: {
-          menuTableFound: menuOk,
-          ordersTableFound: ordersOk,
-          hasMenuItemsTable: menuOk,
-          hasOrdersTable: ordersOk,
-          menuTableStatus: menuOk ? 'ok' : menuMissing ? 'missing' : 'error',
-          ordersTableStatus: ordersOk ? 'ok' : ordersMissing ? 'missing' : 'error',
-          missingTables: true,
-          correctedUrl: targetUrl,
-          correctedKey: targetKey,
-          error: menuError?.message || ordersError?.message,
-        },
-      };
-    }
-
-    // Cas 4 : Autre erreur SQL / RLS
-    if (menuError || ordersError) {
-      const errObj = menuError || ordersError;
-      return {
-        success: false,
-        latencyMs,
-        message: `Erreur d'accès aux tables Supabase : ${errObj?.message}${errObj?.code ? ` (Code: ${errObj.code})` : ''}`,
-        details: {
-          menuTableFound: menuOk,
-          ordersTableFound: ordersOk,
-          hasMenuItemsTable: menuOk,
-          hasOrdersTable: ordersOk,
-          menuTableStatus: menuOk ? 'ok' : 'error',
-          ordersTableStatus: ordersOk ? 'ok' : 'error',
-          correctedUrl: targetUrl,
-          correctedKey: targetKey,
-          error: errObj?.message,
-        },
-      };
-    }
-
-    // Cas 5 : Tout est 100% opérationnel
-    return {
-      success: true,
-      latencyMs,
-      message: `Connexion Supabase réussie en ${latencyMs} ms ! Les tables 'menu_items' et 'orders' sont opérationnelles.`,
-      details: {
-        menuTableFound: true,
-        ordersTableFound: true,
-        hasMenuItemsTable: true,
-        hasOrdersTable: true,
-        menuTableStatus: 'ok',
-        ordersTableStatus: 'ok',
-        correctedUrl: targetUrl,
-        correctedKey: targetKey,
-        menuCount,
-      },
-    };
-  } catch (err: any) {
-    const latencyMs = Date.now() - startTime;
-    return {
-      success: false,
-      latencyMs,
-      message: `Échec de la connexion vers ${targetUrl} : ${err?.message || 'Erreur réseau ou URL inaccessible'}`,
-      details: {
-        menuTableFound: false,
-        ordersTableFound: false,
-        hasMenuItemsTable: false,
-        hasOrdersTable: false,
-        menuTableStatus: 'unreachable',
-        ordersTableStatus: 'unreachable',
-        networkError: true,
-        correctedUrl: targetUrl,
-        correctedKey: targetKey,
-        error: String(err),
-      },
-    };
-  }
-}
-
-/**
- * POUSSER TOUT LE MENU EN BLOC VERS SUPABASE
- */
-export async function pushAllMenuItemsToSupabase(
-  items: MenuItem[],
+export const testSupabaseConnection = async (
   customUrl?: string,
   customKey?: string
-): Promise<{
-  success: boolean;
-  count: number;
-  total: number;
-  error?: string;
-  authError?: boolean;
-  missingTables?: boolean;
-  correctedUrl?: string;
-  correctedKey?: string;
-}> {
-  const activeCreds = getActiveSupabaseCredentials();
-  let targetKey = sanitizeSupabaseKey(customKey !== undefined && customKey.trim() !== '' ? customKey : activeCreds.anonKey);
+): Promise<{ success: boolean; message: string; isUnreachable?: boolean; details?: any }> => {
+  let client = getSupabaseClient();
+  const cfg = getSupabaseConfig();
+  let targetKey = (customKey || cfg.key).trim();
+  const derivedUrl = deriveSupabaseUrlFromKey(targetKey);
+  let targetUrl = cleanSupabaseUrl(customUrl || derivedUrl || cfg.url, targetKey);
 
-  // Si la clé a été collée dans le champ URL par erreur
-  if (!validateSupabaseKeyFormat(targetKey).isValidFormat && customUrl) {
-    const rescuedKey = sanitizeSupabaseKey(customUrl);
-    if (validateSupabaseKeyFormat(rescuedKey).isValidFormat) {
-      targetKey = rescuedKey;
+  if (customUrl || customKey) {
+    try {
+      client = createClient(targetUrl, targetKey);
+    } catch (e: any) {
+      return { success: false, message: `Format d'URL ou de clé invalide : ${e.message || e}` };
     }
   }
 
-  let targetUrl = sanitizeSupabaseUrl(
-    customUrl !== undefined && customUrl.trim() !== '' ? customUrl : activeCreds.url,
-    targetKey
-  );
-  const jwtDerivedUrl = deriveSupabaseUrlFromKey(targetKey);
-  if (!targetUrl && jwtDerivedUrl) {
-    targetUrl = jwtDerivedUrl;
-  }
-
-  const keyValidation = validateSupabaseKeyFormat(targetKey, targetUrl);
-  if (!keyValidation.isValidFormat) {
+  if (!client) {
     return {
       success: false,
-      count: 0,
-      total: items.length,
-      authError: true,
-      correctedUrl: targetUrl,
-      correctedKey: targetKey,
-      error:
-        keyValidation.warningMessage ||
-        "Clé API Supabase invalide. Veuillez coller votre clé publique « anon » (eyJ...) ou « Publishable key » (sb_publishable_...).",
+      message: "Supabase n'est pas configuré. Veuillez renseigner l'URL et la clé Anon."
     };
   }
 
-  if (!targetUrl || !targetUrl.startsWith('https://')) {
-    return {
-      success: false,
-      count: 0,
-      total: items.length,
-      error: "L'URL du projet Supabase est manquante ou invalide.",
-    };
-  }
-
-  // Sauvegarder la configuration nettoyée
-  saveSupabaseConfig(targetUrl, targetKey, isAutoSyncEnabled());
-
-  if (items.length === 0) {
-    return { success: true, count: 0, total: 0, correctedUrl: targetUrl, correctedKey: targetKey };
-  }
+  const cleanUrl = cleanSupabaseUrl(targetUrl, targetKey);
 
   try {
-    const client = createSupabaseClientInstance(targetUrl, targetKey, false);
+    const { data: menuData, error: menuErr } = await client.from('menu_items').select('*').limit(1);
 
-    const payload = items.map((item) => ({
-      id: item.id,
-      name: item.name,
-      description: item.description || '',
-      price: Number(item.price) || 0,
-      image: item.image || '',
-      category: item.category || 'Plat Africain',
-      rating: Number(item.rating) || 5,
-      is_available: item.isAvailable ?? true,
-      is_spicy: Boolean(item.isSpicy),
-      is_specialite_maison: Boolean(item.isSpécialitéMaison),
-      is_plat_du_jour: Boolean(
-        item.isPlatDuJour ||
-        item.category === 'Plat du Jour' ||
-        item.category === 'Menu du Jour'
-      ),
-    }));
-
-    // Upsert par lots de 25 pour une fiabilité optimale
-    const BATCH_SIZE = 25;
-    let synced = 0;
-
-    for (let i = 0; i < payload.length; i += BATCH_SIZE) {
-      const batch = payload.slice(i, i + BATCH_SIZE);
-      const { error } = await upsertMenuItemsAdaptive(client, batch);
-
-      if (error) {
-        if (isAuthKeyError(error)) {
-          return {
-            success: false,
-            count: synced,
-            total: items.length,
-            authError: true,
-            correctedUrl: targetUrl,
-            correctedKey: targetKey,
-            error: `La clé Anon a été refusée par ${targetUrl} (« Invalid API key »). Vérifiez que vous avez bien copié la clé « anon public » (eyJ...) ou « Publishable key » (sb_publishable_...) dans Supabase > Project Settings > API Keys.`,
-          };
-        }
-        if (isTableMissingError(error)) {
-          return {
-            success: false,
-            count: synced,
-            total: items.length,
-            missingTables: true,
-            correctedUrl: targetUrl,
-            correctedKey: targetKey,
-            error: `Connexion réussie à Supabase, mais la table 'menu_items' n'a pas encore été créée ! Cliquez sur « Script SQL » et exécutez-le dans SQL Editor sur Supabase.`,
-          };
-        }
-        throw new Error(error.message);
+    if (menuErr) {
+      if (isSupabaseNetworkError(menuErr)) {
+        return {
+          success: false,
+          isUnreachable: true,
+          message:
+            `⚠️ Impossible de joindre le serveur Supabase (${cleanUrl}).\n\n` +
+            `Erreur : "${menuErr.message}" (le serveur ne répond pas).\n\n` +
+            `Causes & Solutions :\n` +
+            `1. ⏸️ Projet en PAUSE sur Supabase : Rendez-vous sur https://supabase.com/dashboard pour cliquer sur "Restore project" / "Unpause".\n` +
+            `2. 🔄 Clés modifiées : Vérifiez l'URL de votre projet dans les paramètres Supabase.\n` +
+            `3. 🛡️ Vos données sont en sécurité : Plats, commandes et réglages restent enregistrés sur votre appareil.`
+        };
       }
-      synced += batch.length;
+      if (menuErr.code === '42P01' || menuErr.code === 'PGRST205') {
+        return {
+          success: false,
+          message: "La table 'menu_items' n'existe pas encore dans votre base Supabase. Veuillez exécuter le script SQL fourni dans l'onglet 'Script SQL'."
+        };
+      }
+      if (menuErr.message?.includes('permission denied') || menuErr.code === '42501') {
+        return {
+          success: false,
+          message: "Accès refusé par les règles RLS Supabase. Veuillez appliquer les politiques autorisant la lecture/écriture publique (voir script SQL)."
+        };
+      }
+      return { success: false, message: `Erreur Supabase : ${menuErr.message}` };
     }
 
     return {
       success: true,
-      count: synced,
-      total: items.length,
-      correctedUrl: targetUrl,
-      correctedKey: targetKey,
+      message: `✅ Connexion réussie au projet Supabase (${cleanUrl}) ! Les tables 'menu_items', 'orders' et 'app_settings' sont opérationnelles.`
     };
   } catch (err: any) {
-    return {
-      success: false,
-      count: 0,
-      total: items.length,
-      correctedUrl: targetUrl,
-      correctedKey: targetKey,
-      error: err?.message || 'Erreur lors de la synchronisation des plats',
-    };
+    const errorMsg = String(err?.message || err);
+    if (isSupabaseNetworkError(errorMsg)) {
+      return {
+        success: false,
+        isUnreachable: true,
+        message: `⚠️ Impossible de joindre votre projet Supabase (${cleanUrl}).\n\nCauses possibles :\n1. Projet en PAUSE sur Supabase (plan gratuit) : Rendez-vous sur https://supabase.com/dashboard et cliquez sur "Restore project" / "Unpause".\n2. URL de projet modifiée ou supprimée.\n3. Vos données locales restent 100% disponibles.`
+      };
+    }
+    return { success: false, message: `Échec de connexion : ${errorMsg}` };
   }
-}
+};
 
 /**
  * SERVICE DE DONNÉES KHADY'S ELITE
- * Gère la synchronisation entre l'App et le Cloud Supabase
+ * Gère la synchronisation bidirectionnelle Cloud, Plat du Jour, Photo Admin, Menu & Commandes
  */
 export const db = {
   // --- MENU ---
   fetchMenu: async (): Promise<MenuItem[] | null> => {
     const client = getSupabaseClient();
     if (!client) return null;
+
     try {
+      const fullMenuBackup = await db.fetchSetting<MenuItem[]>('full_menu_items');
+
       let { data, error } = await client
         .from('menu_items')
         .select('*')
@@ -1208,125 +459,290 @@ export const db = {
         error = retry.error;
       }
 
-      if (error || !data) {
-        return null;
+      if (error || !data || data.length === 0) {
+        return fullMenuBackup || null;
       }
 
-      return data.map((item: any) => ({
-        id: String(item.id),
-        name: item.name || '',
-        description: item.description || '',
-        price: Number(item.price) || 0,
-        image: item.image || '',
-        category: item.category || 'Plat Africain',
-        rating: Number(item.rating) || 5,
-        isAvailable: item.is_available ?? true,
-        isSpicy: item.is_spicy ?? false,
-        isSpécialitéMaison: item.is_specialite_maison ?? false,
-        isPlatDuJour: item.is_plat_du_jour ?? false,
-      })) as MenuItem[];
+      const backupMap = new Map<string, Partial<MenuItem>>();
+      if (fullMenuBackup && Array.isArray(fullMenuBackup)) {
+        fullMenuBackup.forEach((item) => backupMap.set(item.id, item));
+      }
+
+      return data.map((row: any) => {
+        const cached = backupMap.get(row.id) || {};
+        return {
+          id: String(row.id),
+          name: row.name,
+          description: row.description || '',
+          price: Number(row.price),
+          image: row.image,
+          category: row.category || cached.category || 'Plat Africain',
+          rating: row.rating ? Number(row.rating) : (cached.rating ?? 5),
+          isAvailable: row.is_available ?? row.isAvailable ?? cached.isAvailable ?? true,
+          isSpicy: row.is_spicy ?? row.isSpicy ?? cached.isSpicy ?? false,
+          isVegetarian: row.is_vegetarian ?? row.isVegetarian ?? cached.isVegetarian ?? false,
+          isLowPrice: row.is_low_price ?? row.isLowPrice ?? cached.isLowPrice ?? false,
+          isPromo: row.is_promo ?? row.isPromo ?? cached.isPromo ?? false,
+          isPlatDuJour: row.is_plat_du_jour ?? row.isPlatDuJour ?? cached.isPlatDuJour ?? false,
+          isSpécialitéMaison: row.is_specialite_maison ?? row.isSpécialitéMaison ?? cached.isSpécialitéMaison ?? false
+        };
+      }) as MenuItem[];
     } catch {
       return null;
     }
   },
 
-  saveMenuItem: async (
-    item: MenuItem
-  ): Promise<{ success: boolean; data?: any; error?: string }> => {
+  saveMenuItem: async (item: MenuItem): Promise<{ success: boolean; error?: string; data?: any }> => {
     const client = getSupabaseClient();
-    if (!client) {
-      return {
-        success: false,
-        error: "Supabase non configuré (identifiants absents ou invalides)",
-      };
-    }
+    if (!client) return { success: false, error: 'Supabase non configuré' };
 
     try {
-      const { data, error } = await upsertMenuItemsAdaptive(client, [
-        {
-          id: item.id,
-          name: item.name,
-          description: item.description || '',
-          price: Number(item.price) || 0,
-          image: item.image || '',
-          category: item.category || 'Plat Africain',
-          rating: Number(item.rating) || 5,
-          is_available: item.isAvailable ?? true,
-          is_spicy: Boolean(item.isSpicy),
-          is_specialite_maison: Boolean(item.isSpécialitéMaison),
-          is_plat_du_jour: Boolean(
-            item.isPlatDuJour ||
-            item.category === 'Plat du Jour' ||
-            item.category === 'Menu du Jour'
-          ),
-        },
-      ]);
+      const payload: Record<string, any> = {
+        id: item.id,
+        name: item.name,
+        description: item.description || '',
+        price: item.price,
+        image: item.image,
+        category: item.category,
+        is_available: item.isAvailable ?? true,
+        is_spicy: item.isSpicy ?? false,
+        is_specialite_maison: item.isSpécialitéMaison ?? false,
+        is_plat_du_jour: Boolean((item as any).isPlatDuJour)
+      };
 
+      const { error } = await upsertMenuItemsAdaptive(client, [payload]);
       if (error) {
-        return { success: false, error: error.message };
+        return { success: false, error: formatSupabaseErrorMessage(error.message || error) };
       }
-      return { success: true, data };
-    } catch (err: any) {
-      return { success: false, error: err?.message || 'Erreur réseau Supabase' };
+      return { success: true, data: item };
+    } catch (e: any) {
+      return { success: false, error: formatSupabaseErrorMessage(e.message || 'Erreur inconnue') };
+    }
+  },
+
+  syncAllMenuItems: async (items: MenuItem[]): Promise<{ success: boolean; error?: string; count: number }> => {
+    const client = getSupabaseClient();
+    if (!client) return { success: false, error: 'Supabase non configuré', count: 0 };
+
+    try {
+      // Backup complete list with rich metadata in app_settings
+      await db.saveSetting('full_menu_items', items).catch(() => {});
+
+      const payloads = items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description || '',
+        price: item.price,
+        image: item.image,
+        category: item.category,
+        is_available: item.isAvailable ?? true,
+        is_spicy: item.isSpicy ?? false,
+        is_specialite_maison: item.isSpécialitéMaison ?? false,
+        is_plat_du_jour: Boolean((item as any).isPlatDuJour)
+      }));
+
+      const { error } = await upsertMenuItemsAdaptive(client, payloads);
+      if (error) {
+        return {
+          success: false,
+          error: formatSupabaseErrorMessage(error.message || error),
+          count: 0
+        };
+      }
+
+      return { success: true, count: items.length };
+    } catch (e: any) {
+      return { success: false, error: formatSupabaseErrorMessage(e.message || 'Erreur inconnue'), count: 0 };
     }
   },
 
   deleteMenuItem: async (id: string): Promise<{ success: boolean; error?: string }> => {
     const client = getSupabaseClient();
-    if (!client) {
-      return { success: false, error: "Supabase non configuré" };
-    }
+    if (!client) return { success: false, error: 'Supabase non configuré' };
 
     try {
       const { error } = await client.from('menu_items').delete().eq('id', id);
       if (error) return { success: false, error: error.message };
       return { success: true };
-    } catch (err: any) {
-      return { success: false, error: err?.message || 'Erreur réseau Supabase' };
+    } catch (e: any) {
+      return { success: false, error: e.message };
     }
+  },
+
+  // --- PARAMÈTRES GLOBAUX & SYNCHRONISATION (APP_SETTINGS) ---
+  fetchSetting: async <T = any>(key: string): Promise<T | null> => {
+    const client = getSupabaseClient();
+    if (!client) return null;
+
+    try {
+      const { data, error } = await client
+        .from('app_settings')
+        .select('value')
+        .eq('key', key)
+        .maybeSingle();
+
+      if (error || !data) return null;
+      return data.value as T;
+    } catch {
+      return null;
+    }
+  },
+
+  saveSetting: async (key: string, value: any): Promise<{ success: boolean; error?: string }> => {
+    const client = getSupabaseClient();
+    if (!client) return { success: false, error: 'Supabase non configuré' };
+
+    try {
+      const { error } = await client
+        .from('app_settings')
+        .upsert(
+          {
+            key,
+            value,
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'key' }
+        );
+
+      if (error) {
+        // If app_settings table does not exist in a custom Supabase instance, ignore gracefully
+        if (error.code === '42P01' || error.code === 'PGRST205') {
+          return { success: true };
+        }
+        return { success: false, error: formatSupabaseErrorMessage(error) };
+      }
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: formatSupabaseErrorMessage(e.message || e) };
+    }
+  },
+
+  // --- PLAT DU JOUR SYNC ---
+  fetchPlatDuJour: async (): Promise<PlatDuJourConfig | null> => {
+    return db.fetchSetting<PlatDuJourConfig>('plat_du_jour');
+  },
+
+  savePlatDuJour: async (plat: PlatDuJourConfig): Promise<{ success: boolean; error?: string }> => {
+    return db.saveSetting('plat_du_jour', plat);
+  },
+
+  // --- PHOTO DE PROFIL ADMIN SYNC ---
+  fetchAdminAvatar: async (): Promise<string | null> => {
+    return db.fetchSetting<string>('admin_avatar');
+  },
+
+  saveAdminAvatar: async (avatarBase64OrUrl: string): Promise<{ success: boolean; error?: string }> => {
+    let finalAvatar = avatarBase64OrUrl;
+    if (typeof window !== 'undefined' && finalAvatar && finalAvatar.startsWith('data:image') && finalAvatar.length > 35000) {
+      try {
+        finalAvatar = await compressImage(finalAvatar, 250, 0.65);
+      } catch {}
+    }
+    return db.saveSetting('admin_avatar', finalAvatar);
+  },
+
+  // --- SYNC MASTER GLOBAL (Tout pousser vers Supabase en 1 clic) ---
+  syncEverythingToCloud: async (data: {
+    menuItems?: MenuItem[];
+    platDuJour?: PlatDuJourConfig;
+    adminAvatar?: string;
+    promoCodes?: any[];
+    announcementBanner?: any;
+    flashDeal?: any;
+    customWhatsApp?: string;
+  }): Promise<{ success: boolean; message: string; errors?: string[] }> => {
+    const client = getSupabaseClient();
+    if (!client) {
+      return { success: false, message: "Supabase n'est pas encore configuré." };
+    }
+
+    const errors: string[] = [];
+    let syncedCount = 0;
+
+    // 1. Sync Menu Items
+    if (data.menuItems && data.menuItems.length > 0) {
+      const res = await db.syncAllMenuItems(data.menuItems);
+      if (res.success) syncedCount += res.count;
+      else errors.push(`Menu : ${res.error}`);
+    }
+
+    // 2. Sync Plat du Jour
+    if (data.platDuJour) {
+      const res = await db.savePlatDuJour(data.platDuJour);
+      if (!res.success && res.error) errors.push(`Plat du Jour : ${res.error}`);
+    }
+
+    // 3. Sync Admin Avatar
+    if (data.adminAvatar) {
+      const res = await db.saveAdminAvatar(data.adminAvatar);
+      if (!res.success && res.error) errors.push(`Photo Profil Admin : ${res.error}`);
+    }
+
+    // 4. Sync Promo Codes, Banner, Flash Deal, WhatsApp
+    if (data.promoCodes) await db.saveSetting('promo_codes', data.promoCodes);
+    if (data.announcementBanner) await db.saveSetting('announcement_banner', data.announcementBanner);
+    if (data.flashDeal) await db.saveSetting('flash_deal', data.flashDeal);
+    if (data.customWhatsApp) await db.saveSetting('custom_whatsapp', data.customWhatsApp);
+
+    if (errors.length > 0) {
+      const isNetworkIssue = errors.some((e) => isSupabaseNetworkError(e));
+      const targetUrl = getSupabaseConfig().url;
+      const advice = isNetworkIssue
+        ? `\n\n💡 Cause de l'erreur : Le serveur Supabase (${targetUrl}) est actuellement inaccessible ("Load failed" / échec DNS).\n` +
+          `• Si votre projet gratuit Supabase est en PAUSE : rendez-vous sur https://supabase.com/dashboard et cliquez sur "Restore project".\n` +
+          `• 🛡️ Rassurez-vous : vos plats, votre Plat du Jour et vos réglages sont 100% conservés et opérationnels en local sur votre appareil !`
+        : '';
+
+      return {
+        success: false,
+        message: `Synchronisation partielle avec des avertissements : ${errors.map((e) => formatSupabaseErrorMessage(e, targetUrl)).join(', ')}${advice}`,
+        errors
+      };
+    }
+
+    return {
+      success: true,
+      message: `✅ Synchronisation complète réussie ! Tous les plats (${syncedCount}), le Plat du Jour et le profil Admin sont enregistrés sur le Cloud Supabase (${getSupabaseConfig().url}).`
+    };
   },
 
   // --- COMMANDES ---
   fetchOrders: async (): Promise<Order[] | null> => {
     const client = getSupabaseClient();
     if (!client) return null;
+
     try {
       const { data, error } = await client
         .from('orders')
         .select('*')
         .order('timestamp', { ascending: false });
 
-      if (error || !data) {
-        return null;
-      }
+      if (error || !data) return null;
 
-      return data.map((o: any) => ({
-        id: o.id,
-        customerName: o.customer_name || 'Client',
-        phone: o.phone || '',
-        address: o.address || '',
-        district: o.district || '',
-        items: typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || []),
-        total: Number(o.total) || 0,
-        deliveryFee: Number(o.delivery_fee) || 0,
-        status: o.status || 'RECEIVED',
-        paymentMethod: o.payment_method || 'CASH',
-        paymentType: o.payment_type,
-        paymentTransactionId: o.payment_transaction_id,
-        paymentProofUrl: o.payment_proof_url,
-        paymentValidated: o.payment_validated,
-        timestamp: o.timestamp || new Date().toISOString(),
+      return data.map((row: any) => ({
+        id: row.id,
+        customerName: row.customer_name ?? row.customerName,
+        phone: row.phone,
+        items: typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []),
+        total: Number(row.total),
+        deliveryFee: Number(row.delivery_fee ?? row.deliveryFee ?? 0),
+        status: row.status,
+        paymentMethod: row.payment_method ?? row.paymentMethod,
+        timestamp: row.timestamp,
+        district: row.district,
+        address: row.address
       })) as Order[];
     } catch {
       return null;
     }
   },
 
-  placeOrder: async (order: Order) => {
+  placeOrder: async (order: Order): Promise<{ success: boolean; error?: string }> => {
     const client = getSupabaseClient();
-    if (!client) return null;
+    if (!client) return { success: false, error: 'Supabase non connecté' };
+
     try {
-      const { data, error } = await client
+      const { error } = await client
         .from('orders')
         .insert({
           id: order.id,
@@ -1334,39 +750,35 @@ export const db = {
           phone: order.phone,
           items: order.items,
           total: order.total,
-          delivery_fee: order.deliveryFee,
+          delivery_fee: order.deliveryFee || 0,
           status: order.status,
           payment_method: order.paymentMethod,
-          payment_type: order.paymentType,
-          payment_transaction_id: order.paymentTransactionId,
-          payment_proof_url: order.paymentProofUrl,
-          payment_validated: order.paymentValidated ?? false,
           timestamp: order.timestamp,
           district: order.district,
-          address: order.address,
-        })
-        .select();
+          address: order.address
+        });
 
-      return data;
-    } catch {
-      return null;
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message };
     }
   },
 
   updateOrderStatus: async (orderId: string, status: string) => {
     const client = getSupabaseClient();
     if (!client) return null;
+
     try {
       const { error } = await client
         .from('orders')
         .update({ status })
         .eq('id', orderId);
-
       if (error) return null;
-      return true;
     } catch {
       return null;
     }
-  },
+  }
 };
-

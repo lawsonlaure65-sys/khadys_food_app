@@ -91,15 +91,8 @@ export interface Order {
   deliveryFee: number;
   status: OrderStatus;
   paymentMethod: PaymentMethod;
-  paymentType?: 'MOBILE_MONEY' | 'CASH';
-  paymentProofUrl?: string;
+  paymentProofImage?: string;
   paymentTransactionId?: string;
-  paymentValidated?: boolean;
-  driverName?: string;
-  driverPhone?: string;
-  driverStatus?: 'ASSIGNED' | 'EN_ROUTE' | 'LIVRAISON_VALIDEE' | 'PROBLEME_LIVRAISON';
-  driverNote?: string;
-  driverIssue?: string;
   timestamp: string;
 }
 
@@ -113,74 +106,59 @@ export interface UserProfile {
   referralCode: string;
 }
 
+export interface BlogArticle {
+  id: string;
+  title: string;
+  summary: string;
+  content: string;
+  author: string;
+  date: string;
+  readTime: string;
+  image: string;
+  category: 'Recettes' | 'Secrets du Chef' | 'Nutrition Sahel' | 'Événements';
+  likes: number;
+}
+
+export interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+  category: 'Paiement' | 'Livraison' | 'Commandes' | 'Traiteur' | 'Fidélité' | 'Application';
+}
+
 export enum Page {
   HOME = 'HOME',
   MENU = 'MENU',
   TRAITEUR = 'TRAITEUR',
   CART = 'CART',
+  COMMANDE = 'COMMANDE',
   BOX = 'BOX',
   PACKS = 'PACKS',
   COMMANDES = 'COMMANDES',
   COMPTE = 'COMPTE',
   INFOS = 'INFOS',
   ADMIN = 'ADMIN',
+  GALLERY = 'GALLERY',
+  VIDEO = 'VIDEO',
+  WHATSAPP = 'WHATSAPP',
   BLOG = 'BLOG',
-  GALLERY = 'GALLERY'
+  FAQ = 'FAQ',
+  SETTINGS = 'SETTINGS'
 }
 
 export enum AdminView {
   DASHBOARD = 'DASHBOARD',
+  PLAT_DU_JOUR = 'PLAT_DU_JOUR',
   ORDERS = 'ORDERS',
   MENU_MGMT = 'MENU_MGMT',
+  BLOG_MGMT = 'BLOG_MGMT',
+  FAQ_MGMT = 'FAQ_MGMT',
   AI_MARKETING = 'AI_MARKETING',
-  WHATSAPP_AUTOMATION = 'WHATSAPP_AUTOMATION',
   CLIENTS = 'CLIENTS',
   DELIVERY = 'DELIVERY',
   EVENT = 'EVENT',
   BUFFET = 'BUFFET',
-  BLOG_MGMT = 'BLOG_MGMT',
-  GALLERY_MGMT = 'GALLERY_MGMT',
   SETTINGS = 'SETTINGS'
-}
-
-export interface BlogPost {
-  id: string;
-  title: string;
-  subtitle: string;
-  content: string;
-  author: string;
-  date: string;
-  readTime: string;
-  image: string;
-  category: 'Recettes Secrètes' | 'Gastronomie Sahélienne' | 'Conseils Nutrition' | 'Coulisses Chef';
-  likes: number;
-  commentsCount: number;
-  isPublished: boolean;
-  featuredDishId?: string;
-}
-
-export interface GalleryItem {
-  id: string;
-  title: string;
-  category: string;
-  image: string;
-  likes: number;
-  dishId?: string;
-  tag: string;
-  description?: string;
-}
-
-export interface ClientUser {
-  id: string;
-  name: string;
-  phone: string;
-  email?: string;
-  district: string;
-  points: number;
-  rank: 'Silver' | 'Gold' | 'Platinum';
-  totalOrders: number;
-  totalSpent: number;
-  lastOrderDate: string;
 }
 
 export interface District {

@@ -65,17 +65,7 @@ CREATE POLICY "Public Full Access app_settings" ON app_settings
     WITH CHECK (true);
 
 -- 6. PUBLICATION TEMPS RÉEL (SUPABASE REALTIME)
--- Permet aux téléphones et ordinateurs connectés de recevoir les mises à jour instantanément
 BEGIN;
   DROP PUBLICATION IF EXISTS supabase_realtime;
   CREATE PUBLICATION supabase_realtime FOR TABLE menu_items, orders, app_settings;
 COMMIT;
-
--- 7. DONNÉES INITIALES DU MENU
-INSERT INTO menu_items (id, name, description, price, image, category, rating, is_specialite_maison, is_spicy)
-VALUES 
-('sp1', 'Tiep Royal Khady', 'Le chef-d''œuvre de la maison au poisson capitaine, riz rouge parfumé et légumes fondants.', 5500, 'https://images.unsplash.com/photo-1627308595229-7830a5c91f9f?w=800', 'Spécialité Maison', 5, true, true),
-('sp2', 'Couscous Royal Khady', 'Couscous fin fait main, agneau tendre, boulettes kefta maison, légumes du Sahel & pois chiches mijotés.', 6500, 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=800', 'Spécialité Maison', 5, true, false),
-('af1', 'Mafé Boeuf Express', 'Sauce arachide onctueuse de Bamako, viande de bœuf fondante et riz blanc parfumé.', 3500, 'https://images.unsplash.com/photo-1541518763531-4a949439a3f8?w=800', 'Plat Africain', 5, false, false),
-('gr1', 'Suya Dibi d''Agneau au Feu de Bois', 'Fines lamelles d''agneau mariné au Kankankan du Sahel, oignons caramélisés et piment doux.', 4500, 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800', 'Grillade & Dibi', 5, true, true)
-ON CONFLICT (id) DO NOTHING;

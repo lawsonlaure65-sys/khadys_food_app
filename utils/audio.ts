@@ -1,78 +1,105 @@
+// Web Audio API Synthesizer - 100% Reliable Offline Sound FX without External Network Requests
+let audioCtx: AudioContext | null = null;
 
-// Synthétiseur Web Audio API pour garantie sonore locale 100% sans dépendance externe
-const playSynthChime = (notes: number[], durations: number[]) => {
-  try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    let startTime = ctx.currentTime;
-
-    notes.forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, startTime);
-      
-      gain.gain.setValueAtTime(0.3, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, startTime + durations[idx]);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(startTime);
-      osc.stop(startTime + durations[idx]);
-      startTime += durations[idx] * 0.7;
-    });
-  } catch (e) {
-    console.warn("Web Audio API not supported or blocked", e);
+const getAudioContext = () => {
+  if (!audioCtx && typeof window !== 'undefined') {
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (AudioContextClass) {
+      audioCtx = new AudioContextClass();
+    }
   }
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
+  return audioCtx;
 };
 
-export const playSound = (type: 'pop' | 'success' | 'cash' | 'notification' | 'delivery') => {
-  let audioSrc = '';
-  
+export const playSound = (type: 'pop' | 'success' | 'cash' | 'notification' | 'delivery' | 'error' | 'orderAlert') => {
   // Vibration Android (Haptic Feedback)
   if ('vibrate' in navigator) {
-    if (type === 'pop') navigator.vibrate(20);
-    if (type === 'success') navigator.vibrate([40, 60, 40]);
-    if (type === 'cash') navigator.vibrate([100, 50, 100, 50, 150]);
-    if (type === 'notification') navigator.vibrate([200, 100, 200, 100, 300]);
-    if (type === 'delivery') navigator.vibrate([80, 40, 80]);
-  }
-
-  // Jouer carillon Web Audio synthétique garanti
-  if (type === 'notification') {
-    // Carillon 3 tons (Do5 - Mi5 - Sol5 - Do6)
-    playSynthChime([523.25, 659.25, 783.99, 1046.50], [0.15, 0.15, 0.15, 0.4]);
-  } else if (type === 'cash' || type === 'success') {
-    // Carillon joyeux de confirmation
-    playSynthChime([587.33, 880.00, 1174.66], [0.12, 0.12, 0.35]);
-  }
-
-  switch (type) {
-    case 'pop':
-      audioSrc = 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3';
-      break;
-    case 'success':
-      audioSrc = 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3';
-      break;
-    case 'cash':
-      audioSrc = 'https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3';
-      break;
-    case 'notification':
-      audioSrc = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
-      break;
-    case 'delivery':
-      audioSrc = 'https://assets.mixkit.co/active_storage/sfx/1487/1487-preview.mp3';
-      break;
+    try {
+      if (type === 'pop') navigator.vibrate(12);
+      if (type === 'success' || type === 'cash') navigator.vibrate([25, 40, 25]);
+      if (type === 'notification' || type === 'error') navigator.vibrate([50, 25, 50]);
+      if (type === 'orderAlert') navigator.vibrate([100, 50, 100, 50, 150]);
+    } catch {
+      // Ignore vibration errors
+    }
   }
 
   try {
-    const audio = new Audio(audioSrc);
-    audio.volume = 0.4;
-    audio.play().catch(() => {});
-  } catch (e) {
-    console.error("Audio error", e);
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+
+    if (type === 'orderAlert') {
+      // Loud Triple Chime Bell
+      [0, 0.2, 0.4].forEach((delay) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(987.77, now + delay); // B5
+        osc.frequency.exponentialRampToValueAtTime(1318.51, now + delay + 0.15); // E6
+        gain.gain.setValueAtTime(0.4, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.22);
+        osc.start(now + delay);
+        osc.stop(now + delay + 0.22);
+      });
+      return;
+    }
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (type === 'pop') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.exponentialRampToValueAtTime(200, now + 0.08);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      osc.start(now);
+      osc.stop(now + 0.08);
+    } else if (type === 'success' || type === 'cash') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(523.25, now); // C5
+      osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+      osc.frequency.setValueAtTime(783.99, now + 0.16); // G5
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      osc.start(now);
+      osc.stop(now + 0.3);
+    } else if (type === 'notification') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, now); // A5
+      osc.frequency.setValueAtTime(1174.66, now + 0.1); // D6
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc.start(now);
+      osc.stop(now + 0.25);
+    } else if (type === 'delivery') {
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.setValueAtTime(880, now + 0.12);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc.start(now);
+      osc.stop(now + 0.25);
+    } else if (type === 'error') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(300, now);
+      osc.frequency.setValueAtTime(180, now + 0.1);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+      osc.start(now);
+      osc.stop(now + 0.2);
+    }
+  } catch {
+    // Graceful fallback if Web Audio API is blocked
   }
 };
 

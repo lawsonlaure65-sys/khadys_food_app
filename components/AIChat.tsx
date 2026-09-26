@@ -9,7 +9,7 @@ const AIChat: React.FC = () => {
   const [messages, setMessages] = useState<{role: 'user' | 'assistant', text: string}[]>(() => {
     const saved = localStorage.getItem('khady_chat_history');
     return saved ? JSON.parse(saved) : [
-      { role: 'assistant', text: "Salam ! Je suis votre Assistant Khady, votre guide pour un festin inoubliable à Niamey. On commence par quoi ? 🥘" }
+      { role: 'assistant', text: "Salam ! Je suis Khady IA, votre guide pour un festin inoubliable à Niamey. On commence par quoi ? 🥘" }
     ];
   });
   const [inputText, setInputText] = useState('');
@@ -70,7 +70,7 @@ const AIChat: React.FC = () => {
                 <Sparkles size={18} strokeWidth={1.5} className="text-white animate-pulse" />
               </div>
               <div>
-                <h3 className="font-black text-sm uppercase tracking-tighter italic">Assistant Khady</h3>
+                <h3 className="font-black text-sm uppercase tracking-tighter italic">Khady IA</h3>
                 <div className="flex items-center gap-1.5">
                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
                    <span className="text-[8px] font-black text-brand-gold uppercase tracking-widest">En ligne</span>
