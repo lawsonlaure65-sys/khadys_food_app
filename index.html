@@ -8,67 +8,120 @@
     <meta name="theme-color" content="#3E2723" />
     
     <title>KHADY'S FOOD & EVENT</title>
+    <meta name="description" content="L'excellence de la gastronomie africaine à Niamey en un clic. Commandez vos plats préférés et services traiteur chez Khady's Food & Event." />
+    <meta property="og:title" content="KHADY'S FOOD & EVENT — Niamey" />
+    <meta property="og:description" content="L'excellence de la gastronomie africaine à Niamey en un clic." />
     
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
+    <!-- Auto-réparation du cache Chrome / Service Worker sur Vercel -->
+    <script>
+      (function () {
+        var CURRENT_SW_CACHE = 'khadys-food-v9-clean';
+
+        // 1. Purger immédiatement les anciens caches Service Worker qui causaient l'écran blanc sur Chrome
+        if ('caches' in window) {
+          caches.keys().then(function (names) {
+            names.forEach(function (name) {
+              if (name !== CURRENT_SW_CACHE) {
+                caches.delete(name);
+              }
+            });
+          }).catch(function () {});
+        }
+
+        // 2. Fonction globale de réparation 1-clic (nettoie uniquement le cache SW sans toucher aux plats/commandes)
+        window.__repairKhadysCache = function () {
+          var p1 = ('serviceWorker' in navigator)
+            ? navigator.serviceWorker.getRegistrations().then(function (regs) {
+                return Promise.all(regs.map(function (r) { return r.unregister(); }));
+              })
+            : Promise.resolve();
+          var p2 = ('caches' in window)
+            ? caches.keys().then(function (names) {
+                return Promise.all(names.map(function (n) { return caches.delete(n); }));
+              })
+            : Promise.resolve();
+          Promise.all([p1, p2]).finally(function () {
+            var url = new URL(window.location.href);
+            url.searchParams.set('v', String(Date.now()));
+            window.location.replace(url.toString());
+          });
+        };
+
+        // 3. Si un ancien script JS mis en cache échoue à charger sur Vercel, auto-réparer une fois
+        window.addEventListener('error', function (e) {
+          var target = e && e.target;
+          if (target && target.tagName === 'SCRIPT') {
+            if (!sessionStorage.getItem('__khadys_sw_repaired')) {
+              sessionStorage.setItem('__khadys_sw_repaired', '1');
+              window.__repairKhadysCache();
+            }
+          }
+        }, true);
+      })();
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Great+Vibes&display=swap" rel="stylesheet">
     <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Poppins', 'sans-serif'],
-              script: ['Great Vibes', 'cursive'],
-            },
-            colors: {
-              brand: {
-                brown: '#3E2723',
-                orange: '#FF6F00',
-                gold: '#FFD700',
-                cream: '#FFF8E1',
-                light: '#FAFAFA'
-              }
-            },
-            animation: {
-              'wave': 'wave 2.5s infinite',
-              'fade-in': 'fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
-              'slide-up': 'slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
-              'infinite-scroll': 'infiniteScroll 60s linear infinite',
-              'zoom-dezoom': 'zoomRespiration 12s ease-in-out infinite',
-              'pulse-gold': 'pulseGold 2s infinite',
-              'bounce-subtle': 'bounceSubtle 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            },
-            keyframes: {
-              wave: {
-                '0%, 100%': { transform: 'rotate(0deg)' },
-                '10%, 30%, 50%': { transform: 'rotate(14deg)' },
-                '20%, 40%, 60%': { transform: 'rotate(-8deg)' },
+      if (typeof tailwind !== 'undefined') {
+        tailwind.config = {
+          theme: {
+            extend: {
+              fontFamily: {
+                sans: ['Poppins', 'sans-serif'],
+                script: ['Great Vibes', 'cursive'],
               },
-              fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
-              slideUp: { '0%': { opacity: '0', transform: 'translateY(30px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
-              infiniteScroll: { 
-                '0%': { transform: 'translateX(0)' }, 
-                '100%': { transform: 'translateX(-50%)' } 
+              colors: {
+                brand: {
+                  brown: '#3E2723',
+                  orange: '#FF6F00',
+                  gold: '#FFD700',
+                  cream: '#FFF8E1',
+                  light: '#FAFAFA'
+                }
               },
-              zoomRespiration: {
-                '0%, 100%': { transform: 'scale(1)' },
-                '50%': { transform: 'scale(1.15)' },
+              animation: {
+                'wave': 'wave 2.5s infinite',
+                'fade-in': 'fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+                'slide-up': 'slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+                'infinite-scroll': 'infiniteScroll 60s linear infinite',
+                'zoom-dezoom': 'zoomRespiration 12s ease-in-out infinite',
+                'pulse-gold': 'pulseGold 2s infinite',
+                'bounce-subtle': 'bounceSubtle 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)',
               },
-              pulseGold: {
-                '0%, 100%': { boxShadow: '0 0 0 0 rgba(255, 215, 0, 0.6)' },
-                '70%': { boxShadow: '0 0 0 15px rgba(255, 215, 0, 0)' },
-              },
-              bounceSubtle: {
-                '0%': { transform: 'scale(1)' },
-                '30%': { transform: 'scale(1.3) translateY(-10px)' },
-                '100%': { transform: 'scale(1) translateY(0)' },
+              keyframes: {
+                wave: {
+                  '0%, 100%': { transform: 'rotate(0deg)' },
+                  '10%, 30%, 50%': { transform: 'rotate(14deg)' },
+                  '20%, 40%, 60%': { transform: 'rotate(-8deg)' },
+                },
+                fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+                slideUp: { '0%': { opacity: '0', transform: 'translateY(30px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+                infiniteScroll: { 
+                  '0%': { transform: 'translateX(0)' }, 
+                  '100%': { transform: 'translateX(-50%)' } 
+                },
+                zoomRespiration: {
+                  '0%, 100%': { transform: 'scale(1)' },
+                  '50%': { transform: 'scale(1.15)' },
+                },
+                pulseGold: {
+                  '0%, 100%': { boxShadow: '0 0 0 0 rgba(255, 215, 0, 0.6)' },
+                  '70%': { boxShadow: '0 0 0 15px rgba(255, 215, 0, 0)' },
+                },
+                bounceSubtle: {
+                  '0%': { transform: 'scale(1)' },
+                  '30%': { transform: 'scale(1.3) translateY(-10px)' },
+                  '100%': { transform: 'scale(1) translateY(0)' },
+                }
               }
             }
           }
-        }
+        };
       }
     </script>
     <style>
@@ -79,6 +132,8 @@
         overscroll-behavior-y: none;
         -webkit-tap-highlight-color: transparent;
         -webkit-touch-callout: none;
+        margin: 0;
+        font-family: 'Poppins', sans-serif;
       }
       .glass-card {
         background: rgba(255, 255, 255, 0.7);
@@ -101,7 +156,28 @@
     </style>
   </head>
   <body class="text-[#3E2723] antialiased">
-    <div id="root"></div>
+    <div id="root">
+      <!-- Écran d'accueil immédiat pendant l'ouverture sur Chrome/Mobile -->
+      <div id="khadys-boot-loader" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1A0F0D;color:#FFD700;padding:24px;text-align:center;">
+        <img src="/logo.png" alt="Khady's Food" style="width:76px;height:76px;border-radius:50%;border:3px solid #FFD700;object-fit:cover;margin-bottom:16px;box-shadow:0 10px 30px rgba(0,0,0,0.5);" onerror="this.style.display='none'" />
+        <div style="font-weight:900;font-size:18px;letter-spacing:1px;text-transform:uppercase;font-style:italic;">KHADY'S FOOD &amp; EVENT</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:6px;">Ouverture de votre festin à Niamey...</div>
+        <div id="khadys-boot-repair" style="display:none;margin-top:22px;">
+          <p style="font-size:11px;color:#FDE68A;max-width:280px;margin:0 auto 12px;">Le cache de votre navigateur Chrome bloque la nouvelle mise à jour.</p>
+          <button onclick="window.__repairKhadysCache && window.__repairKhadysCache()" style="background:#FF6F00;color:#fff;border:none;padding:12px 22px;border-radius:14px;font-weight:800;font-size:11px;text-transform:uppercase;cursor:pointer;box-shadow:0 6px 20px rgba(255,111,0,0.4);">
+            ⚡ Actualiser et Ouvrir l'application
+          </button>
+        </div>
+      </div>
+    </div>
+    <script>
+      setTimeout(function () {
+        var repairBtn = document.getElementById('khadys-boot-repair');
+        if (repairBtn && document.getElementById('khadys-boot-loader')) {
+          repairBtn.style.display = 'block';
+        }
+      }, 4000);
+    </script>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

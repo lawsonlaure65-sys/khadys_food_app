@@ -1,0 +1,43 @@
+{
+  "name": "KHADY'S FOOD & EVENT",
+  "short_name": "KHADY'S FOOD",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#3E2723",
+  "theme_color": "#3E2723",
+  "orientation": "portrait",
+  "description": "L'excellence de la gastronomie africaine à Niamey en un clic.",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
