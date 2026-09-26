@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
 import { CartItem, Order, PaymentMethod, UserProfile } from '../types';
-import { Trash2, ShoppingBag, ArrowRight, MapPin, Smartphone, ChevronLeft, ShieldCheck, Wallet, CreditCard, Banknote, Sparkles, Upload, CheckCircle2, FileText, Camera, AlertTriangle, Send, MessageSquare, Tag, Gift, Check, X, Share2, Copy, Link2, ExternalLink } from 'lucide-react';
+import { Trash2, ShoppingBag, ArrowRight, MapPin, Smartphone, ChevronLeft, ShieldCheck, Wallet, CreditCard, Banknote, Sparkles, Upload, CheckCircle2, FileText, Camera, AlertTriangle, Send, MessageSquare, Tag, Gift, Check, X, Share2, Copy, Link2, ExternalLink, Users, Plus, Minus, UserPlus } from 'lucide-react';
 import { PhoneInput } from './PhoneInput';
 import { playSound } from '../utils/audio';
 import { BILLO_INFO, RESTAURANT_INFO, DISTRICTS, DISCOUNT_PER_100_POINTS } from '../constants';
 import { getStoredRestaurantWhatsApp, buildKitchenOrderMessage, openWhatsApp } from '../utils/whatsapp';
 import { applyPromoCode, PromoValidationResult, getStoredPromoCodes } from '../utils/marketing';
-import { generateCartShareUrl, generateCartShareWhatsAppText } from '../utils/cartShare';
+import {
+  generateCartShareUrl,
+  generateCartShareWhatsAppText,
+  extractSharedCartFromInput,
+  mergeCartItems,
+  SharedCartMetadata
+} from '../utils/cartShare';
+import { ToastType } from './Toast';
 
 interface CartViewProps {
   cart: CartItem[];
@@ -15,17 +22,36 @@ interface CartViewProps {
   onClose: () => void;
   userProfile: UserProfile;
   onConsumePoints: (pts: number) => void;
+  sharedCartMeta?: SharedCartMetadata | null;
+  onClearSharedMeta?: () => void;
+  onShowToast?: (msg: string, type?: ToastType) => void;
 }
 
-export const CartView: React.FC<CartViewProps> = ({ cart, setCart, onOrderPlace, onClose, userProfile, onConsumePoints }) => {
+export const CartView: React.FC<CartViewProps> = ({
+  cart,
+  setCart,
+  onOrderPlace,
+  onClose,
+  userProfile,
+  onConsumePoints,
+  sharedCartMeta,
+  onClearSharedMeta,
+  onShowToast
+}) => {
   const [customer, setCustomer] = useState({ name: userProfile.name || '', phone: userProfile.phone || '', address: '', district: 'Grande Mosquée / Zongo' });
   const [payment, setPayment] = useState<PaymentMethod>('MYNITA');
   const [usePoints, setUsePoints] = useState(false);
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
 
-  // Share Cart Modal States
+  // Share & Group Order Modal States
   const [showShareModal, setShowShareModal] = useState(false);
+  const [shareModalTab, setShareModalTab] = useState<'share' | 'import'>('share');
   const [copiedShareLink, setCopiedShareLink] = useState(false);
+  const [groupHostName, setGroupHostName] = useState(sharedCartMeta?.hostName || userProfile.name || '');
+  const [groupNote, setGroupNote] = useState(sharedCartMeta?.groupNote || '');
+  const [groupSplitCount, setGroupSplitCount] = useState<number>(sharedCartMeta?.splitCount || 1);
+  const [importLinkInput, setImportLinkInput] = useState('');
+  const [importFeedback, setImportFeedback] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   // Promo Code State
   const [promoInput, setPromoInput] = useState('');
@@ -251,67 +277,226 @@ export const CartView: React.FC<CartViewProps> = ({ cart, setCart, onOrderPlace,
           </div>
         </div>
 
-        {cart.length > 0 && (
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => {
               playSound('pop');
+              setShareModalTab(cart.length > 0 ? 'share' : 'import');
               setShowShareModal(true);
             }}
             className="px-3.5 py-2.5 bg-brand-orange/10 hover:bg-brand-orange text-brand-orange hover:text-white rounded-2xl text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all active:scale-95 border border-brand-orange/20 shadow-sm shrink-0"
-            title="Partager mon panier avec un ami ou collègue"
+            title="Générer un lien partageable ou importer un panier de commande groupée"
           >
             <Share2 size={15} />
-            <span className="hidden sm:inline">Partager mon panier</span>
-            <span className="sm:hidden">Partager</span>
+            <span className="hidden sm:inline">{cart.length > 0 ? 'Commande Groupée & Lien' : 'Importer un Panier'}</span>
+            <span className="sm:hidden">{cart.length > 0 ? 'Partager' : 'Importer'}</span>
           </button>
-        )}
+        </div>
       </header>
 
-      {cart.length === 0 ? (
-        <div className="py-20 flex flex-col items-center justify-center opacity-20 grayscale">
-           <ShoppingBag size={80} className="mb-6 text-brand-brown" />
-           <p className="font-black uppercase text-[10px] tracking-widest text-brand-brown mb-8 italic">Votre panier est vide</p>
-           <button onClick={onClose} className="text-brand-orange font-black uppercase text-[10px] underline tracking-widest">Retour au menu</button>
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Share Cart Quick Action Card */}
-          <div className="bg-gradient-to-r from-amber-500/10 via-brand-gold/10 to-brand-orange/10 p-4 sm:p-5 rounded-[2.2rem] border-2 border-brand-gold/30 flex items-center justify-between gap-3 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-brand-orange text-white flex items-center justify-center shadow-md shrink-0">
-                <Share2 size={18} />
+      {/* Bannière Commande Groupée Reçue */}
+      {sharedCartMeta && cart.length > 0 && (
+        <div className="mb-6 bg-gradient-to-r from-[#1A0F0D] via-brand-brown to-[#2A1510] text-white p-5 rounded-[2.2rem] border-2 border-brand-gold/40 shadow-xl animate-fade-in">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-brand-gold text-brand-brown flex items-center justify-center shrink-0 shadow-md">
+                <Users size={20} />
               </div>
               <div>
-                <h4 className="font-black text-xs text-brand-brown uppercase italic">Partager ce festin 🎁</h4>
-                <p className="text-[9px] text-gray-600">Générez un lien pour pré-remplir le panier d'un autre utilisateur</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="bg-brand-gold/20 text-brand-gold border border-brand-gold/40 text-[8px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider">
+                    🤝 Commande Groupée Active
+                  </span>
+                  {sharedCartMeta.splitCount && sharedCartMeta.splitCount > 1 && (
+                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[8px] font-black uppercase px-2.5 py-0.5 rounded-full">
+                      👥 {sharedCartMeta.splitCount} participants (~{Math.ceil(subtotal / sharedCartMeta.splitCount).toLocaleString('fr-FR')} F / pers.)
+                    </span>
+                  )}
+                </div>
+                <h4 className="font-black text-xs sm:text-sm uppercase italic text-white mt-1">
+                  {sharedCartMeta.hostName
+                    ? `Panier partagé par ${sharedCartMeta.hostName}`
+                    : 'Panier partagé chargé avec succès'}
+                </h4>
+                {sharedCartMeta.groupNote && (
+                  <p className="text-[10px] text-amber-200/90 font-bold mt-0.5">
+                    📌 « {sharedCartMeta.groupNote} »
+                  </p>
+                )}
               </div>
             </div>
+            {onClearSharedMeta && (
+              <button
+                type="button"
+                onClick={onClearSharedMeta}
+                className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-white/60 hover:text-white transition-all"
+                title="Masquer"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-white/10">
             <button
               type="button"
               onClick={() => {
                 playSound('pop');
+                onClose();
+              }}
+              className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2.5 px-3.5 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
+            >
+              <Plus size={13} /> Ajouter mes plats au panier
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                playSound('pop');
+                setShareModalTab('share');
                 setShowShareModal(true);
               }}
-              className="bg-brand-brown hover:bg-brand-orange text-brand-gold hover:text-white px-4 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95 shrink-0 flex items-center gap-1.5"
+              className="flex-1 bg-brand-gold hover:bg-amber-400 text-brand-brown py-2.5 px-3.5 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md transition-all"
             >
-              <Link2 size={13} />
-              <span>Partager</span>
+              <Share2 size={13} /> Renvoyer le lien mis à jour
             </button>
           </div>
+        </div>
+      )}
 
-          {/* Cart items list */}
+      {cart.length === 0 ? (
+        <div className="py-16 flex flex-col items-center justify-center text-center">
+           <ShoppingBag size={72} className="mb-5 text-brand-brown/20" />
+           <p className="font-black uppercase text-[10px] tracking-widest text-brand-brown/40 mb-6 italic">Votre panier est vide</p>
+           <div className="flex flex-wrap items-center justify-center gap-3">
+             <button
+               type="button"
+               onClick={onClose}
+               className="px-6 py-3 bg-brand-orange text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all"
+             >
+               Explorer le menu
+             </button>
+             <button
+               type="button"
+               onClick={() => {
+                 playSound('pop');
+                 setShareModalTab('import');
+                 setShowShareModal(true);
+               }}
+               className="px-6 py-3 bg-brand-brown text-brand-gold rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all"
+             >
+               <Users size={14} /> Importer un lien de commande groupée
+             </button>
+           </div>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Commande Groupée & Partage du Panier Card */}
+          <div className="bg-gradient-to-r from-amber-500/10 via-brand-gold/15 to-brand-orange/10 p-4 sm:p-5 rounded-[2.2rem] border-2 border-brand-gold/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 shadow-sm">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-brand-orange text-white flex items-center justify-center shadow-md shrink-0">
+                <Users size={20} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-black text-xs text-brand-brown uppercase italic">Commande Groupée & Lien Partageable 🤝</h4>
+                </div>
+                <p className="text-[9px] text-gray-600 mt-0.5">
+                  Générez un lien pour partager ce panier, diviser la note ou fusionner les plats de vos collègues
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('pop');
+                  setShareModalTab('share');
+                  setShowShareModal(true);
+                }}
+                className="flex-1 sm:flex-initial bg-brand-brown hover:bg-brand-orange text-brand-gold hover:text-white px-4 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                <Link2 size={13} />
+                <span>Lien Partageable</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('pop');
+                  setShareModalTab('import');
+                  setShowShareModal(true);
+                }}
+                className="bg-white hover:bg-amber-50 text-brand-brown border border-brand-brown/15 px-3 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1"
+                title="Ajouter les plats d'un ami via son lien"
+              >
+                <UserPlus size={13} />
+                <span className="hidden sm:inline">Fusionner</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Cart items list with +/- quantity controls */}
           <div className="space-y-3">
              {cart.map((item, idx) => (
-               <div key={idx} className="bg-white p-5 rounded-[2.5rem] flex items-center gap-5 shadow-sm border border-brand-brown/5 transition-all hover:shadow-md">
-                  <div className="relative w-16 h-16 rounded-2xl overflow-hidden shadow-md">
+               <div key={idx} className="bg-white p-4 sm:p-5 rounded-[2.5rem] flex items-center gap-4 shadow-sm border border-brand-brown/5 transition-all hover:shadow-md">
+                  <div className="relative w-16 h-16 rounded-2xl overflow-hidden shadow-md shrink-0">
                      <img src={item.image} className="w-full h-full object-cover" alt={item.name} />
                   </div>
-                  <div className="flex-1">
-                     <h4 className="font-black text-[10px] text-brand-brown uppercase italic truncate mb-1">{item.name}</h4>
-                     <p className="text-[10px] font-black text-brand-orange bg-brand-orange/5 px-2 py-1 rounded-lg inline-block">{item.quantity} x {item.price} F</p>
+                  <div className="flex-1 min-w-0">
+                     <h4 className="font-black text-[10px] sm:text-xs text-brand-brown uppercase italic truncate mb-1">{item.name}</h4>
+                     <div className="flex flex-wrap items-center gap-2">
+                       <p className="text-[10px] font-black text-brand-orange bg-brand-orange/10 px-2.5 py-0.5 rounded-lg inline-block">
+                         {(item.price * item.quantity).toLocaleString('fr-FR')} F
+                       </p>
+                       <span className="text-[9px] text-gray-400 font-bold">
+                         ({item.price.toLocaleString('fr-FR')} F / unité)
+                       </span>
+                     </div>
+                     {item.instructions && (
+                       <p className="text-[9px] text-gray-500 italic truncate mt-1">Note : {item.instructions}</p>
+                     )}
                   </div>
-                  <button type="button" onClick={() => { playSound('pop'); setCart(cart.filter((_, i) => i !== idx)); }} className="p-3 text-red-400 transition-transform active:scale-90"><Trash2 size={20}/></button>
+                  <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-2xl shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playSound('pop');
+                        if (item.quantity <= 1) {
+                          setCart(cart.filter((_, i) => i !== idx));
+                        } else {
+                          setCart(cart.map((c, i) => (i === idx ? { ...c, quantity: c.quantity - 1 } : c)));
+                        }
+                      }}
+                      className="w-7 h-7 rounded-xl bg-white text-brand-brown flex items-center justify-center shadow-sm hover:bg-rose-50 hover:text-rose-600 active:scale-90 transition-all"
+                      title="Diminuer la quantité"
+                    >
+                      <Minus size={13} />
+                    </button>
+                    <span className="w-6 text-center font-black text-xs text-brand-brown">
+                      {item.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playSound('pop');
+                        setCart(cart.map((c, i) => (i === idx ? { ...c, quantity: c.quantity + 1 } : c)));
+                      }}
+                      className="w-7 h-7 rounded-xl bg-brand-orange text-white flex items-center justify-center shadow-sm hover:bg-amber-600 active:scale-90 transition-all"
+                      title="Augmenter la quantité"
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound('pop');
+                      setCart(cart.filter((_, i) => i !== idx));
+                    }}
+                    className="p-2.5 text-red-400 hover:text-red-600 transition-transform active:scale-90 shrink-0"
+                    title="Retirer du panier"
+                  >
+                    <Trash2 size={18}/>
+                  </button>
                </div>
              ))}
           </div>
@@ -726,15 +911,16 @@ export const CartView: React.FC<CartViewProps> = ({ cart, setCart, onOrderPlace,
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL PARTAGER MON PANIER : LIEN URL MAGIQUE & WHATSAPP                   */}
+      {/* MODAL COMMANDE GROUPÉE & LIEN PARTAGEABLE DU PANIER                       */}
       {/* ========================================================================= */}
       {showShareModal && (
-        <div className="fixed inset-0 z-[120] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-fade-in">
-          <div className="bg-[#1A0F0D] border-2 border-brand-gold/40 w-full max-w-lg rounded-[2.5rem] shadow-2xl p-6 sm:p-8 relative text-white">
+        <div className="fixed inset-0 z-[120] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-fade-in overflow-y-auto">
+          <div className="bg-[#1A0F0D] border-2 border-brand-gold/40 w-full max-w-lg rounded-[2.5rem] shadow-2xl p-6 sm:p-8 relative text-white my-auto max-h-[92vh] overflow-y-auto no-scrollbar">
             
             {/* Bouton Fermer */}
             <button 
-              onClick={() => { playSound('pop'); setShowShareModal(false); }}
+              type="button"
+              onClick={() => { playSound('pop'); setShowShareModal(false); setImportFeedback(null); }}
               className="absolute top-6 right-6 p-2 rounded-xl bg-white/5 hover:bg-white/15 text-white/60 hover:text-white transition-all"
               title="Fermer"
             >
@@ -742,117 +928,401 @@ export const CartView: React.FC<CartViewProps> = ({ cart, setCart, onOrderPlace,
             </button>
 
             {/* En-tête Modal */}
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-5">
               <div className="p-3 bg-brand-orange/20 text-brand-orange rounded-2xl border border-brand-orange/30">
-                <Share2 size={24} />
+                <Users size={24} />
               </div>
               <div>
                 <h3 className="text-lg sm:text-xl font-black italic uppercase text-brand-gold tracking-tight">
-                  Partager mon Panier
+                  Commande Groupée & Partage
                 </h3>
                 <p className="text-[10px] text-white/60">
-                  Transmettez votre sélection en 1 clic à vos amis ou proches
+                  Générez un lien de panier partageable ou fusionnez la sélection d'un ami
                 </p>
               </div>
             </div>
 
-            {/* Aperçu du Panier à partager */}
-            <div className="bg-white/5 p-4 rounded-2xl border border-white/10 mb-5 space-y-2">
-              <div className="flex justify-between items-center text-[10px] font-black uppercase text-brand-gold">
-                <span>{cart.length} plat{cart.length > 1 ? 's' : ''} inclus</span>
-                <span>Total : {subtotal.toLocaleString('fr-FR')} F CFA</span>
-              </div>
-              <div className="max-h-32 overflow-y-auto no-scrollbar space-y-1.5 pt-1">
-                {cart.map((item, i) => (
-                  <div key={i} className="flex justify-between items-center text-[10px] text-white/80 bg-black/30 p-2 rounded-xl border border-white/5">
-                    <span className="font-bold truncate pr-2">{item.quantity}x {item.name}</span>
-                    <span className="font-mono text-brand-orange shrink-0">{(item.price * item.quantity).toLocaleString('fr-FR')} F</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Champ Lien URL & Bouton Copier */}
-            <div className="space-y-2 mb-6">
-              <label className="text-[9px] font-black uppercase text-white/50 tracking-wider">
-                Lien magique de pré-remplissage du panier :
-              </label>
-              <div className="flex items-center gap-2">
-                <input 
-                  type="text" 
-                  readOnly
-                  value={generateCartShareUrl(cart)}
-                  className="w-full p-3.5 bg-black/50 border border-white/15 rounded-xl text-brand-gold font-mono text-xs outline-none select-all truncate"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const url = generateCartShareUrl(cart);
-                    navigator.clipboard.writeText(url);
-                    setCopiedShareLink(true);
-                    playSound('success');
-                    setTimeout(() => setCopiedShareLink(false), 3000);
-                  }}
-                  className={`px-4 py-3.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shrink-0 transition-all active:scale-95 shadow-md ${
-                    copiedShareLink 
-                      ? 'bg-emerald-600 text-white' 
-                      : 'bg-brand-gold hover:bg-yellow-400 text-brand-brown'
-                  }`}
-                  title="Copier le lien dans le presse-papier"
-                >
-                  {copiedShareLink ? <CheckCircle2 size={16} /> : <Copy size={16} />}
-                  <span>{copiedShareLink ? 'Copié !' : 'Copier'}</span>
-                </button>
-              </div>
-              {copiedShareLink && (
-                <p className="text-[10px] font-bold text-emerald-400 flex items-center gap-1 animate-fade-in">
-                  <CheckCircle2 size={12} /> Lien copié ! Vous pouvez l'envoyer par SMS, message ou réseau social.
-                </p>
-              )}
-            </div>
-
-            {/* Boutons d'Action Rapide : WhatsApp & Partage Système */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Onglets : Partager mon panier vs Importer/Fusionner un lien */}
+            <div className="grid grid-cols-2 gap-2 p-1.5 bg-black/40 rounded-2xl border border-white/10 mb-6">
               <button
                 type="button"
                 onClick={() => {
                   playSound('pop');
-                  const url = generateCartShareUrl(cart);
-                  const waText = generateCartShareWhatsAppText(cart, url);
-                  window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank');
+                  setShareModalTab('share');
                 }}
-                className="py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
+                className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${
+                  shareModalTab === 'share'
+                    ? 'bg-brand-gold text-brand-brown shadow-md'
+                    : 'text-white/60 hover:text-white'
+                }`}
               >
-                <MessageSquare size={16} />
-                <span>Partager via WhatsApp</span>
+                <Link2 size={14} />
+                <span>1. Générer le Lien</span>
               </button>
-
-              {typeof navigator !== 'undefined' && !!navigator.share && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    playSound('pop');
-                    const url = generateCartShareUrl(cart);
-                    try {
-                      await navigator.share({
-                        title: "Khady's Food & Event - Panier Partagé",
-                        text: `Voici ma commande gourmande Khady's Food (${cart.length} plats, ${subtotal.toLocaleString('fr-FR')} F CFA) :`,
-                        url: url
-                      });
-                    } catch (e) {}
-                  }}
-                  className="py-3.5 px-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 border border-white/15 active:scale-95 transition-all"
-                >
-                  <Share2 size={16} />
-                  <span>Autres Applis</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('pop');
+                  setShareModalTab('import');
+                }}
+                className={`py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${
+                  shareModalTab === 'import'
+                    ? 'bg-brand-orange text-white shadow-md'
+                    : 'text-white/60 hover:text-white'
+                }`}
+              >
+                <UserPlus size={14} />
+                <span>2. Fusionner un Lien</span>
+              </button>
             </div>
 
-            {/* Note d'information */}
-            <p className="text-[8px] text-center text-white/40 font-bold uppercase tracking-widest mt-6">
-              Quand votre destinataire clique sur le lien, son panier s'ouvre automatiquement avec tous ces plats !
-            </p>
+            {shareModalTab === 'share' ? (
+              <div className="space-y-5">
+                {/* Options de personnalisation de la Commande Groupée */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-brand-gold/80 tracking-wider block mb-1">
+                      Votre Nom / Organisateur
+                    </label>
+                    <input
+                      type="text"
+                      value={groupHostName}
+                      onChange={(e) => setGroupHostName(e.target.value)}
+                      placeholder="Ex: Abdou, Équipe Bureau..."
+                      className="w-full p-3 bg-white/5 border border-white/15 rounded-xl text-xs text-white font-bold outline-none focus:border-brand-gold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-brand-gold/80 tracking-wider block mb-1">
+                      Note du Groupe (Optionnel)
+                    </label>
+                    <input
+                      type="text"
+                      value={groupNote}
+                      onChange={(e) => setGroupNote(e.target.value)}
+                      placeholder="Ex: Déjeuner Midi, Dîner Famille..."
+                      className="w-full p-3 bg-white/5 border border-white/15 rounded-xl text-xs text-white font-bold outline-none focus:border-brand-gold"
+                    />
+                  </div>
+                </div>
+
+                {/* Calculateur de partage des frais (Split Bill) */}
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-white/80 flex items-center gap-1.5">
+                      <Users size={14} className="text-brand-gold" />
+                      Diviser la note entre participants :
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {[1, 2, 3, 4, 5, 6].map((num) => (
+                        <button
+                          key={num}
+                          type="button"
+                          onClick={() => {
+                            playSound('pop');
+                            setGroupSplitCount(num);
+                          }}
+                          className={`w-7 h-7 rounded-lg text-[10px] font-black transition-all ${
+                            groupSplitCount === num
+                              ? 'bg-brand-gold text-brand-brown shadow-md scale-105'
+                              : 'bg-black/40 text-white/60 hover:text-white border border-white/10'
+                          }`}
+                        >
+                          {num}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {groupSplitCount > 1 && (
+                    <div className="bg-emerald-500/15 border border-emerald-500/30 p-3 rounded-xl flex items-center justify-between text-xs">
+                      <span className="text-emerald-200 font-bold text-[10px] uppercase">
+                        Part par personne ({groupSplitCount} pers.) :
+                      </span>
+                      <span className="font-black text-emerald-400 font-mono text-sm">
+                        ~{Math.ceil(subtotal / groupSplitCount).toLocaleString('fr-FR')} F CFA / pers.
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Aperçu du Panier à partager */}
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/10 space-y-2">
+                  <div className="flex justify-between items-center text-[10px] font-black uppercase text-brand-gold">
+                    <span>
+                      {cart.reduce((s, i) => s + i.quantity, 0)} plat{cart.reduce((s, i) => s + i.quantity, 0) > 1 ? 's' : ''} dans le panier
+                    </span>
+                    <span>Total : {subtotal.toLocaleString('fr-FR')} F CFA</span>
+                  </div>
+                  <div className="max-h-28 overflow-y-auto no-scrollbar space-y-1.5 pt-1">
+                    {cart.map((item, i) => (
+                      <div key={i} className="flex justify-between items-center text-[10px] text-white/80 bg-black/30 p-2 rounded-xl border border-white/5">
+                        <span className="font-bold truncate pr-2">{item.quantity}x {item.name}</span>
+                        <span className="font-mono text-brand-orange shrink-0">{(item.price * item.quantity).toLocaleString('fr-FR')} F</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Champ Lien URL & Bouton Copier */}
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase text-white/50 tracking-wider">
+                    Lien partageable du panier actuel :
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="text" 
+                      readOnly
+                      value={generateCartShareUrl(cart, {
+                        hostName: groupHostName,
+                        groupNote,
+                        splitCount: groupSplitCount
+                      })}
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                      className="w-full p-3.5 bg-black/50 border border-white/15 rounded-xl text-brand-gold font-mono text-xs outline-none select-all truncate"
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const url = generateCartShareUrl(cart, {
+                          hostName: groupHostName,
+                          groupNote,
+                          splitCount: groupSplitCount
+                        });
+                        try {
+                          await navigator.clipboard.writeText(url);
+                        } catch {
+                          const input = document.createElement('input');
+                          input.value = url;
+                          document.body.appendChild(input);
+                          input.select();
+                          document.execCommand('copy');
+                          document.body.removeChild(input);
+                        }
+                        setCopiedShareLink(true);
+                        playSound('success');
+                        if (onShowToast) {
+                          onShowToast('🔗 Lien du panier groupé copié dans le presse-papier !', 'success');
+                        }
+                        setTimeout(() => setCopiedShareLink(false), 3000);
+                      }}
+                      className={`px-4 py-3.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shrink-0 transition-all active:scale-95 shadow-md ${
+                        copiedShareLink 
+                          ? 'bg-emerald-600 text-white' 
+                          : 'bg-brand-gold hover:bg-yellow-400 text-brand-brown'
+                      }`}
+                      title="Copier le lien dans le presse-papier"
+                    >
+                      {copiedShareLink ? <CheckCircle2 size={16} /> : <Copy size={16} />}
+                      <span>{copiedShareLink ? 'Copié !' : 'Copier'}</span>
+                    </button>
+                  </div>
+                  {copiedShareLink && (
+                    <p className="text-[10px] font-bold text-emerald-400 flex items-center gap-1 animate-fade-in">
+                      <CheckCircle2 size={12} /> Lien copié ! Envoyez-le à vos collègues ou proches pour qu'ils voient ou complètent le panier.
+                    </p>
+                  )}
+                </div>
+
+                {/* Boutons d'Action Rapide : WhatsApp & Partage Système */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound('pop');
+                      const meta: SharedCartMetadata = {
+                        hostName: groupHostName,
+                        groupNote,
+                        splitCount: groupSplitCount
+                      };
+                      const url = generateCartShareUrl(cart, meta);
+                      const waText = generateCartShareWhatsAppText(cart, url, meta);
+                      window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank');
+                    }}
+                    className="py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
+                  >
+                    <MessageSquare size={16} />
+                    <span>Partager sur WhatsApp</span>
+                  </button>
+
+                  {typeof navigator !== 'undefined' && !!navigator.share ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        playSound('pop');
+                        const meta: SharedCartMetadata = {
+                          hostName: groupHostName,
+                          groupNote,
+                          splitCount: groupSplitCount
+                        };
+                        const url = generateCartShareUrl(cart, meta);
+                        try {
+                          await navigator.share({
+                            title: groupHostName
+                              ? `Commande Groupée Khady's Food de ${groupHostName}`
+                              : "Khady's Food & Event - Panier Partagé",
+                            text: `Rejoins notre commande groupée Khady's Food (${cart.reduce((s, i) => s + i.quantity, 0)} plats, ${subtotal.toLocaleString('fr-FR')} F CFA) :`,
+                            url
+                          });
+                        } catch (e) {}
+                      }}
+                      className="py-3.5 px-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 border border-white/15 active:scale-95 transition-all"
+                    >
+                      <Share2 size={16} />
+                      <span>Autres Applications</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playSound('pop');
+                        setShareModalTab('import');
+                      }}
+                      className="py-3.5 px-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 border border-white/15 active:scale-95 transition-all"
+                    >
+                      <UserPlus size={16} />
+                      <span>Fusionner le panier d'un ami</span>
+                    </button>
+                  )}
+                </div>
+
+                <p className="text-[8px] text-center text-white/40 font-bold uppercase tracking-widest pt-2">
+                  Astuce : Vos amis peuvent ouvrir ce lien, ajouter leurs propres plats, puis vous renvoyer leur nouveau lien !
+                </p>
+              </div>
+            ) : (
+              /* ONGLET 2 : FUSIONNER / IMPORTER LE PANIER D'UN PARTICIPANT */
+              <div className="space-y-5">
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/10 space-y-2">
+                  <h4 className="font-black text-xs uppercase italic text-brand-gold flex items-center gap-2">
+                    <UserPlus size={15} /> Combiner plusieurs paniers en une seule commande
+                  </h4>
+                  <p className="text-[10px] text-white/70 leading-relaxed">
+                    Un collègue ou un proche vous a envoyé son lien de panier Khady's Food ? Collez son lien (ou son message WhatsApp contenant le lien) ci-dessous pour ajouter automatiquement ses plats à votre panier !
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[9px] font-black uppercase text-white/50 tracking-wider">
+                      Lien ou message reçu :
+                    </label>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          if (text) {
+                            setImportLinkInput(text.trim());
+                            setImportFeedback(null);
+                            playSound('pop');
+                          }
+                        } catch {
+                          // Ignore clipboard read error
+                        }
+                      }}
+                      className="px-2.5 py-1 bg-brand-gold/20 hover:bg-brand-gold/30 text-brand-gold rounded-lg text-[8px] font-black uppercase border border-brand-gold/30"
+                    >
+                      📋 Coller depuis le presse-papier
+                    </button>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={importLinkInput}
+                    onChange={(e) => {
+                      setImportLinkInput(e.target.value);
+                      setImportFeedback(null);
+                    }}
+                    placeholder="Collez ici le lien https://...?shared_cart=... envoyé par votre ami"
+                    className="w-full p-3.5 bg-black/50 border border-white/15 rounded-xl text-white font-mono text-xs outline-none focus:border-brand-gold resize-none"
+                  />
+                </div>
+
+                {importFeedback && (
+                  <div
+                    className={`p-3.5 rounded-xl border text-[10px] font-bold flex items-center gap-2 ${
+                      importFeedback.type === 'success'
+                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                        : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+                    }`}
+                  >
+                    {importFeedback.type === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                    <span>{importFeedback.text}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    disabled={!importLinkInput.trim()}
+                    onClick={() => {
+                      const decoded = extractSharedCartFromInput(importLinkInput);
+                      if (!decoded || decoded.items.length === 0) {
+                        playSound('error');
+                        setImportFeedback({
+                          text: 'Lien invalide ou aucun plat détecté. Vérifiez que vous avez copié le lien complet contenant ?shared_cart=...',
+                          type: 'error'
+                        });
+                        return;
+                      }
+                      const merged = mergeCartItems(cart, decoded.items);
+                      setCart(merged);
+                      if (decoded.metadata?.hostName) setGroupHostName(decoded.metadata.hostName);
+                      if (decoded.metadata?.groupNote) setGroupNote(decoded.metadata.groupNote);
+                      if (decoded.metadata?.splitCount) setGroupSplitCount(decoded.metadata.splitCount);
+                      playSound('cash');
+                      const addedCount = decoded.items.reduce((s, i) => s + i.quantity, 0);
+                      setImportFeedback({
+                        text: `✅ ${addedCount} plat(s) fusionné(s) avec succès dans votre panier groupé !`,
+                        type: 'success'
+                      });
+                      setImportLinkInput('');
+                      if (onShowToast) {
+                        onShowToast(`🤝 ${addedCount} plat(s) ajouté(s) au panier groupé !`, 'success');
+                      }
+                    }}
+                    className="py-3.5 px-4 bg-brand-orange hover:bg-amber-600 disabled:opacity-40 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
+                  >
+                    <UserPlus size={16} />
+                    <span>Fusionner avec mon panier</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!importLinkInput.trim()}
+                    onClick={() => {
+                      const decoded = extractSharedCartFromInput(importLinkInput);
+                      if (!decoded || decoded.items.length === 0) {
+                        playSound('error');
+                        setImportFeedback({
+                          text: 'Lien invalide ou aucun plat détecté.',
+                          type: 'error'
+                        });
+                        return;
+                      }
+                      setCart(decoded.items);
+                      if (decoded.metadata?.hostName) setGroupHostName(decoded.metadata.hostName);
+                      if (decoded.metadata?.groupNote) setGroupNote(decoded.metadata.groupNote);
+                      if (decoded.metadata?.splitCount) setGroupSplitCount(decoded.metadata.splitCount);
+                      playSound('cash');
+                      const addedCount = decoded.items.reduce((s, i) => s + i.quantity, 0);
+                      setImportFeedback({
+                        text: `✅ Panier remplacé avec succès (${addedCount} plat(s) chargé(s)) !`,
+                        type: 'success'
+                      });
+                      setImportLinkInput('');
+                      if (onShowToast) {
+                        onShowToast(`🎁 Panier remplacé (${addedCount} plat(s)) !`, 'success');
+                      }
+                    }}
+                    className="py-3.5 px-4 bg-white/10 hover:bg-white/20 disabled:opacity-40 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 border border-white/15 active:scale-95 transition-all"
+                  >
+                    <ShoppingBag size={16} />
+                    <span>Remplacer mon panier</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
           </div>
         </div>

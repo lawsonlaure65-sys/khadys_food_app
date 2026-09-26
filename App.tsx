@@ -45,11 +45,12 @@ import {
 } from './utils/offlineDB';
 
 import { getStoredBanner, AnnouncementBanner } from './utils/marketing';
-import { decodeSharedCart } from './utils/cartShare';
+import { decodeSharedCartWithMeta, mergeCartItems, SharedCartMetadata } from './utils/cartShare';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.HOME);
   const [marketingBanner, setMarketingBanner] = useState<AnnouncementBanner>(() => getStoredBanner());
+  const [sharedCartMeta, setSharedCartMeta] = useState<SharedCartMetadata | null>(null);
   
   // Persistent items (menu dishes) initialization with multi-tier storage fallback
   const [items, setItems] = useState<MenuItem[]>(() => {
@@ -222,15 +223,24 @@ const App: React.FC = () => {
         const urlParams = new URLSearchParams(window.location.search);
         const sharedCartData = urlParams.get('shared_cart') || urlParams.get('cart');
         if (sharedCartData) {
-          const decodedItems = decodeSharedCart(sharedCartData);
-          if (decodedItems && decodedItems.length > 0) {
-            setCart(decodedItems);
-            await saveCartToIDB(decodedItems);
+          const decoded = decodeSharedCartWithMeta(sharedCartData);
+          if (decoded && decoded.items.length > 0) {
+            const cachedCart = await getCartFromIDB();
+            const mergedItems =
+              cachedCart && cachedCart.length > 0
+                ? mergeCartItems(cachedCart, decoded.items)
+                : decoded.items;
+
+            setCart(mergedItems);
+            setSharedCartMeta(decoded.metadata || {});
+            await saveCartToIDB(mergedItems);
             setCurrentPage(Page.CART);
             hasLoadedSharedCart = true;
             playSound('cash');
+            const totalUnits = decoded.items.reduce((sum, i) => sum + i.quantity, 0);
+            const hostText = decoded.metadata?.hostName ? ` de ${decoded.metadata.hostName}` : '';
             setToast({
-              message: `🎁 Panier partagé chargé avec succès (${decodedItems.length} plat${decodedItems.length > 1 ? 's' : ''}) !`,
+              message: `🤝 Panier groupé${hostText} chargé avec succès (${totalUnits} plat${totalUnits > 1 ? 's' : ''}) !`,
               type: 'success'
             });
             // Nettoyer l'URL proprement sans recharger la page
@@ -1028,6 +1038,9 @@ const App: React.FC = () => {
             onClose={() => setCurrentPage(Page.MENU)} 
             userProfile={userProfile}
             onConsumePoints={(pts) => setUserProfile(prev => ({ ...prev, points: Math.max(0, prev.points - pts) }))}
+            sharedCartMeta={sharedCartMeta}
+            onClearSharedMeta={() => setSharedCartMeta(null)}
+            onShowToast={showToast}
           />
         </div>;
 
