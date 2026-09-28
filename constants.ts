@@ -28,7 +28,7 @@ export const RESTAURANT_INFO = {
   whatsapp: "+227 74 44 16 21",
   whatsappClean: "22774441621",
   whatsappDirectUrl: "https://wa.me/22774441621",
-  whatsappCatalogUrl: "https://wa.me/c/74441621",
+  whatsappCatalogUrl: "https://wa.me/c/22774441621",
   directLine: "+227 96 05 23 10",
   directLineClean: "22796052310",
   depositNumbers: {

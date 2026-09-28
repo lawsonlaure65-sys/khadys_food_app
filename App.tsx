@@ -30,6 +30,7 @@ import ReviewsSection from './components/ReviewsSection';
 import PromotionCalendar from './components/PromotionCalendar';
 import FlashOffer from './components/FlashOffer';
 import { MenuDuJourTrio } from './components/MenuDuJourTrio';
+import { HomeSpecialSections } from './components/HomeSpecialSections';
 import { Page, MenuItem, Order, Review, CartItem, UserProfile, BlogArticle, FaqItem } from './types';
 import { MENU_ITEMS, REVIEWS, LOGO_URL, POINTS_PER_1000, RESTAURANT_INFO } from './constants';
 import { playSound } from './utils/audio';
@@ -754,7 +755,7 @@ const App: React.FC = () => {
                     <span>Discuter</span>
                   </a>
                   <a
-                    href={RESTAURANT_INFO.whatsappCatalogUrl || "https://wa.me/c/74441621"}
+                    href={RESTAURANT_INFO.whatsappCatalogUrl || "https://wa.me/c/22774441621"}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => playSound('pop')}
@@ -903,6 +904,23 @@ const App: React.FC = () => {
               />
             </div>
 
+            {/* Sections Spéciales : Plats Signature de Khady & Formules Déjeuner Complet du Midi */}
+            <div className="px-4 sm:px-6">
+              <HomeSpecialSections
+                items={items}
+                onSelectItem={(item) => {
+                  setSelectedItem(item);
+                  setIsItemModalOpen(true);
+                  playSound('pop');
+                }}
+                onAddToCart={handleAddToCart}
+                onNavigateToMenu={() => {
+                  setActiveMenuSection('CARTE');
+                  setCurrentPage(Page.MENU);
+                }}
+              />
+            </div>
+
             {/* Interactive Weekly Promotion Calendar Component */}
             <div className="px-4 sm:px-6">
               <PromotionCalendar 
@@ -980,7 +998,13 @@ const App: React.FC = () => {
             </div>
 
             <div className="px-4 sm:px-6">
-              <ReviewsSection reviews={reviews} />
+              <ReviewsSection
+                reviews={reviews}
+                onAddReview={(newRev) => {
+                  setReviews((prev) => [newRev, ...prev]);
+                  showToast('Merci ! Votre avis gourmand a été publié ✨', 'success');
+                }}
+              />
             </div>
           </div>
         );
