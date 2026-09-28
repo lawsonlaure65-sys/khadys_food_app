@@ -136,43 +136,43 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
   };
 
   return (
-    <section className="mb-10 w-full" id="section-menu-du-jour-trio">
-      <div className="bg-gradient-to-br from-[#1C0D09] via-[#2A130D] to-[#120704] rounded-[2.5rem] p-5 sm:p-7 border-2 border-brand-gold/40 shadow-2xl relative overflow-hidden">
+    <section className="mb-10 w-full min-w-0 max-w-full overflow-hidden" id="section-menu-du-jour-trio">
+      <div className="bg-gradient-to-br from-[#1C0D09] via-[#2A130D] to-[#120704] rounded-[2rem] sm:rounded-[2.5rem] p-4 sm:p-7 border-2 border-brand-gold/40 shadow-2xl relative overflow-hidden w-full min-w-0">
         {/* Glow ambient de fond */}
         <div className="absolute -top-24 -right-24 w-72 h-72 bg-brand-orange/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-brand-gold/15 rounded-full blur-3xl pointer-events-none" />
 
         {/* En-tête du Plat du Jour */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 mb-5 border-b border-brand-gold/20 relative z-10">
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="bg-brand-orange text-white text-[9px] font-black uppercase px-3 py-1 rounded-full shadow-lg flex items-center gap-1.5 animate-pulse">
-                <Sun size={12} className="animate-spin-slow" /> Plat du Jour
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 sm:pb-5 mb-4 sm:mb-5 border-b border-brand-gold/20 relative z-10 min-w-0">
+          <div className="space-y-1.5 min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <span className="bg-brand-orange text-white text-[8px] sm:text-[9px] font-black uppercase px-2.5 sm:px-3 py-1 rounded-full shadow-lg flex items-center gap-1 animate-pulse">
+                <Sun size={11} className="animate-spin-slow shrink-0" /> Plat du Jour
               </span>
-              <span className="bg-brand-gold/20 text-brand-gold text-[9px] font-black uppercase px-3 py-1 rounded-full border border-brand-gold/30 flex items-center gap-1">
-                👑 Sélection Officielle du Jour
+              <span className="bg-brand-gold/20 text-brand-gold text-[8px] sm:text-[9px] font-black uppercase px-2.5 sm:px-3 py-1 rounded-full border border-brand-gold/30 flex items-center gap-1">
+                👑 Sélection Officielle
               </span>
-              <span className="text-[10px] text-white/70 font-mono font-bold bg-white/5 px-2.5 py-0.5 rounded-lg border border-white/10">
+              <span className="text-[9px] sm:text-[10px] text-white/70 font-mono font-bold bg-white/5 px-2 py-0.5 rounded-lg border border-white/10">
                 {menuDuJour.targetDayLabel || (menuDuJour.publicationTiming === 'TONIGHT_FOR_TOMORROW' ? 'Demain Midi' : "Aujourd'hui Midi")}
               </span>
             </div>
 
-            <h3 className="text-xl sm:text-2xl font-black italic uppercase text-white tracking-wide">
+            <h3 className="text-lg sm:text-2xl font-black italic uppercase text-white tracking-wide break-words">
               {rawPrimaryDish.dishName}
             </h3>
-            <p className="text-xs text-white/75 font-medium max-w-xl">
+            <p className="text-[11px] sm:text-xs text-white/75 font-medium max-w-xl">
               {rawPrimaryDish.tagline || 'Préparé frais chaque matin par la Cheffe Khady avec des ingrédients sélectionnés.'}
             </p>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto bg-black/50 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-brand-gold/30 text-[10px] font-bold text-brand-gold">
-            <Gift size={14} className="text-brand-orange animate-bounce" />
+          <div className="flex items-center gap-2 self-start sm:self-auto bg-black/50 backdrop-blur-md px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl border border-brand-gold/30 text-[9px] sm:text-[10px] font-bold text-brand-gold shrink-0">
+            <Gift size={13} className="text-brand-orange animate-bounce shrink-0" />
             <span>Cuisiné Frais du Jour</span>
           </div>
         </div>
 
         {/* Plat Cuisiné du Jour (1 seul plat publié par date, hors Attiéké/Doukounou) */}
-        <div className="grid grid-cols-1 gap-4 sm:gap-5 relative z-10">
+        <div className="grid grid-cols-1 gap-4 sm:gap-5 relative z-10 min-w-0">
           {dishesList.map((dish, index) => {
             const effectivePrice = dish.promoPrice || dish.price;
             const hasPromo = dish.promoPrice && dish.promoPrice < dish.price;
@@ -184,7 +184,7 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
                 whileHover={{ y: -4, scale: 1.01 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => handleDishClick(dish, index)}
-                className={`rounded-[2rem] p-4 border transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden backdrop-blur-md ${
+                className={`rounded-[1.6rem] sm:rounded-[2rem] p-3.5 sm:p-4 border transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden backdrop-blur-md min-w-0 ${
                   isFirstDish 
                     ? 'bg-gradient-to-b from-[#2A140E]/90 to-[#1A0C08]/90 border-brand-orange/50 shadow-xl shadow-brand-orange/10 hover:border-brand-orange' 
                     : 'bg-black/45 border-brand-gold/25 hover:border-brand-gold shadow-lg hover:bg-black/60'
@@ -195,7 +195,7 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
                   index === 0 ? 'bg-brand-orange' : index === 1 ? 'bg-amber-500' : 'bg-emerald-500'
                 }`} />
 
-                <div className="space-y-3">
+                <div className="space-y-3 min-w-0">
                   {/* Photo avec Badges */}
                   <div className="relative h-36 sm:h-40 w-full rounded-2xl overflow-hidden border border-white/10 bg-black/40">
                     <img
@@ -207,7 +207,7 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
 
                     {/* Emplacement Badge */}
-                    <div className={`absolute top-2 left-2 text-[9px] font-black uppercase px-2.5 py-1 rounded-full shadow-md backdrop-blur-md ${
+                    <div className={`absolute top-2 left-2 max-w-[calc(100%-3rem)] truncate text-[8px] sm:text-[9px] font-black uppercase px-2.5 py-1 rounded-full shadow-md backdrop-blur-md ${
                       dish.badgeColor || (index === 0 ? 'bg-brand-orange text-white' : index === 1 ? 'bg-amber-600 text-white' : 'bg-emerald-600 text-white')
                     }`}>
                       {dish.badgeLabel || (index === 0 ? '🍲 Plat Cuisiné du Jour' : index === 1 ? '🌽 Doukounou Quotidien' : '🐟 Attiéké Royal')}
@@ -227,7 +227,7 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
                   </div>
 
                   {/* Titre & Descriptions */}
-                  <div>
+                  <div className="min-w-0">
                     <h4 className="text-sm sm:text-base font-black italic uppercase text-white leading-snug group-hover:text-brand-gold transition-colors line-clamp-1">
                       {dish.dishName}
                     </h4>
@@ -243,7 +243,7 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
                     </p>
 
                     {dish.accompaniments && (
-                      <div className="mt-2 p-2 bg-white/5 rounded-xl border border-white/10 text-[9px] text-brand-gold font-bold flex items-center gap-1.5">
+                      <div className="mt-2 p-2 bg-white/5 rounded-xl border border-white/10 text-[9px] text-brand-gold font-bold flex items-center gap-1.5 min-w-0">
                         <Gift size={12} className="text-brand-orange shrink-0" />
                         <span className="truncate">Inclus : {dish.accompaniments}</span>
                       </div>
@@ -252,24 +252,24 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
                 </div>
 
                 {/* Pied de Carte : Prix & Boutons d'Action */}
-                <div className="pt-3 mt-4 border-t border-white/10 flex items-center justify-between gap-2">
-                  <div>
+                <div className="pt-3 mt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 min-w-0">
+                  <div className="min-w-0">
                     {hasPromo && (
                       <span className="text-[9px] text-white/45 line-through block font-mono">
                         {dish.price.toLocaleString('fr-FR')} F
                       </span>
                     )}
-                    <span className="text-sm sm:text-base font-black text-brand-orange font-mono">
+                    <span className="text-xs sm:text-base font-black text-brand-orange font-mono truncate block">
                       {effectivePrice.toLocaleString('fr-FR')} F CFA
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     {/* Bouton WhatsApp direct */}
                     <button
                       type="button"
                       onClick={(e) => handleWhatsAppOrder(e, dish)}
-                      className="w-8 h-8 rounded-xl bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 flex items-center justify-center active:scale-90 transition-all"
+                      className="w-8 h-8 rounded-xl bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 flex items-center justify-center active:scale-90 transition-all shrink-0"
                       title="Commander sur WhatsApp"
                     >
                       <MessageSquare size={14} />
@@ -278,7 +278,7 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
                     {/* Bouton Voir / Choisir */}
                     <button
                       type="button"
-                      className="bg-brand-orange hover:bg-orange-600 text-white px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider shadow-md active:scale-95 transition-all flex items-center gap-1 group-hover:bg-brand-gold group-hover:text-brand-brown"
+                      className="bg-brand-orange hover:bg-orange-600 text-white px-2.5 sm:px-3 py-2 rounded-xl text-[8px] sm:text-[9px] font-black uppercase tracking-wider shadow-md active:scale-95 transition-all flex items-center gap-1 group-hover:bg-brand-gold group-hover:text-brand-brown shrink-0"
                     >
                       <span>Commander</span>
                       <ArrowRight size={11} />

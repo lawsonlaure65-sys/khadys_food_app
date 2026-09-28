@@ -63,26 +63,26 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationProps> = ({ cart
   };
 
   return (
-    <div className="animate-fade-in p-4 sm:p-6 pb-36 max-w-2xl mx-auto space-y-8">
+    <div className="animate-fade-in p-4 sm:p-6 pb-36 max-w-2xl w-full min-w-0 mx-auto space-y-6 sm:space-y-8 overflow-x-hidden">
       {/* Header */}
-      <header className="flex justify-between items-center">
-        <div>
-          <span className="text-[9px] font-black uppercase text-green-600 tracking-[0.3em] flex items-center gap-1.5 mb-1">
-            <Zap size={14} className="animate-pulse text-green-500" /> Commande WhatsApp Directe
+      <header className="flex justify-between items-center gap-3">
+        <div className="min-w-0">
+          <span className="text-[9px] font-black uppercase text-green-600 tracking-[0.25em] sm:tracking-[0.3em] flex items-center gap-1.5 mb-1">
+            <Zap size={14} className="animate-pulse text-green-500 shrink-0" /> Commande WhatsApp Directe
           </span>
-          <h2 className="text-3xl font-black italic uppercase text-brand-brown leading-none">
+          <h2 className="text-2xl sm:text-3xl font-black italic uppercase text-brand-brown leading-none">
             COMMANDE <span className="text-green-600">WHATSAPP</span>
           </h2>
         </div>
-        <div className="w-12 h-12 bg-green-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/20">
+        <div className="w-12 h-12 bg-green-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/20 shrink-0">
           <MessageSquare size={24} />
         </div>
       </header>
 
       {/* Official Contact Info Box */}
-      <div className="bg-gradient-to-r from-[#1A0F0D] to-[#2B1814] text-white p-6 rounded-[2.5rem] border-2 border-brand-gold/30 shadow-xl space-y-4">
+      <div className="bg-gradient-to-r from-[#1A0F0D] to-[#2B1814] text-white p-5 sm:p-6 rounded-[2.2rem] sm:rounded-[2.5rem] border-2 border-brand-gold/30 shadow-xl space-y-4">
         <h3 className="text-brand-gold font-black uppercase italic text-xs tracking-widest flex items-center gap-2">
-          <ShieldCheck size={18} /> Contacts Officiels Khady's & Billo Express
+          <ShieldCheck size={18} className="shrink-0" /> Contacts Officiels Khady's & Billo Express
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[10px]">
           <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
@@ -101,23 +101,23 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationProps> = ({ cart
       </div>
 
       {/* Bot Automation Card */}
-      <div className="bg-[#0B141A] text-white p-8 rounded-[3.5rem] shadow-2xl border-4 border-green-500/20 relative overflow-hidden">
-        <div className="flex items-center gap-4 mb-6 pb-6 border-b border-white/10">
-          <div className="w-12 h-12 bg-green-500 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg">
+      <div className="bg-[#0B141A] text-white p-5 sm:p-8 rounded-[2.5rem] sm:rounded-[3.5rem] shadow-2xl border-4 border-green-500/20 relative overflow-hidden">
+        <div className="flex items-center gap-3 sm:gap-4 mb-6 pb-5 sm:pb-6 border-b border-white/10">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 bg-green-500 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg shrink-0">
             K
           </div>
-          <div>
-            <h3 className="font-black text-sm italic uppercase text-white flex items-center gap-2">
-              Khady's WhatsApp Official <CheckCircle2 size={16} className="text-green-400" />
+          <div className="min-w-0">
+            <h3 className="font-black text-xs sm:text-sm italic uppercase text-white flex items-center gap-2 truncate">
+              Khady's WhatsApp Official <CheckCircle2 size={16} className="text-green-400 shrink-0" />
             </h3>
             <span className="text-[9px] font-bold text-green-400 uppercase tracking-widest flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> {RESTAURANT_INFO.whatsapp}
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse shrink-0"></span> {RESTAURANT_INFO.whatsapp}
             </span>
           </div>
         </div>
 
         {/* Live Message Preview */}
-        <div className="bg-[#121B22] p-6 rounded-3xl border border-white/5 font-mono text-[11px] leading-relaxed text-green-200 whitespace-pre-line mb-6">
+        <div className="bg-[#121B22] p-4 sm:p-6 rounded-3xl border border-white/5 font-mono text-[10px] sm:text-[11px] leading-relaxed text-green-200 whitespace-pre-line break-words mb-6">
           {generateWhatsAppText()}
         </div>
 
@@ -163,16 +163,16 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationProps> = ({ cart
         <div className="space-y-3">
           <button 
             onClick={handleOpenRestaurantWhatsApp}
-            className="w-full bg-green-500 hover:bg-green-600 text-white py-5 rounded-2xl font-black uppercase italic shadow-[0_10px_30px_rgba(34,197,94,0.4)] flex items-center justify-center gap-3 active:scale-95 transition-all text-xs tracking-wider"
+            className="w-full bg-green-500 hover:bg-green-600 text-white py-4 sm:py-5 px-3 rounded-2xl font-black uppercase italic shadow-[0_10px_30px_rgba(34,197,94,0.4)] flex items-center justify-center gap-2 sm:gap-3 active:scale-95 transition-all text-[10px] sm:text-xs tracking-wider min-w-0"
           >
-            <Send size={20} /> Commander au Restaurant ({RESTAURANT_INFO.whatsapp})
+            <Send size={18} className="shrink-0" /> <span className="truncate">Commander au Restaurant ({RESTAURANT_INFO.whatsapp})</span>
           </button>
 
           <button 
             onClick={handleOpenBilloWhatsApp}
-            className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white py-4 rounded-2xl font-black uppercase italic shadow-md flex items-center justify-center gap-3 active:scale-95 transition-all text-xs tracking-wider"
+            className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white py-3.5 sm:py-4 px-3 rounded-2xl font-black uppercase italic shadow-md flex items-center justify-center gap-2 sm:gap-3 active:scale-95 transition-all text-[10px] sm:text-xs tracking-wider min-w-0"
           >
-            <Bike size={20} /> Contacter Livreur Billo Express ({BILLO_INFO.whatsapp})
+            <Bike size={18} className="shrink-0" /> <span className="truncate">Contacter Livreur Billo ({BILLO_INFO.whatsapp})</span>
           </button>
 
           <button 

@@ -148,62 +148,62 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
   }, [items, activeSection, selectedCategory, selectedTagFilter, searchQuery]);
 
   return (
-    <div className="animate-fade-in pt-6 pb-36 overflow-x-hidden">
-      <header className="px-4 sm:px-6 mb-8">
+    <div className="animate-fade-in pt-5 sm:pt-6 pb-36 w-full max-w-full min-w-0 overflow-x-hidden">
+      <header className="px-3.5 sm:px-6 mb-6 sm:mb-8 w-full min-w-0">
         {!navigator.onLine && (
-          <div className="mb-4 bg-amber-500/10 border border-amber-500/30 text-amber-800 px-3.5 py-2 rounded-2xl text-[9px] font-black uppercase tracking-wider flex items-center justify-between shadow-sm">
-            <span className="flex items-center gap-1.5"><WifiOff size={14} className="text-amber-600 animate-pulse" /> Mode Hors-ligne : Carte chargée via IndexedDB</span>
-            <span className="text-[8px] bg-amber-500/20 text-amber-900 px-2 py-0.5 rounded-lg font-mono font-bold flex items-center gap-1"><Database size={10}/> {items.length} Plats</span>
+          <div className="mb-4 bg-amber-500/10 border border-amber-500/30 text-amber-800 px-3 py-2 rounded-2xl text-[8px] sm:text-[9px] font-black uppercase tracking-wider flex flex-wrap items-center justify-between gap-2 shadow-sm">
+            <span className="flex items-center gap-1.5 min-w-0 truncate"><WifiOff size={13} className="text-amber-600 animate-pulse shrink-0" /> Mode Hors-ligne : Carte chargée via IndexedDB</span>
+            <span className="text-[8px] bg-amber-500/20 text-amber-900 px-2 py-0.5 rounded-lg font-mono font-bold flex items-center gap-1 shrink-0"><Database size={10}/> {items.length} Plats</span>
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-3xl font-black italic uppercase text-brand-brown leading-tight">
+        <div className="flex items-center justify-between mb-5 sm:mb-6">
+          <h2 className="text-2xl sm:text-3xl font-black italic uppercase text-brand-brown leading-tight">
             Notre <br/>
-            <span className="text-brand-orange text-lg tracking-[0.3em]">Univers</span>
+            <span className="text-brand-orange text-base sm:text-lg tracking-[0.25em] sm:tracking-[0.3em]">Univers</span>
           </h2>
-          <div className="bg-brand-gold/20 p-3 rounded-2xl">
-            <Utensils size={24} className="text-brand-brown" />
+          <div className="bg-brand-gold/20 p-3 rounded-2xl shrink-0">
+            <Utensils size={22} className="text-brand-brown" />
           </div>
         </div>
 
         {/* Main Sections Tabs */}
-        <div className="flex bg-gray-100 p-1.5 rounded-[2rem] mb-6 shadow-inner">
+        <div className="flex bg-gray-100 p-1 sm:p-1.5 rounded-[1.8rem] sm:rounded-[2rem] mb-5 sm:mb-6 shadow-inner w-full min-w-0">
           {MAIN_SECTIONS.map(section => (
             <motion.button
               key={section.id}
               whileTap={{ scale: 0.95 }}
               onClick={() => { playSound('pop'); onSectionChange(section.id); setSelectedCategory('TOUT'); }}
-              className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-[1.6rem] text-[9px] font-black uppercase tracking-tighter transition-all relative ${activeSection === section.id ? 'bg-white text-brand-brown shadow-md' : 'text-gray-400 hover:text-brand-brown'}`}
+              className={`flex-1 min-w-0 flex items-center justify-center gap-1 sm:gap-2 py-3.5 sm:py-4 px-1.5 rounded-[1.4rem] sm:rounded-[1.6rem] text-[8px] sm:text-[9px] font-black uppercase tracking-tighter transition-all relative ${activeSection === section.id ? 'bg-white text-brand-brown shadow-md' : 'text-gray-400 hover:text-brand-brown'}`}
             >
               {activeSection === section.id && (
                 <motion.div
                   layoutId="activeSectionBg"
-                  className="absolute inset-0 bg-white rounded-[1.6rem] shadow-md z-0"
+                  className="absolute inset-0 bg-white rounded-[1.4rem] sm:rounded-[1.6rem] shadow-md z-0"
                   transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 />
               )}
-              <span className="relative z-10 flex items-center gap-2">
-                {section.icon}
-                {section.label}
+              <span className="relative z-10 flex items-center gap-1 sm:gap-2 truncate">
+                <span className="shrink-0">{section.icon}</span>
+                <span className="truncate">{section.label}</span>
               </span>
             </motion.button>
           ))}
         </div>
 
         {/* Barre de Recherche & Commande Vocale */}
-        <div className="flex gap-3 mb-5">
-           <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center px-4 gap-3">
-              <Search size={18} className="text-gray-300" />
+        <div className="flex gap-2.5 sm:gap-3 mb-5 w-full min-w-0">
+           <div className="flex-1 min-w-0 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center px-3.5 sm:px-4 gap-2.5 sm:gap-3">
+              <Search size={17} className="text-gray-300 shrink-0" />
               <input 
                 type="text" 
                 placeholder="Rechercher un plat, ingrédient..." 
-                className="w-full py-4 text-xs font-bold outline-none bg-transparent"
+                className="w-full min-w-0 py-3.5 sm:py-4 text-xs font-bold outline-none bg-transparent"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600">
+                <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600 shrink-0">
                   <X size={16} />
                 </button>
               )}
@@ -213,31 +213,31 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
                whileHover={{ scale: 1.05 }}
                whileTap={{ scale: 0.9 }}
                onClick={() => { playSound('pop'); onOpenVoiceModal(); }}
-               className="bg-brand-orange text-white p-4 rounded-2xl shadow-lg hover:bg-brand-gold hover:text-brand-brown transition-all flex items-center justify-center shrink-0"
+               className="bg-brand-orange text-white p-3.5 sm:p-4 rounded-2xl shadow-lg hover:bg-brand-gold hover:text-brand-brown transition-all flex items-center justify-center shrink-0"
                title="Commande Vocale 🎙️"
              >
-               <Mic size={20} className="animate-pulse" />
+               <Mic size={19} className="animate-pulse" />
              </motion.button>
            )}
         </div>
 
         {/* Filtres par Tags Spéciaux (Plat du jour, Spécialité, Épicé, Végétarien, Promos) */}
-        <div className="mb-6">
-           <div className="flex items-center justify-between mb-2">
-              <span className="text-[9px] font-black uppercase text-brand-brown/50 tracking-widest flex items-center gap-1">
-                 <Filter size={11} className="text-brand-orange" /> Filtres Rapides :
+        <div className="mb-5 sm:mb-6 w-full min-w-0">
+           <div className="flex items-center justify-between mb-2 gap-2">
+              <span className="text-[9px] font-black uppercase text-brand-brown/50 tracking-widest flex items-center gap-1 truncate">
+                 <Filter size={11} className="text-brand-orange shrink-0" /> Filtres Rapides :
               </span>
               {selectedTagFilter !== 'ALL' && (
                  <button 
                    onClick={() => { playSound('pop'); setSelectedTagFilter('ALL'); }}
-                   className="text-[9px] font-black text-rose-600 hover:text-rose-700 flex items-center gap-1 uppercase tracking-wider bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200"
+                   className="text-[9px] font-black text-rose-600 hover:text-rose-700 flex items-center gap-1 uppercase tracking-wider bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200 shrink-0"
                  >
                     <X size={10} /> Réinitialiser
                  </button>
               )}
            </div>
 
-           <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 sm:-mx-6 px-4 sm:px-6 pb-1">
+           <div className="flex gap-2 overflow-x-auto no-scrollbar w-full max-w-full pb-1">
               {TAG_FILTERS.map(tag => {
                 const isSelected = selectedTagFilter === tag.id;
                 const count = tagCounts[tag.id];
@@ -251,7 +251,7 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
                       playSound('pop');
                       setSelectedTagFilter(isSelected && tag.id !== 'ALL' ? 'ALL' : tag.id);
                     }}
-                    className={`px-3.5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-2 border ${
+                    className={`px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 sm:gap-2 border shrink-0 ${
                       isSelected 
                         ? `${tag.activeBg} shadow-md border-transparent` 
                         : 'bg-white text-brand-brown/70 border-gray-100 hover:border-brand-brown/20'
@@ -274,7 +274,7 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
 
         {/* Catégories de la Carte */}
         {activeSection === 'CARTE' && (
-          <div className="flex gap-2.5 overflow-x-auto no-scrollbar -mx-4 sm:-mx-6 px-4 sm:px-6 pb-2">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar w-full max-w-full pb-2">
              {CARTE_CATEGORIES.map(cat => {
                const isSelected = selectedCategory === cat;
                return (
@@ -283,7 +283,7 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
                    whileHover={{ scale: 1.04 }}
                    whileTap={{ scale: 0.94 }}
                    onClick={() => { playSound('pop'); setSelectedCategory(cat); }}
-                   className={`relative px-4 py-2.5 rounded-full text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-colors ${
+                   className={`relative px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-colors shrink-0 ${
                      isSelected 
                        ? 'bg-brand-orange text-white shadow-lg shadow-brand-orange/30' 
                        : 'bg-white text-gray-400 border border-gray-100 hover:text-brand-brown'
@@ -305,32 +305,32 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
       </header>
 
       {/* NOTIFICATION PRÉCOMMANDE WHATSAPP & CATALOGUE SÉPARÉ */}
-      <div className="px-6 mb-6 space-y-2">
+      <div className="px-3.5 sm:px-6 mb-6 space-y-2 w-full min-w-0">
         <div 
           onClick={() => {
             playSound('pop');
             const url = `https://wa.me/${RESTAURANT_INFO.whatsappClean}?text=${encodeURIComponent("Salam Khady's Food ! Je souhaite précommander sur WhatsApp : ")}`;
             window.open(url, '_blank');
           }}
-          className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-[#12261A] text-white p-4 rounded-3xl border border-emerald-500/40 flex items-center justify-between cursor-pointer hover:border-emerald-400 active:scale-98 transition-all shadow-lg"
+          className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-[#12261A] text-white p-3.5 sm:p-4 rounded-3xl border border-emerald-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:border-emerald-400 active:scale-98 transition-all shadow-lg"
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
-              <MessageSquare size={20} className="animate-pulse" />
+              <MessageSquare size={18} className="animate-pulse" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <span className="text-[8px] font-black uppercase text-emerald-300 tracking-wider block">Commande Directe WhatsApp</span>
-              <h4 className="text-xs font-black uppercase italic text-white">Précommande sur le numéro WhatsApp du restaurant</h4>
-              <p className="text-[9px] text-emerald-200/80 font-bold mt-0.5">
+              <h4 className="text-[11px] sm:text-xs font-black uppercase italic text-white leading-tight">Précommande sur le numéro WhatsApp du restaurant</h4>
+              <p className="text-[9px] text-emerald-200/80 font-bold mt-0.5 truncate">
                 Contact direct : <span className="text-brand-gold font-mono">{RESTAURANT_INFO.whatsapp}</span>
               </p>
             </div>
           </div>
-          <span className="bg-emerald-500 hover:bg-emerald-400 text-white text-[8px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-colors shrink-0 flex items-center gap-1">
+          <span className="bg-emerald-500 hover:bg-emerald-400 text-white text-[8px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-colors shrink-0 flex items-center justify-center gap-1 self-end sm:self-auto">
             Commander <ArrowRight size={10} />
           </span>
         </div>
-        <div className="flex items-center justify-between px-2 text-[9px] text-brand-brown/70 font-bold">
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-1 text-[8px] sm:text-[9px] text-brand-brown/70 font-bold">
           <span>Ligne directe : <strong className="font-mono text-brand-brown">{RESTAURANT_INFO.whatsapp}</strong></span>
           <a
             href={RESTAURANT_INFO.whatsappCatalogUrl}
@@ -338,17 +338,17 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
             rel="noreferrer"
             className="text-emerald-700 hover:text-emerald-600 underline font-black uppercase"
           >
-            Consulter le Catalogue WhatsApp séparé →
+            Catalogue WhatsApp séparé →
           </a>
         </div>
       </div>
 
       {/* PARTIE 1 : PLAT DU JOUR */}
       {platDuJour && platDuJour.isActive && (selectedTagFilter === 'ALL' || selectedTagFilter === 'PLAT_DU_JOUR') && selectedCategory === 'TOUT' && searchQuery === '' && (
-        <div className="px-4 sm:px-6 mb-8">
-          <div className="flex items-center gap-2 mb-3 px-2">
-            <span className="bg-brand-orange text-white text-[9px] font-black uppercase px-2.5 py-1 rounded-full">1</span>
-            <h3 className="text-sm sm:text-base font-black italic uppercase text-brand-brown tracking-wide">
+        <div className="px-3.5 sm:px-6 mb-8 w-full min-w-0">
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <span className="bg-brand-orange text-white text-[9px] font-black uppercase px-2.5 py-1 rounded-full shrink-0">1</span>
+            <h3 className="text-xs sm:text-base font-black italic uppercase text-brand-brown tracking-wide truncate">
               Plat du Jour & Sélection Quotidienne
             </h3>
           </div>
@@ -362,45 +362,45 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
 
       {/* PARTIE 2 : INCONTOURNABLES & SPÉCIALITÉS PERMANENTES (Doukounou, Attiéké, Spécialités) */}
       {activeSection === 'CARTE' && selectedTagFilter === 'ALL' && selectedCategory === 'TOUT' && searchQuery === '' && permanentSpecialties.length > 0 && (
-        <div className="px-4 sm:px-6 mb-10">
-          <div className="flex items-center justify-between mb-3 px-2">
-            <div className="flex items-center gap-2">
-              <span className="bg-amber-600 text-white text-[9px] font-black uppercase px-2.5 py-1 rounded-full">2</span>
-              <div>
-                <h3 className="text-sm sm:text-base font-black italic uppercase text-brand-brown tracking-wide">
+        <div className="px-3.5 sm:px-6 mb-10 w-full min-w-0">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="bg-amber-600 text-white text-[9px] font-black uppercase px-2.5 py-1 rounded-full shrink-0">2</span>
+              <div className="min-w-0">
+                <h3 className="text-xs sm:text-base font-black italic uppercase text-brand-brown tracking-wide leading-tight">
                   Incontournables & Spécialités Permanentes
                 </h3>
-                <p className="text-[10px] text-brand-brown/60 font-bold">
+                <p className="text-[9px] sm:text-[10px] text-brand-brown/60 font-bold leading-snug">
                   Doukounou, Attiéké & grands classiques maison — toujours disponibles à la carte
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-4 w-full min-w-0">
             {permanentSpecialties.map((item) => {
               const isIncontournable = isDishIncontournable(item);
               return (
                 <div
                   key={`perm-${item.id}`}
                   onClick={() => { playSound('pop'); onSelectItem(item); }}
-                  className="bg-gradient-to-b from-amber-50/80 to-white rounded-[2rem] p-3.5 border-2 border-amber-500/40 shadow-sm hover:shadow-md cursor-pointer flex flex-col justify-between transition-all active:scale-95"
+                  className="min-w-0 bg-gradient-to-b from-amber-50/80 to-white rounded-[1.7rem] sm:rounded-[2rem] p-2.5 sm:p-3.5 border-2 border-amber-500/40 shadow-sm hover:shadow-md cursor-pointer flex flex-col justify-between transition-all active:scale-95"
                 >
-                  <div>
-                    <div className="relative h-28 w-full mb-2.5 overflow-hidden rounded-2xl">
+                  <div className="min-w-0">
+                    <div className="relative h-24 sm:h-28 w-full mb-2 overflow-hidden rounded-xl sm:rounded-2xl">
                       <img src={item.image} className="w-full h-full object-cover" alt={item.name} />
-                      <span className="absolute top-2 left-2 bg-gradient-to-r from-amber-600 to-orange-600 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow flex items-center gap-1">
-                        <Crown size={9} className="text-yellow-200 fill-yellow-200" />
-                        {isIncontournable ? 'Carte Permanente' : 'Spécialité'}
+                      <span className="absolute top-1.5 left-1.5 max-w-[calc(100%-0.75rem)] truncate bg-gradient-to-r from-amber-600 to-orange-600 text-white text-[7px] sm:text-[8px] font-black uppercase px-1.5 sm:px-2 py-0.5 rounded-full shadow flex items-center gap-1">
+                        <Crown size={8} className="text-yellow-200 fill-yellow-200 shrink-0" />
+                        <span className="truncate">{isIncontournable ? 'Carte Permanente' : 'Spécialité'}</span>
                       </span>
                     </div>
-                    <h4 className="text-[11px] font-black text-brand-brown uppercase italic leading-tight line-clamp-2">
+                    <h4 className="text-[10px] sm:text-[11px] font-black text-brand-brown uppercase italic leading-tight line-clamp-2 break-words">
                       {item.name}
                     </h4>
                   </div>
-                  <div className="flex justify-between items-center mt-2 pt-2 border-t border-amber-500/10">
-                    <span className="text-xs font-black text-brand-orange">{item.price.toLocaleString('fr-FR')} F</span>
-                    <div className="w-7 h-7 bg-brand-brown text-brand-gold rounded-xl flex items-center justify-center shadow">
+                  <div className="flex justify-between items-center gap-1.5 mt-2 pt-2 border-t border-amber-500/10 min-w-0">
+                    <span className="text-[11px] sm:text-xs font-black text-brand-orange truncate">{item.price.toLocaleString('fr-FR')} F</span>
+                    <div className="w-7 h-7 shrink-0 bg-brand-brown text-brand-gold rounded-xl flex items-center justify-center shadow">
                       <Plus size={14} />
                     </div>
                   </div>
@@ -412,20 +412,20 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
       )}
 
       {/* PARTIE 3 : CARTE COMPLÈTE PAR CATÉGORIE */}
-      <div className="px-6 mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="bg-brand-brown text-brand-gold text-[9px] font-black uppercase px-2.5 py-1 rounded-full">3</span>
-          <h3 className="text-sm sm:text-base font-black italic uppercase text-brand-brown tracking-wide">
+      <div className="px-4 sm:px-6 mb-3 flex items-center justify-between gap-2 w-full min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="bg-brand-brown text-brand-gold text-[9px] font-black uppercase px-2.5 py-1 rounded-full shrink-0">3</span>
+          <h3 className="text-xs sm:text-base font-black italic uppercase text-brand-brown tracking-wide truncate">
             {selectedCategory === 'TOUT' ? 'Carte Complète par Catégorie' : `Catégorie : ${selectedCategory}`}
           </h3>
         </div>
-        <span className="text-[10px] font-mono font-bold text-brand-brown/60">{filteredItems.length} plats</span>
+        <span className="text-[10px] font-mono font-bold text-brand-brown/60 shrink-0">{filteredItems.length} plats</span>
       </div>
 
       {/* Grid of Dishes with fluid scale and opacity animations */}
       <motion.div 
         layout
-        className="px-4 sm:px-6 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5"
+        className="px-3.5 sm:px-6 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-5 w-full min-w-0"
       >
         <AnimatePresence mode="popLayout">
           {filteredItems.map((item, index) => {
@@ -449,67 +449,68 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={() => { playSound('pop'); onSelectItem(item); }}
-                className={`bg-white rounded-[2.5rem] p-4 shadow-sm relative group cursor-pointer h-full flex flex-col transition-all ${
+                className={`min-w-0 bg-white rounded-[1.8rem] sm:rounded-[2.5rem] p-3 sm:p-4 shadow-sm relative group cursor-pointer h-full flex flex-col transition-all ${
                   isIncontournable 
                     ? 'border-2 border-amber-500/60 shadow-md ring-2 ring-amber-400/20 hover:border-amber-500 bg-gradient-to-b from-amber-500/[0.03] to-white' 
                     : 'border border-brand-brown/5'
                 }`}
               >
-                 <div className="relative h-32 w-full mb-4 overflow-hidden rounded-[1.8rem] flex-shrink-0">
+                 <div className="relative h-28 sm:h-32 w-full mb-3 sm:mb-4 overflow-hidden rounded-[1.3rem] sm:rounded-[1.8rem] flex-shrink-0">
                     <img src={item.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={item.name} />
                     
                     {/* Top Left Tag Badge */}
-                    <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                    <div className="absolute top-1.5 left-1.5 max-w-[calc(100%-2.5rem)] flex flex-col gap-1 items-start">
                        {isIncontournable && (
-                          <span className="bg-gradient-to-r from-amber-600 via-orange-500 to-amber-600 text-white text-[8px] font-black uppercase px-2.5 py-0.5 rounded-full shadow-lg flex items-center gap-1 border border-white/60 animate-pulse">
-                             <Crown size={9} className="text-yellow-200 fill-yellow-200" /> Incontournable
+                          <span className="max-w-full truncate bg-gradient-to-r from-amber-600 via-orange-500 to-amber-600 text-white text-[7px] sm:text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1 border border-white/60">
+                             <Crown size={8} className="text-yellow-200 fill-yellow-200 shrink-0" />
+                             <span className="truncate">Incontournable</span>
                           </span>
                        )}
                        {isPlatDuJour && !isIncontournable && (
-                          <span className="bg-amber-500/90 backdrop-blur-md text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border border-white/40">
-                             <Sun size={9} /> Jour
+                          <span className="bg-amber-500/90 backdrop-blur-md text-white text-[7px] sm:text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border border-white/40">
+                             <Sun size={8} className="shrink-0" /> Jour
                           </span>
                        )}
                        {isSpecialite && !isPlatDuJour && !isIncontournable && (
-                          <span className="bg-purple-600/90 backdrop-blur-md text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border border-white/40">
-                             <Sparkles size={9} /> Chef
+                          <span className="bg-purple-600/90 backdrop-blur-md text-white text-[7px] sm:text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border border-white/40">
+                             <Sparkles size={8} className="shrink-0" /> Chef
                           </span>
                        )}
                        {isPromo && !isPlatDuJour && !isSpecialite && !isIncontournable && (
-                          <span className="bg-amber-600/90 backdrop-blur-md text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border border-white/40">
-                             <Tag size={9} /> Éco
+                          <span className="bg-amber-600/90 backdrop-blur-md text-white text-[7px] sm:text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border border-white/40">
+                             <Tag size={8} className="shrink-0" /> Éco
                           </span>
                        )}
                     </div>
 
                     {/* Top Right Badges (Spicy & Vegetarian) */}
-                    <div className="absolute top-2 right-2 flex items-center gap-1">
+                    <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
                        {item.isSpicy && (
-                          <div className="bg-rose-500 text-white p-1.5 rounded-full shadow-lg border border-white" title="Épicé">
-                             <Flame size={11} fill="white" />
+                          <div className="bg-rose-500 text-white p-1 sm:p-1.5 rounded-full shadow-lg border border-white" title="Épicé">
+                             <Flame size={10} fill="white" />
                           </div>
                        )}
                        {item.isVegetarian && (
-                          <div className="bg-emerald-500 text-white p-1.5 rounded-full shadow-lg border border-white" title="Végétarien">
-                             <Leaf size={11} fill="white" />
+                          <div className="bg-emerald-500 text-white p-1 sm:p-1.5 rounded-full shadow-lg border border-white" title="Végétarien">
+                             <Leaf size={10} fill="white" />
                           </div>
                        )}
                     </div>
 
                     {/* Rating or Best Badge */}
                     {item.rating === 5 && (
-                      <div className="absolute bottom-2 left-2 bg-brand-gold text-brand-brown px-2 py-0.5 rounded-lg text-[8px] font-black flex items-center gap-1 border border-white shadow-md">
+                      <div className="absolute bottom-1.5 left-1.5 bg-brand-gold text-brand-brown px-1.5 sm:px-2 py-0.5 rounded-lg text-[7px] sm:text-[8px] font-black flex items-center gap-1 border border-white shadow-md">
                          <Star size={8} fill="currentColor" /> BEST
                       </div>
                     )}
                  </div>
                  
-                 <h4 className="text-[11px] font-black text-brand-brown uppercase italic leading-tight mb-2 line-clamp-2 flex-1">{item.name}</h4>
+                 <h4 className="text-[10px] sm:text-[11px] font-black text-brand-brown uppercase italic leading-tight mb-2 line-clamp-2 break-words flex-1">{item.name}</h4>
                  
-                 <div className="flex justify-between items-center mt-2">
-                    <span className="text-xs font-black text-brand-orange">{item.price.toLocaleString()} F</span>
-                    <div className="w-8 h-8 bg-brand-brown text-brand-gold rounded-xl flex items-center justify-center shadow-lg transition-transform group-hover:bg-brand-orange group-hover:text-white">
-                       <Plus size={16} />
+                 <div className="flex justify-between items-center gap-1.5 mt-2 min-w-0">
+                    <span className="text-[11px] sm:text-xs font-black text-brand-orange truncate">{item.price.toLocaleString('fr-FR')} F</span>
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 bg-brand-brown text-brand-gold rounded-xl flex items-center justify-center shadow-lg transition-transform group-hover:bg-brand-orange group-hover:text-white">
+                       <Plus size={15} />
                     </div>
                  </div>
               </motion.div>

@@ -428,23 +428,23 @@ export const CartView: React.FC<CartViewProps> = ({
                const currentSpice = item.spiceLevel || (item.isSpicy ? 'Piment normal' : 'Sans piment');
                const spiceOptions = ['Sans piment', 'Peu pimenté', 'Piment normal', 'Bien pimenté 🌶️'];
                return (
-                 <div key={idx} className="bg-white p-4 sm:p-5 rounded-[2.2rem] shadow-sm border border-brand-brown/5 transition-all hover:shadow-md space-y-3">
-                    <div className="flex items-center gap-3.5">
-                      <div className="relative w-16 h-16 rounded-2xl overflow-hidden shadow-md shrink-0">
+                 <div key={idx} className="bg-white p-3.5 sm:p-5 rounded-[1.8rem] sm:rounded-[2.2rem] shadow-sm border border-brand-brown/5 transition-all hover:shadow-md space-y-3 min-w-0">
+                    <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
+                      <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden shadow-md shrink-0">
                          <img src={item.image} className="w-full h-full object-cover" alt={item.name} />
                       </div>
                       <div className="flex-1 min-w-0">
-                         <h4 className="font-black text-[11px] sm:text-xs text-brand-brown uppercase italic truncate mb-1">{item.name}</h4>
-                         <div className="flex flex-wrap items-center gap-2">
-                           <p className="text-[10px] font-black text-brand-orange bg-brand-orange/10 px-2.5 py-0.5 rounded-lg inline-block">
-                             {(item.price * item.quantity).toLocaleString('fr-FR')} F CFA
+                         <h4 className="font-black text-[10px] sm:text-xs text-brand-brown uppercase italic truncate mb-1">{item.name}</h4>
+                         <div className="flex flex-wrap items-center gap-1.5">
+                           <p className="text-[10px] font-black text-brand-orange bg-brand-orange/10 px-2 py-0.5 rounded-lg inline-block">
+                             {(item.price * item.quantity).toLocaleString('fr-FR')} F
                            </p>
-                           <span className="text-[9px] text-gray-400 font-bold">
-                             ({item.price.toLocaleString('fr-FR')} F / unité)
+                           <span className="text-[8px] sm:text-[9px] text-gray-400 font-bold">
+                             ({item.price.toLocaleString('fr-FR')} F/u)
                            </span>
                          </div>
                       </div>
-                      <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-2xl shrink-0">
+                      <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-2xl shrink-0">
                         <button
                           type="button"
                           onClick={() => {
@@ -561,16 +561,16 @@ export const CartView: React.FC<CartViewProps> = ({
             <button
               type="button"
               onClick={handleDirectWhatsAppOrder}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-white py-4 px-5 rounded-2xl font-black uppercase italic tracking-wider text-xs sm:text-sm shadow-lg flex items-center justify-center gap-2.5 active:scale-95 transition-all"
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-white py-3.5 sm:py-4 px-3 sm:px-5 rounded-2xl font-black uppercase italic tracking-wider text-[10px] sm:text-sm shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all min-w-0"
             >
-              <MessageSquare size={18} />
-              <span>Commander sur WhatsApp ({RESTAURANT_INFO.whatsapp})</span>
-              <ArrowRight size={18} />
+              <MessageSquare size={17} className="shrink-0" />
+              <span className="truncate">Commander sur WhatsApp ({RESTAURANT_INFO.whatsapp})</span>
+              <ArrowRight size={17} className="shrink-0" />
             </button>
           </div>
 
           {/* Delivery coordinates */}
-          <div className="bg-[#1A0F0D] p-8 sm:p-10 rounded-[3.5rem] shadow-2xl border-4 border-white text-white relative overflow-hidden">
+          <div className="bg-[#1A0F0D] p-5 sm:p-10 rounded-[2.5rem] sm:rounded-[3.5rem] shadow-2xl border-4 border-white text-white relative overflow-hidden">
              <div className="absolute top-0 right-0 p-8 opacity-5 rotate-12"><MapPin size={100} /></div>
              <h3 className="text-brand-gold font-black uppercase italic text-xs tracking-widest mb-8 flex items-center gap-2 relative z-10"><MapPin size={16}/> Adresse de Livraison Billo Express</h3>
              <div className="space-y-4 relative z-10">
@@ -725,23 +725,23 @@ export const CartView: React.FC<CartViewProps> = ({
           </div>
 
           {/* Payment Method Selector */}
-          <div className="bg-white p-8 sm:p-10 rounded-[3.5rem] shadow-xl border border-gray-100">
-             <div className="flex justify-between items-center mb-6">
-               <h3 className="text-brand-brown font-black uppercase italic text-xs tracking-widest flex items-center gap-3">
-                 <Smartphone size={18} className="text-brand-orange"/> Mode de Paiement
+          <div className="bg-white p-5 sm:p-10 rounded-[2.5rem] sm:rounded-[3.5rem] shadow-xl border border-gray-100">
+             <div className="flex justify-between items-center gap-2 mb-6">
+               <h3 className="text-brand-brown font-black uppercase italic text-xs tracking-widest flex items-center gap-2 sm:gap-3 min-w-0 truncate">
+                 <Smartphone size={18} className="text-brand-orange shrink-0"/> Mode de Paiement
                </h3>
-               <span className="text-[8px] font-black text-green-600 bg-green-50 px-3 py-1 rounded-full uppercase tracking-widest">
+               <span className="text-[8px] font-black text-green-600 bg-green-50 px-2.5 sm:px-3 py-1 rounded-full uppercase tracking-widest shrink-0">
                  Dépôt & Espèces
                </span>
              </div>
 
-             <div className="grid grid-cols-2 gap-3 mb-6">
+             <div className="grid grid-cols-2 gap-2.5 sm:gap-3 mb-6">
                 {paymentMethods.map(m => (
                   <button 
                     key={m.id} 
                     type="button" 
                     onClick={() => { playSound('pop'); setPayment(m.id as any); setProofError(false); }} 
-                    className={`p-4 rounded-3xl flex items-center gap-3 text-[9px] font-black uppercase border-2 transition-all shadow-sm text-left ${payment === m.id ? 'border-brand-orange bg-brand-orange text-white shadow-brand-orange/20 scale-[1.02]' : 'border-gray-100 bg-gray-50 text-brand-brown/60 hover:bg-gray-100'}`}
+                    className={`p-3 sm:p-4 rounded-2xl sm:rounded-3xl flex items-center gap-2 sm:gap-3 text-[9px] font-black uppercase border-2 transition-all shadow-sm text-left min-w-0 ${payment === m.id ? 'border-brand-orange bg-brand-orange text-white shadow-brand-orange/20 scale-[1.02]' : 'border-gray-100 bg-gray-50 text-brand-brown/60 hover:bg-gray-100'}`}
                   >
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${payment === m.id ? 'bg-white text-brand-orange' : 'bg-white text-brand-brown/40'}`}>
                       <m.icon size={16} />
@@ -956,24 +956,24 @@ export const CartView: React.FC<CartViewProps> = ({
           </div>
 
           {/* Total & Commander sur WhatsApp Button */}
-          <div className="bg-brand-brown p-6 sm:p-10 rounded-[3rem] sm:rounded-[4rem] text-brand-gold shadow-2xl relative overflow-hidden border-4 border-white">
+          <div className="bg-brand-brown p-5 sm:p-10 rounded-[2.5rem] sm:rounded-[4rem] text-brand-gold shadow-2xl relative overflow-hidden border-4 border-white">
              <div className="space-y-3.5 mb-7">
-                <div className="flex justify-between text-white/60 text-[10px] font-black uppercase tracking-widest"><span>Sous-total Festin</span><span>{subtotal.toLocaleString('fr-FR')} F CFA</span></div>
-                {loyaltyDiscount > 0 && <div className="flex justify-between text-brand-orange text-[10px] font-black uppercase tracking-widest"><span>Réduction Fidélité ({maxRedeemablePoints} pts)</span><span>- {loyaltyDiscount.toLocaleString('fr-FR')} F CFA</span></div>}
-                {promoDiscount > 0 && <div className="flex justify-between text-emerald-400 text-[10px] font-black uppercase tracking-widest"><span>Code Promo ({appliedPromo?.promoCodeObj?.code})</span><span>- {promoDiscount.toLocaleString('fr-FR')} F CFA</span></div>}
-                <div className="flex justify-between text-brand-gold text-[10px] font-black uppercase tracking-widest"><span>Service Billo ({DISTRICTS.find(d => d.name === customer.district)?.name})</span><span>{deliveryFee.toLocaleString('fr-FR')} F CFA</span></div>
-                <div className="pt-5 border-t border-white/15 flex justify-between items-end gap-2"><span className="text-white font-black italic uppercase text-xs sm:text-sm">Total à Payer</span><span className="text-2xl sm:text-4xl font-black">{total.toLocaleString('fr-FR')} F CFA</span></div>
+                <div className="flex justify-between gap-2 text-white/60 text-[10px] font-black uppercase tracking-widest"><span className="truncate">Sous-total Festin</span><span className="shrink-0">{subtotal.toLocaleString('fr-FR')} F CFA</span></div>
+                {loyaltyDiscount > 0 && <div className="flex justify-between gap-2 text-brand-orange text-[10px] font-black uppercase tracking-widest"><span className="truncate">Réduction Fidélité ({maxRedeemablePoints} pts)</span><span className="shrink-0">- {loyaltyDiscount.toLocaleString('fr-FR')} F CFA</span></div>}
+                {promoDiscount > 0 && <div className="flex justify-between gap-2 text-emerald-400 text-[10px] font-black uppercase tracking-widest"><span className="truncate">Code Promo ({appliedPromo?.promoCodeObj?.code})</span><span className="shrink-0">- {promoDiscount.toLocaleString('fr-FR')} F CFA</span></div>}
+                <div className="flex justify-between gap-2 text-brand-gold text-[10px] font-black uppercase tracking-widest"><span className="truncate">Service Billo ({DISTRICTS.find(d => d.name === customer.district)?.name})</span><span className="shrink-0">{deliveryFee.toLocaleString('fr-FR')} F CFA</span></div>
+                <div className="pt-5 border-t border-white/15 flex justify-between items-end gap-2"><span className="text-white font-black italic uppercase text-xs sm:text-sm">Total à Payer</span><span className="text-2xl sm:text-4xl font-black shrink-0">{total.toLocaleString('fr-FR')} F CFA</span></div>
              </div>
              
              <div className="space-y-3">
                <button
                  type="button"
                  onClick={handleDirectWhatsAppOrder}
-                 className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-5 sm:py-6 px-4 rounded-[2rem] font-black uppercase shadow-[0_20px_50px_rgba(16,185,129,0.35)] flex items-center justify-center gap-3 active:scale-95 transition-all italic tracking-wider text-xs sm:text-sm border-2 border-emerald-400/50"
+                 className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-4 sm:py-6 px-3 sm:px-4 rounded-[1.8rem] sm:rounded-[2rem] font-black uppercase shadow-[0_20px_50px_rgba(16,185,129,0.35)] flex items-center justify-center gap-2 sm:gap-3 active:scale-95 transition-all italic tracking-wider text-[10px] sm:text-sm border-2 border-emerald-400/50 min-w-0"
                >
-                 <MessageSquare size={20} className="shrink-0" />
-                 <span>Commander sur WhatsApp ({RESTAURANT_INFO.whatsapp})</span>
-                 <ArrowRight size={20} className="shrink-0" />
+                 <MessageSquare size={18} className="shrink-0" />
+                 <span className="truncate">Commander sur WhatsApp ({RESTAURANT_INFO.whatsapp})</span>
+                 <ArrowRight size={18} className="shrink-0" />
                </button>
 
                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-[9px] text-white/70 font-bold">

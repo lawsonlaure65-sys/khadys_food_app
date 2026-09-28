@@ -988,11 +988,11 @@ const App: React.FC = () => {
         );
 
       case Page.MENU:
-        return <div className="max-w-4xl mx-auto"><MenuView items={items} onSelectItem={(item) => { setSelectedItem(item); setIsItemModalOpen(true); }} activeSection={activeMenuSection} onSectionChange={setActiveMenuSection} onOpenVoiceModal={() => setShowVoiceModal(true)} /></div>;
+        return <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-hidden"><MenuView items={items} onSelectItem={(item) => { setSelectedItem(item); setIsItemModalOpen(true); }} activeSection={activeMenuSection} onSectionChange={setActiveMenuSection} onOpenVoiceModal={() => setShowVoiceModal(true)} /></div>;
 
       case Page.BLOG:
         return (
-          <div className="max-w-4xl mx-auto">
+          <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-hidden">
             <BlogView 
               articles={blogArticles} 
               onNavigateToMenu={() => setCurrentPage(Page.MENU)} 
@@ -1002,7 +1002,7 @@ const App: React.FC = () => {
 
       case Page.FAQ:
         return (
-          <div className="max-w-2xl mx-auto">
+          <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-hidden">
             <FaqView 
               faqs={faqs} 
               onNavigateToWhatsApp={() => setCurrentPage(Page.WHATSAPP)} 
@@ -1012,7 +1012,7 @@ const App: React.FC = () => {
 
       case Page.SETTINGS:
         return (
-          <div className="max-w-2xl mx-auto">
+          <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-hidden">
             <SettingsView 
               isDarkMode={isDarkMode}
               onToggleDarkMode={toggleDarkMode}
@@ -1025,24 +1025,24 @@ const App: React.FC = () => {
         );
 
       case Page.GALLERY:
-        return <div className="max-w-4xl mx-auto"><GalleryView items={items} onAddToCart={handleAddToCart} onNavigateToMenu={() => setCurrentPage(Page.MENU)} /></div>;
+        return <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-hidden"><GalleryView items={items} onAddToCart={handleAddToCart} onNavigateToMenu={() => setCurrentPage(Page.MENU)} /></div>;
 
       case Page.VIDEO:
-        return <div className="max-w-4xl mx-auto"><VideoDemoView onNavigateToMenu={() => setCurrentPage(Page.MENU)} onNavigateToTraiteur={() => setCurrentPage(Page.TRAITEUR)} /></div>;
+        return <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-hidden"><VideoDemoView onNavigateToMenu={() => setCurrentPage(Page.MENU)} onNavigateToTraiteur={() => setCurrentPage(Page.TRAITEUR)} /></div>;
 
       case Page.WHATSAPP:
-        return <div className="max-w-4xl mx-auto"><WhatsAppAutomationView cart={cart} userProfile={userProfile} onNavigateToCart={() => setCurrentPage(Page.CART)} onNavigateToMenu={() => setCurrentPage(Page.MENU)} /></div>;
+        return <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-hidden"><WhatsAppAutomationView cart={cart} userProfile={userProfile} onNavigateToCart={() => setCurrentPage(Page.CART)} onNavigateToMenu={() => setCurrentPage(Page.MENU)} /></div>;
 
       case Page.TRAITEUR:
-        return <div className="max-w-2xl mx-auto"><TraiteurView /></div>;
+        return <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-hidden"><TraiteurView /></div>;
 
       case Page.INFOS:
-        return <div className="max-w-2xl mx-auto"><GuideView onClose={() => setCurrentPage(Page.HOME)} /></div>;
+        return <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-hidden"><GuideView onClose={() => setCurrentPage(Page.HOME)} /></div>;
 
       case Page.COMMANDE:
       case Page.COMMANDES:
         return (
-          <div className="max-w-2xl w-full mx-auto">
+          <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-hidden">
             <CommandeHubView
               cart={cart}
               orders={orders}
@@ -1055,7 +1055,7 @@ const App: React.FC = () => {
         );
 
       case Page.CART:
-        return <div className="max-w-2xl mx-auto">
+        return <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-hidden">
           <CartView 
             cart={cart} 
             setCart={setCart} 
@@ -1070,7 +1070,7 @@ const App: React.FC = () => {
         </div>;
 
       case Page.COMPTE:
-        return <div className="max-w-xl mx-auto">
+        return <div className="w-full min-w-0 max-w-xl mx-auto overflow-x-hidden">
           <AccountView 
             orders={orders} 
             userProfile={userProfile}
@@ -1119,7 +1119,7 @@ const App: React.FC = () => {
         );
 
       default:
-        return <div className="max-w-4xl mx-auto"><MenuView items={items} onSelectItem={(item) => { setSelectedItem(item); setIsItemModalOpen(true); }} activeSection={activeMenuSection} onSectionChange={setActiveMenuSection} /></div>;
+        return <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-hidden"><MenuView items={items} onSelectItem={(item) => { setSelectedItem(item); setIsItemModalOpen(true); }} activeSection={activeMenuSection} onSectionChange={setActiveMenuSection} /></div>;
     }
   };
 
