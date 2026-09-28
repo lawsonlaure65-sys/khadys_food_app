@@ -1,4 +1,4 @@
-const CACHE_NAME = 'khadys-food-v9-clean';
+const CACHE_NAME = 'khadys-food-v10-fast';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -99,6 +99,16 @@ self.addEventListener('fetch', (event) => {
 
   // Ne JAMAIS intercepter les requêtes externes (Supabase, Google Fonts, CDN Tailwind, Unsplash...)
   if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  // Ne JAMAIS intercepter les modules de développement Vite
+  if (
+    url.pathname.startsWith('/@') ||
+    url.pathname.startsWith('/node_modules/') ||
+    url.pathname.endsWith('.tsx') ||
+    url.pathname.endsWith('.ts')
+  ) {
     return;
   }
 

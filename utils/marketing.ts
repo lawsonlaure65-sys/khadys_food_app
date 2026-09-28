@@ -637,11 +637,25 @@ export const isCustomRestaurantImage = (img?: string): boolean => {
   return true;
 };
 
+// In-memory caches to prevent repeated synchronous JSON.parse of large localStorage items on the main thread
+let _cachedMenuItems: MenuItem[] | null = null;
+let _cachedMenuItemsTimestamp = 0;
+let _cachedMenuDuJour: MenuDuJourConfig | null = null;
+
+export const invalidateMarketingMemoryCache = () => {
+  _cachedMenuItems = null;
+  _cachedMenuDuJour = null;
+};
+
 // Helper to retrieve all saved menu items from localStorage when not passed via props
 export const getStoredRestaurantMenuItems = (): MenuItem[] => {
+  const now = Date.now();
+  if (_cachedMenuItems && now - _cachedMenuItemsTimestamp < 5000) {
+    return _cachedMenuItems;
+  }
   const map = new Map<string, MenuItem>();
   try {
-    const rawMain = localStorage.getItem('khadys_menu_items') || localStorage.getItem('khadys_menu_emergency_backup');
+    const rawMain = localStorage.getItem('khadys_menu_items');
     if (rawMain) {
       const parsed = JSON.parse(rawMain);
       if (Array.isArray(parsed)) {
@@ -660,7 +674,9 @@ export const getStoredRestaurantMenuItems = (): MenuItem[] => {
       }
     }
   } catch (e) {}
-  return Array.from(map.values());
+  _cachedMenuItems = Array.from(map.values());
+  _cachedMenuItemsTimestamp = now;
+  return _cachedMenuItems;
 };
 
 // Resolve the authentic restaurant image for any of the 3 Trio Gourmand slots (0: Plat du Jour, 1: Doukounou, 2: Attiéké)
@@ -787,8 +803,11 @@ export const syncMenuDuJourWithMenuItems = (
 
 // Storage for Menu du Jour / Plat du Jour
 export const getStoredMenuDuJour = (): MenuDuJourConfig => {
+  if (_cachedMenuDuJour) {
+    return _cachedMenuDuJour;
+  }
   try {
-    const data = localStorage.getItem('khadys_plat_du_jour') || localStorage.getItem('khadys_menu_du_jour');
+    const data = localStorage.getItem('khadys_plat_du_jour');
     if (data) {
       const parsed = JSON.parse(data);
       if (parsed) {
@@ -845,11 +864,14 @@ export const getStoredMenuDuJour = (): MenuDuJourConfig => {
         synced.marketingTextEveningTeaser = synced.marketingTextEveningTeaser || texts.eveningTeaser;
         synced.marketingTextEveningStatusShort = synced.marketingTextEveningStatusShort || texts.eveningStatusShort;
 
+        _cachedMenuDuJour = synced;
         return synced;
       }
     }
   } catch (e) {}
-  return syncMenuDuJourWithMenuItems(INITIAL_MENU_DU_JOUR);
+  const fallback = syncMenuDuJourWithMenuItems(INITIAL_MENU_DU_JOUR);
+  _cachedMenuDuJour = fallback;
+  return fallback;
 };
 
 export const getStoredPlatDuJour = getStoredMenuDuJour;
@@ -869,8 +891,11 @@ export const saveStoredMenuDuJour = (menu: MenuDuJourConfig, menuItems?: MenuIte
       syncedMenu.remainingStock = syncedMenu.dishes[0].remainingStock;
     }
 
-    localStorage.setItem('khadys_plat_du_jour', JSON.stringify(syncedMenu));
-    localStorage.setItem('khadys_menu_du_jour', JSON.stringify(syncedMenu));
+    _cachedMenuDuJour = syncedMenu;
+    try {
+      localStorage.removeItem('khadys_menu_du_jour');
+      localStorage.setItem('khadys_plat_du_jour', JSON.stringify(syncedMenu));
+    } catch (e) {}
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('khadys_plat_du_jour_updated', { detail: syncedMenu }));
       window.dispatchEvent(new CustomEvent('khadys_menu_du_jour_updated', { detail: syncedMenu }));

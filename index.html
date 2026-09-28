@@ -19,7 +19,13 @@
     <!-- Auto-réparation du cache Chrome / Service Worker sur Vercel -->
     <script>
       (function () {
-        var CURRENT_SW_CACHE = 'khadys-food-v9-clean';
+        var CURRENT_SW_CACHE = 'khadys-food-v10-fast';
+
+        // 0. Libérer immédiatement l'espace LocalStorage des clés dupliquées qui saturaient le quota 5 Mo mobile
+        try {
+          localStorage.removeItem('khadys_menu_emergency_backup');
+          localStorage.removeItem('khadys_menu_du_jour');
+        } catch (e) {}
 
         // 1. Purger immédiatement les anciens caches Service Worker qui causaient l'écran blanc sur Chrome
         if ('caches' in window) {
@@ -127,14 +133,13 @@
     <style>
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      html, body, #root {
-        max-width: 100vw;
-        overflow-x: hidden;
+      html, body {
+        max-width: 100%;
+        overflow-x: clip;
         box-sizing: border-box;
       }
       body {
         background-color: #FDFCFB;
-        overscroll-behavior-y: none;
         -webkit-tap-highlight-color: transparent;
         -webkit-touch-callout: none;
         margin: 0;

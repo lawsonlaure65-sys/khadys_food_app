@@ -463,8 +463,6 @@ export const db = {
     if (!client) return null;
 
     try {
-      const fullMenuBackup = await db.fetchSetting<MenuItem[]>('full_menu_items');
-
       let { data, error } = await client
         .from('menu_items')
         .select('*')
@@ -476,39 +474,16 @@ export const db = {
         error = retry.error;
       }
 
-      // If Allôresto 'dishes' table exists, also read from it for full harmonization
-      let allorestoDishes: any[] = [];
-      try {
-        const dishesRes = await client.from('dishes').select('*');
-        if (!dishesRes.error && Array.isArray(dishesRes.data) && dishesRes.data.length > 0) {
-          allorestoDishes = dishesRes.data;
-        }
-      } catch {}
-
-      if ((error || !data || data.length === 0) && allorestoDishes.length === 0) {
+      if (error || !data || data.length === 0) {
+        const fullMenuBackup = await db.fetchSetting<MenuItem[]>('full_menu_items');
         return fullMenuBackup || null;
-      }
-
-      const backupMap = new Map<string, Partial<MenuItem>>();
-      if (fullMenuBackup && Array.isArray(fullMenuBackup)) {
-        fullMenuBackup.forEach((item) => backupMap.set(item.id, item));
-      }
-
-      const combinedRows = [...(data || [])];
-      const existingIds = new Set(combinedRows.map((r: any) => String(r.id)));
-      for (const d of allorestoDishes) {
-        if (d && d.id && !existingIds.has(String(d.id))) {
-          combinedRows.push(d);
-          existingIds.add(String(d.id));
-        }
       }
 
       let foundPrimaryPlatDuJour = false;
 
-      return combinedRows.map((row: any) => {
-        const cached = backupMap.get(row.id) || {};
+      return data.map((row: any) => {
         const excludedFromDaily = isExcludedFromAutomaticPlatDuJour(row.name, row.id);
-        const rawCategory = row.category || cached.category || 'Plat Africain';
+        const rawCategory = row.category || 'Plat Africain';
         const finalCategory =
           excludedFromDaily && (rawCategory === 'Menu du Jour' || rawCategory === 'Plat du Jour')
             ? 'Spécialité Maison'
@@ -516,7 +491,7 @@ export const db = {
 
         let isDaily = excludedFromDaily
           ? false
-          : Boolean(row.is_plat_du_jour ?? row.isPlatDuJour ?? cached.isPlatDuJour ?? false);
+          : Boolean(row.is_plat_du_jour ?? row.isPlatDuJour ?? false);
 
         // Enforce single published Plat du Jour rule
         if (isDaily) {
@@ -534,16 +509,16 @@ export const db = {
           price: Number(row.price),
           image: row.image || row.image_url,
           category: finalCategory,
-          rating: row.rating ? Number(row.rating) : (cached.rating ?? 5),
-          isAvailable: row.is_available ?? row.isAvailable ?? cached.isAvailable ?? true,
-          isSpicy: row.is_spicy ?? row.isSpicy ?? cached.isSpicy ?? false,
-          isVegetarian: row.is_vegetarian ?? row.isVegetarian ?? cached.isVegetarian ?? false,
-          isLowPrice: row.is_low_price ?? row.isLowPrice ?? cached.isLowPrice ?? false,
-          isPromo: row.is_promo ?? row.isPromo ?? cached.isPromo ?? false,
+          rating: row.rating ? Number(row.rating) : 5,
+          isAvailable: row.is_available ?? row.isAvailable ?? true,
+          isSpicy: row.is_spicy ?? row.isSpicy ?? false,
+          isVegetarian: row.is_vegetarian ?? row.isVegetarian ?? false,
+          isLowPrice: row.is_low_price ?? row.isLowPrice ?? false,
+          isPromo: row.is_promo ?? row.isPromo ?? false,
           isPlatDuJour: isDaily,
           isSpécialitéMaison:
             excludedFromDaily ||
-            Boolean(row.is_specialite_maison ?? row.isSpécialitéMaison ?? cached.isSpécialitéMaison ?? false)
+            Boolean(row.is_specialite_maison ?? row.isSpécialitéMaison ?? false)
         };
       }) as MenuItem[];
     } catch {

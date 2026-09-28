@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Sun, Sparkles, Gift, ArrowRight, MessageSquare, Flame, 
@@ -45,10 +45,6 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
     };
   }, []);
 
-  if (!menuDuJour || !menuDuJour.isActive) {
-    return null;
-  }
-
   const isForbiddenDailyDish = (name?: string, id?: string) => {
     const n = (name || '').toLowerCase();
     const i = (id || '').toLowerCase();
@@ -62,7 +58,8 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
     );
   };
 
-  const rawPrimaryDish: MenuDuJourDishItem = (() => {
+  const rawPrimaryDish: MenuDuJourDishItem = useMemo(() => {
+    if (!menuDuJour) return DEFAULT_MENU_DU_JOUR_DISHES[0];
     const candidate =
       menuDuJour.dishes && menuDuJour.dishes.length > 0
         ? menuDuJour.dishes.find(d => !isForbiddenDailyDish(d.dishName, d.id))
@@ -100,7 +97,11 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
       ...baseDish,
       dishImage: resolveTrioDishImage(baseDish, 0, items)
     };
-  })();
+  }, [menuDuJour, items]);
+
+  if (!menuDuJour || !menuDuJour.isActive) {
+    return null;
+  }
 
   const dishesList: MenuDuJourDishItem[] = [rawPrimaryDish];
 

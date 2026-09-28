@@ -148,7 +148,7 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
   }, [items, activeSection, selectedCategory, selectedTagFilter, searchQuery]);
 
   return (
-    <div className="animate-fade-in pt-5 sm:pt-6 pb-36 w-full max-w-full min-w-0 overflow-x-hidden">
+    <div className="animate-fade-in pt-5 sm:pt-6 pb-36 w-full max-w-full min-w-0 overflow-x-clip">
       <header className="px-3.5 sm:px-6 mb-6 sm:mb-8 w-full min-w-0">
         {!navigator.onLine && (
           <div className="mb-4 bg-amber-500/10 border border-amber-500/30 text-amber-800 px-3 py-2 rounded-2xl text-[8px] sm:text-[9px] font-black uppercase tracking-wider flex flex-wrap items-center justify-between gap-2 shadow-sm">

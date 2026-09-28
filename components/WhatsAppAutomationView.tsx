@@ -63,7 +63,7 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationProps> = ({ cart
   };
 
   return (
-    <div className="animate-fade-in p-4 sm:p-6 pb-36 max-w-2xl w-full min-w-0 mx-auto space-y-6 sm:space-y-8 overflow-x-hidden">
+    <div className="animate-fade-in p-4 sm:p-6 pb-36 max-w-2xl w-full min-w-0 mx-auto space-y-6 sm:space-y-8 overflow-x-clip">
       {/* Header */}
       <header className="flex justify-between items-center gap-3">
         <div className="min-w-0">

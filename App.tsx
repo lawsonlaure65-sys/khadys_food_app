@@ -45,8 +45,25 @@ import {
   clearPendingOrdersFromIDB 
 } from './utils/offlineDB';
 
-import { getStoredBanner, AnnouncementBanner, getStoredPlatDuJour, syncMenuDuJourWithMenuItems } from './utils/marketing';
+import { getStoredBanner, AnnouncementBanner, getStoredPlatDuJour, syncMenuDuJourWithMenuItems, invalidateMarketingMemoryCache } from './utils/marketing';
 import { decodeSharedCartWithMeta, mergeCartItems, SharedCartMetadata } from './utils/cartShare';
+
+const GREETINGS = ["SALAM 👋🏾", "BONJOUR 👋🏾", "BARKA 👋🏾", "FOFO 👋🏾", "VOTRE FESTIN ? 🥘"];
+
+const RotatingGreeting: React.FC = React.memo(() => {
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIndex((prev) => (prev + 1) % GREETINGS.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+  return (
+    <span className="text-[9px] sm:text-[10px] font-black text-brand-orange uppercase tracking-wider transition-all duration-300 truncate">
+      {GREETINGS[index]}
+    </span>
+  );
+});
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.HOME);
@@ -65,9 +82,9 @@ const App: React.FC = () => {
       }
     } catch (e) {}
 
-    // 2. Try reading primary localStorage or emergency backup
+    // 2. Try reading primary localStorage
     let localSavedDishes: MenuItem[] = [];
-    const saved = localStorage.getItem('khadys_menu_items') || localStorage.getItem('khadys_menu_emergency_backup');
+    const saved = localStorage.getItem('khadys_menu_items');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -85,11 +102,7 @@ const App: React.FC = () => {
     localSavedDishes.forEach(m => { if (m && m.id) map.set(m.id, m); });
     customDishes.forEach(m => { if (m && m.id) map.set(m.id, m); });
 
-    const consolidated = Array.from(map.values());
-    try {
-      localStorage.setItem('khadys_menu_items', JSON.stringify(consolidated));
-    } catch (e) {}
-    return consolidated;
+    return Array.from(map.values());
   });
 
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -164,9 +177,6 @@ const App: React.FC = () => {
   const [showSurveyModal, setShowSurveyModal] = useState(false);
   const [showQrLoyaltyModal, setShowQrLoyaltyModal] = useState(false);
   const [showPushNotificationModal, setShowPushNotificationModal] = useState(false);
-
-  const [greetingIndex, setGreetingIndex] = useState(0);
-  const greetings = ["SALAM 👋🏾", "BONJOUR 👋🏾", "BARKA 👋🏾", "FOFO 👋🏾", "VOTRE FESTIN ? 🥘"];
 
   // Offline Mode & IndexedDB Initialization
   useEffect(() => {
@@ -326,8 +336,10 @@ const App: React.FC = () => {
             const cloudPlat = await db.fetchPlatDuJour();
             const basePlat = cloudPlat && cloudPlat.dishName ? cloudPlat : getStoredPlatDuJour();
             const syncedPlat = syncMenuDuJourWithMenuItems(basePlat, latestMergedMenu.length > 0 ? latestMergedMenu : undefined);
-            localStorage.setItem('khadys_plat_du_jour', JSON.stringify(syncedPlat));
-            localStorage.setItem('khadys_menu_du_jour', JSON.stringify(syncedPlat));
+            try {
+              localStorage.setItem('khadys_plat_du_jour', JSON.stringify(syncedPlat));
+            } catch (e) {}
+            invalidateMarketingMemoryCache();
             window.dispatchEvent(new CustomEvent('khadys_plat_du_jour_updated', { detail: syncedPlat }));
           } catch (e) {}
 
@@ -395,7 +407,10 @@ const App: React.FC = () => {
             if (payload?.new) {
               const { key, value } = payload.new;
               if (key === 'plat_du_jour' && value) {
-                localStorage.setItem('khadys_plat_du_jour', JSON.stringify(value));
+                try {
+                  localStorage.setItem('khadys_plat_du_jour', JSON.stringify(value));
+                } catch (e) {}
+                invalidateMarketingMemoryCache();
                 window.dispatchEvent(new CustomEvent('khadys_plat_du_jour_updated', { detail: value }));
               } else if (key === 'admin_avatar' && value) {
                 localStorage.setItem('khadys_admin_avatar', value);
@@ -441,31 +456,23 @@ const App: React.FC = () => {
   // Sauvegarde automatique du menu dans IndexedDB & LocalStorage à chaque modification
   useEffect(() => {
     if (items && items.length > 0) {
+      invalidateMarketingMemoryCache();
       // 1. Toujours sauvegarder dans IndexedDB en premier (capacité illimitée)
       saveMenuToIDB(items).catch(err => console.warn('Erreur saveMenuToIDB:', err));
 
-      // 2. Sauvegarder dans LocalStorage avec sécurisation contre le dépassement de quota
+      // 2. Sauvegarder dans LocalStorage avec sécurisation contre le dépassement de quota (1 seule copie)
       try {
+        localStorage.removeItem('khadys_menu_emergency_backup');
         localStorage.setItem('khadys_menu_items', JSON.stringify(items));
-        // Sauvegarde de secours légère sans data-URLs volumineuses
-        const light = items.map(it => ({
-          ...it,
-          image: (it.image && it.image.startsWith('data:image') && it.image.length > 40000)
-            ? 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c'
-            : it.image
-        }));
-        localStorage.setItem('khadys_menu_emergency_backup', JSON.stringify(light));
       } catch (err) {
-        console.warn('Quota LocalStorage dépassé. Sauvegarde de la version optimisée...');
         try {
           const lightItems = items.map(it => ({
             ...it,
-            image: (it.image && it.image.startsWith('data:image'))
+            image: (it.image && it.image.startsWith('data:image') && it.image.length > 30000)
               ? 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c'
               : it.image
           }));
           localStorage.setItem('khadys_menu_items', JSON.stringify(lightItems));
-          localStorage.setItem('khadys_menu_emergency_backup', JSON.stringify(lightItems));
         } catch (e) {
           console.warn('Secours LocalStorage non disponible:', e);
         }
@@ -537,13 +544,6 @@ const App: React.FC = () => {
       }
     };
     loadCloudOrders();
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setGreetingIndex((prev) => (prev + 1) % greetings.length);
-    }, 4000);
-    return () => clearInterval(interval);
   }, []);
 
   const showToast = (message: string, type: ToastType = 'success') => {
@@ -624,7 +624,7 @@ const App: React.FC = () => {
     switch (currentPage) {
       case Page.HOME:
         return (
-          <div className="pb-40 animate-fade-in w-full max-w-2xl mx-auto overflow-x-hidden">
+          <div className="pb-40 animate-fade-in w-full max-w-2xl mx-auto overflow-x-clip">
             {/* Banner Mode Hors-ligne IndexedDB */}
             {isOffline && (
               <div className="bg-amber-500 text-brand-brown font-black px-4 py-2.5 text-[10px] uppercase tracking-widest text-center flex items-center justify-center gap-2 shadow-lg mb-2 rounded-2xl mx-4 animate-pulse border border-amber-600">
@@ -649,9 +649,7 @@ const App: React.FC = () => {
                     <span className="text-sm sm:text-base inline-block animate-wave origin-[70%_70%] select-none shrink-0">
                       👋🏾
                     </span>
-                    <span className="text-[9px] sm:text-[10px] font-black text-brand-orange uppercase tracking-wider transition-all duration-300 truncate">
-                      {greetings[greetingIndex]}
-                    </span>
+                    <RotatingGreeting />
                   </div>
                   <h1 className={`text-[11px] sm:text-[12px] font-black italic uppercase tracking-tighter leading-none mt-0.5 truncate ${isDarkMode ? 'text-brand-gold' : 'text-brand-brown'}`}>
                     Khady's Food & Event
@@ -988,11 +986,11 @@ const App: React.FC = () => {
         );
 
       case Page.MENU:
-        return <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-hidden"><MenuView items={items} onSelectItem={(item) => { setSelectedItem(item); setIsItemModalOpen(true); }} activeSection={activeMenuSection} onSectionChange={setActiveMenuSection} onOpenVoiceModal={() => setShowVoiceModal(true)} /></div>;
+        return <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-clip"><MenuView items={items} onSelectItem={(item) => { setSelectedItem(item); setIsItemModalOpen(true); }} activeSection={activeMenuSection} onSectionChange={setActiveMenuSection} onOpenVoiceModal={() => setShowVoiceModal(true)} /></div>;
 
       case Page.BLOG:
         return (
-          <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-hidden">
+          <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-clip">
             <BlogView 
               articles={blogArticles} 
               onNavigateToMenu={() => setCurrentPage(Page.MENU)} 
@@ -1002,7 +1000,7 @@ const App: React.FC = () => {
 
       case Page.FAQ:
         return (
-          <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-hidden">
+          <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-clip">
             <FaqView 
               faqs={faqs} 
               onNavigateToWhatsApp={() => setCurrentPage(Page.WHATSAPP)} 
@@ -1012,7 +1010,7 @@ const App: React.FC = () => {
 
       case Page.SETTINGS:
         return (
-          <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-hidden">
+          <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-clip">
             <SettingsView 
               isDarkMode={isDarkMode}
               onToggleDarkMode={toggleDarkMode}
@@ -1025,24 +1023,24 @@ const App: React.FC = () => {
         );
 
       case Page.GALLERY:
-        return <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-hidden"><GalleryView items={items} onAddToCart={handleAddToCart} onNavigateToMenu={() => setCurrentPage(Page.MENU)} /></div>;
+        return <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-clip"><GalleryView items={items} onAddToCart={handleAddToCart} onNavigateToMenu={() => setCurrentPage(Page.MENU)} /></div>;
 
       case Page.VIDEO:
-        return <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-hidden"><VideoDemoView onNavigateToMenu={() => setCurrentPage(Page.MENU)} onNavigateToTraiteur={() => setCurrentPage(Page.TRAITEUR)} /></div>;
+        return <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-clip"><VideoDemoView onNavigateToMenu={() => setCurrentPage(Page.MENU)} onNavigateToTraiteur={() => setCurrentPage(Page.TRAITEUR)} /></div>;
 
       case Page.WHATSAPP:
-        return <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-hidden"><WhatsAppAutomationView cart={cart} userProfile={userProfile} onNavigateToCart={() => setCurrentPage(Page.CART)} onNavigateToMenu={() => setCurrentPage(Page.MENU)} /></div>;
+        return <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-clip"><WhatsAppAutomationView cart={cart} userProfile={userProfile} onNavigateToCart={() => setCurrentPage(Page.CART)} onNavigateToMenu={() => setCurrentPage(Page.MENU)} /></div>;
 
       case Page.TRAITEUR:
-        return <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-hidden"><TraiteurView /></div>;
+        return <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-clip"><TraiteurView /></div>;
 
       case Page.INFOS:
-        return <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-hidden"><GuideView onClose={() => setCurrentPage(Page.HOME)} /></div>;
+        return <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-clip"><GuideView onClose={() => setCurrentPage(Page.HOME)} /></div>;
 
       case Page.COMMANDE:
       case Page.COMMANDES:
         return (
-          <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-hidden">
+          <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-clip">
             <CommandeHubView
               cart={cart}
               orders={orders}
@@ -1055,7 +1053,7 @@ const App: React.FC = () => {
         );
 
       case Page.CART:
-        return <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-hidden">
+        return <div className="w-full min-w-0 max-w-2xl mx-auto overflow-x-clip">
           <CartView 
             cart={cart} 
             setCart={setCart} 
@@ -1070,7 +1068,7 @@ const App: React.FC = () => {
         </div>;
 
       case Page.COMPTE:
-        return <div className="w-full min-w-0 max-w-xl mx-auto overflow-x-hidden">
+        return <div className="w-full min-w-0 max-w-xl mx-auto overflow-x-clip">
           <AccountView 
             orders={orders} 
             userProfile={userProfile}
@@ -1119,7 +1117,7 @@ const App: React.FC = () => {
         );
 
       default:
-        return <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-hidden"><MenuView items={items} onSelectItem={(item) => { setSelectedItem(item); setIsItemModalOpen(true); }} activeSection={activeMenuSection} onSectionChange={setActiveMenuSection} /></div>;
+        return <div className="w-full min-w-0 max-w-4xl mx-auto overflow-x-clip"><MenuView items={items} onSelectItem={(item) => { setSelectedItem(item); setIsItemModalOpen(true); }} activeSection={activeMenuSection} onSectionChange={setActiveMenuSection} /></div>;
     }
   };
 
@@ -1128,7 +1126,7 @@ const App: React.FC = () => {
   }, [items]);
 
   return (
-    <div className={`min-h-screen font-sans transition-colors duration-500 selection:bg-brand-orange selection:text-white pb-safe flex flex-col items-center ${
+    <div className={`min-h-screen w-full font-sans transition-colors duration-500 selection:bg-brand-orange selection:text-white pb-safe flex flex-col items-center ${
       isDarkMode ? 'bg-[#0E0806] text-white' : 'bg-[#FDFCFB] text-brand-brown'
     }`}>
       {/* Dynamic Marketing Announcement Banner */}
@@ -1162,7 +1160,7 @@ const App: React.FC = () => {
         </aside>
       )}
 
-      <div className="w-full max-w-full overflow-x-hidden h-full flex flex-col items-center">
+      <div className="w-full max-w-full flex flex-col items-center">
         {renderPage()}
       </div>
       
