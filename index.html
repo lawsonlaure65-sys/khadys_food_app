@@ -165,11 +165,26 @@
         -webkit-backdrop-filter: blur(20px);
       }
       .hero-slide-layer {
-        will-change: opacity;
+        will-change: opacity, transform;
         -webkit-backface-visibility: hidden;
         backface-visibility: hidden;
         transform: translateZ(0);
         -webkit-transform: translateZ(0);
+      }
+      @keyframes zoomRespiration {
+        0%, 100% {
+          transform: scale(1) translateZ(0);
+          -webkit-transform: scale(1) translateZ(0);
+        }
+        50% {
+          transform: scale(1.18) translateZ(0);
+          -webkit-transform: scale(1.18) translateZ(0);
+        }
+      }
+      .animate-zoom-dezoom {
+        animation: zoomRespiration 8s ease-in-out infinite !important;
+        -webkit-animation: zoomRespiration 8s ease-in-out infinite !important;
+        transform-origin: center center;
       }
     </style>
   </head>

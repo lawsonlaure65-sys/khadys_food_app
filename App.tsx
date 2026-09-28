@@ -66,6 +66,147 @@ const RotatingGreeting: React.FC = React.memo(() => {
   );
 });
 
+const HeroBannerSlideshow: React.FC<{
+  items: MenuItem[];
+  onOpenMenu: () => void;
+  onSelectDish: (dish: MenuItem) => void;
+}> = React.memo(({ items, onOpenMenu, onSelectDish }) => {
+  const slides = useMemo(() => {
+    const valid = (items || []).filter(
+      (i) => i && typeof i.image === 'string' && i.image.trim().length > 0 && i.isAvailable !== false
+    );
+    // Prioritize custom dishes, Plat du Jour, and Spécialités Maison first, then all other recorded dishes
+    const prioritized = [...valid].sort((a, b) => {
+      const score = (item: MenuItem) =>
+        (item.id.startsWith('custom-') || item.id.startsWith('dish-') ? 4 : 0) +
+        (item.isPlatDuJour ? 3 : 0) +
+        (item.isSpécialitéMaison ? 2 : 0) +
+        (item.isPromo ? 1 : 0);
+      return score(b) - score(a);
+    });
+    // Deduplicate by image URL so every slide shows a distinct dish photo
+    const seenImages = new Set<string>();
+    const uniqueSlides: MenuItem[] = [];
+    for (const dish of prioritized) {
+      if (!seenImages.has(dish.image)) {
+        seenImages.add(dish.image);
+        uniqueSlides.push(dish);
+      }
+    }
+    return uniqueSlides.length > 0
+      ? uniqueSlides
+      : [
+          {
+            id: 'hero-default',
+            name: 'Grillades & Spécialités Royales',
+            description: "L'excellence culinaire à Niamey",
+            price: 4500,
+            image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1000',
+            category: 'Spécialité Maison' as const,
+            rating: 5,
+            isAvailable: true,
+          },
+        ];
+  }, [items]);
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [prevIndex, setPrevIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (slides.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => {
+        setPrevIndex(prev);
+        return (prev + 1) % slides.length;
+      });
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [slides.length]);
+
+  const safeCurrentIndex = currentIndex % slides.length;
+  const currentDish = slides[safeCurrentIndex];
+  const prevDish = prevIndex !== null && prevIndex < slides.length ? slides[prevIndex] : null;
+
+  return (
+    <div className="px-4 sm:px-6 mb-4 overflow-hidden">
+      <div
+        className="relative h-60 sm:h-64 rounded-[3rem] shadow-2xl overflow-hidden group cursor-pointer border-2 border-brand-gold/25 bg-[#1A0F0D]"
+        onClick={onOpenMenu}
+      >
+        {/* Previous slide layer for smooth crossfade */}
+        {prevDish && prevDish.id !== currentDish.id && (
+          <img
+            key={`prev-${prevDish.id}`}
+            src={prevDish.image}
+            alt={prevDish.name}
+            className="absolute inset-0 w-full h-full object-cover animate-zoom-dezoom hero-slide-layer opacity-0 transition-opacity duration-1000 pointer-events-none"
+          />
+        )}
+
+        {/* Active recorded dish slide with continuous zoom & unzoom animation */}
+        <img
+          key={`curr-${currentDish.id}-${safeCurrentIndex}`}
+          src={currentDish.image}
+          alt={currentDish.name}
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src =
+              'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1000';
+          }}
+          className="absolute inset-0 w-full h-full object-cover animate-zoom-dezoom hero-slide-layer opacity-100 transition-opacity duration-1000"
+        />
+
+        {/* Gradient overlay for text readability */}
+        <div className="absolute inset-0 z-10 bg-gradient-to-r from-black/85 via-black/45 to-black/15 pointer-events-none"></div>
+
+        {/* Hero Content */}
+        <div className="absolute inset-0 z-20 flex flex-col justify-center px-7 sm:px-10">
+          <div className="flex items-center gap-2 mb-2.5">
+            <Sparkles size={14} className="text-brand-gold animate-pulse" />
+            <span className="bg-brand-orange text-white text-[8px] font-black px-4 py-1.5 rounded-full uppercase italic tracking-widest shadow-lg">
+              L'Excellence à Niamey
+            </span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-black text-white italic uppercase tracking-tighter leading-[0.9] mb-3.5 drop-shadow-lg">
+            LE GOÛT <br />
+            <span className="text-brand-gold">DES ROIS</span>
+          </h2>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenMenu();
+            }}
+            className="bg-white text-brand-brown px-6 py-2.5 rounded-full text-[9px] font-black uppercase italic self-start shadow-xl flex items-center gap-2 group-hover:bg-brand-gold transition-colors"
+          >
+            Commander maintenant <Navigation size={12} />
+          </button>
+        </div>
+
+        {/* Live badge of the currently animated recorded dish */}
+        {currentDish && (
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectDish(currentDish);
+            }}
+            className="absolute bottom-3.5 right-4 z-20 max-w-[62%] sm:max-w-[55%] bg-black/65 backdrop-blur-md border border-brand-gold/40 rounded-2xl px-3 py-1.5 flex items-center gap-2 shadow-lg hover:bg-black/80 transition-all"
+            title="Voir ce plat"
+          >
+            <span className="w-2 h-2 rounded-full bg-brand-gold animate-ping shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase italic text-white truncate leading-tight">
+                {currentDish.name}
+              </p>
+              <p className="text-[8px] font-black text-brand-gold leading-tight">
+                {currentDish.price.toLocaleString('fr-FR')} F CFA
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.HOME);
   const [marketingBanner, setMarketingBanner] = useState<AnnouncementBanner>(() => getStoredBanner());
@@ -694,29 +835,16 @@ const App: React.FC = () => {
               </div>
             </header>
 
-            {/* Banner Hero */}
-            <div className="px-4 sm:px-6 mb-4 overflow-hidden">
-              <div className="relative h-60 rounded-[3rem] shadow-2xl overflow-hidden group cursor-pointer border-2 border-brand-gold/20" onClick={() => setCurrentPage(Page.MENU)}>
-                <div className="absolute inset-0 z-10 bg-gradient-to-r from-black/85 via-black/40 to-transparent"></div>
-                <img 
-                  src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1000" 
-                  className="absolute inset-0 w-full h-full object-cover animate-zoom-dezoom" 
-                  alt="Banner" 
-                />
-                <div className="absolute inset-0 z-20 flex flex-col justify-center px-8 sm:px-10">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Sparkles size={14} className="text-brand-gold animate-pulse" />
-                    <span className="bg-brand-orange text-white text-[8px] font-black px-4 py-1.5 rounded-full uppercase italic tracking-widest shadow-lg">L'Excellence à Niamey</span>
-                  </div>
-                  <h2 className="text-3xl sm:text-4xl font-black text-white italic uppercase tracking-tighter leading-[0.9] mb-4">
-                    LE GOÛT <br/><span className="text-brand-gold">DES ROIS</span>
-                  </h2>
-                  <button className="bg-white text-brand-brown px-6 py-2.5 rounded-full text-[9px] font-black uppercase italic self-start shadow-xl flex items-center gap-2 group-hover:bg-brand-gold transition-colors">
-                    Commander maintenant <Navigation size={12} />
-                  </button>
-                </div>
-              </div>
-            </div>
+            {/* Banner Hero avec défilement continu des plats enregistrés en zoom & dézoom */}
+            <HeroBannerSlideshow
+              items={items}
+              onOpenMenu={() => setCurrentPage(Page.MENU)}
+              onSelectDish={(dish) => {
+                setSelectedItem(dish);
+                setIsItemModalOpen(true);
+                playSound('pop');
+              }}
+            />
 
             {/* Notification Précommande & Catalogue WhatsApp du Restaurant */}
             <div className="px-4 sm:px-6 mb-6">
