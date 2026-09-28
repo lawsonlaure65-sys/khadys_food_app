@@ -5,6 +5,7 @@ import AdminDashboard from './components/AdminDashboard';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import MenuView from './components/MenuView';
 import CartView from './components/CartView';
+import CommandeHubView from './components/CommandeHubView';
 import AccountView from './components/AccountView';
 import TraiteurView from './components/TraiteurView';
 import GuideView from './components/GuideView';
@@ -1037,6 +1038,21 @@ const App: React.FC = () => {
 
       case Page.INFOS:
         return <div className="max-w-2xl mx-auto"><GuideView onClose={() => setCurrentPage(Page.HOME)} /></div>;
+
+      case Page.COMMANDE:
+      case Page.COMMANDES:
+        return (
+          <div className="max-w-2xl w-full mx-auto">
+            <CommandeHubView
+              cart={cart}
+              orders={orders}
+              onOpenOnlineCart={() => setCurrentPage(Page.CART)}
+              onOpenWhatsAppCart={() => setCurrentPage(Page.WHATSAPP)}
+              onNavigateToMenu={() => setCurrentPage(Page.MENU)}
+              onOpenLiveDriverMap={() => setShowLiveDriverMapModal(true)}
+            />
+          </div>
+        );
 
       case Page.CART:
         return <div className="max-w-2xl mx-auto">
