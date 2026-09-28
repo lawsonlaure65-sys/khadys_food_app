@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Home, ScrollText, ShoppingBag, Image as ImageIcon, Video, MessageSquare, UserRound, ClipboardList } from 'lucide-react';
+import { Home, ScrollText, ShoppingBag, Image as ImageIcon, BookOpen, MessageSquare, UserRound, ClipboardList } from 'lucide-react';
 import { Page } from '../types';
 import { playSound } from '../utils/audio';
 
@@ -44,7 +44,7 @@ const Navbar: React.FC<NavbarProps> = ({ currentPage, setPage, cartCount }) => {
     { page: Page.MENU, icon: ScrollText, label: 'Menu' },
     { page: Page.COMMANDE, icon: ClipboardList, label: 'Commande' },
     { page: Page.GALLERY, icon: ImageIcon, label: 'Galerie' },
-    { page: Page.VIDEO, icon: Video, label: 'Démo 4K' },
+    { page: Page.BLOG, icon: BookOpen, label: 'Blog culinaire' },
     { page: Page.WHATSAPP, icon: MessageSquare, label: 'WhatsApp' },
     { page: Page.CART, icon: ShoppingBag, label: 'Panier', badge: cartCount },
     { page: Page.COMPTE, icon: UserRound, label: 'Moi' },

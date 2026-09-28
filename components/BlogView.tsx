@@ -79,7 +79,7 @@ export const BlogView: React.FC<BlogViewProps> = ({ articles = INITIAL_BLOG_ARTI
   const [activeCategory, setActiveCategory] = useState<string>('TOUT');
   const [likedArticles, setLikedArticles] = useState<Record<string, number>>({});
 
-  const categories = ['TOUT', 'Secrets du Chef', 'Recettes', 'Nutrition Sahel', 'Événements'];
+  const categories = ['TOUT', ...Array.from(new Set(articles.map(a => a.category)))];
 
   const filtered = activeCategory === 'TOUT' 
     ? articles 
@@ -156,7 +156,7 @@ export const BlogView: React.FC<BlogViewProps> = ({ articles = INITIAL_BLOG_ARTI
                   {art.title}
                 </h3>
                 <p className="text-xs text-gray-500 font-medium line-clamp-2 leading-relaxed">
-                  {art.summary}
+                  {art.summary || art.subtitle}
                 </p>
               </div>
 
