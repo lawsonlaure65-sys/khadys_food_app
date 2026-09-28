@@ -64,7 +64,12 @@ export const FlashOffer: React.FC<FlashOfferProps> = ({ onAddToCart, onSelectIte
   }, []);
 
   const itemsList = useMemo(() => {
-    if (flashConfig && flashConfig.isEnabled && flashConfig.dishName) {
+    const isExcludedFeatured = (name?: string) => {
+      const n = (name || '').toLowerCase();
+      return n.includes('doukounou') || n.includes('attiéké') || n.includes('attieke');
+    };
+
+    if (flashConfig && flashConfig.isEnabled && flashConfig.dishName && !isExcludedFeatured(flashConfig.dishName)) {
       const customItem: MenuItem & { originalPrice: number; discountPercent: number; remainingStock: number; totalStock: number } = {
         id: 'flash-custom',
         name: flashConfig.dishName,

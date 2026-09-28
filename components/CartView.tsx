@@ -253,7 +253,7 @@ export const CartView: React.FC<CartViewProps> = ({
   const selectedPaymentInfo = paymentMethods.find(m => m.id === payment);
 
   return (
-    <div className="animate-fade-in p-4 sm:p-6 pb-36 max-w-2xl mx-auto">
+    <div className="animate-fade-in p-4 sm:p-6 pb-40 max-w-2xl w-full mx-auto overflow-x-hidden">
       <header className="mb-8 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <button onClick={onClose} className="w-12 h-12 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center text-brand-brown hover:bg-gray-50 transition-all">

@@ -6,6 +6,7 @@ import { Clock, CheckCircle2, ChefHat, Bike, PackageCheck, Box, Bell, MapPin, Na
 
 interface OrderTrackingProps {
   order: Order;
+  onUpdateOrder?: (updatedOrder: Order) => void;
   onComplete: () => void;
   onOpenLiveDriverMap?: () => void;
   onOpenPushNotification?: () => void;

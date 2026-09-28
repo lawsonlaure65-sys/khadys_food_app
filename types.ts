@@ -110,14 +110,42 @@ export interface UserProfile {
 export interface BlogArticle {
   id: string;
   title: string;
-  summary: string;
+  subtitle?: string;
+  summary?: string;
   content: string;
   author: string;
   date: string;
   readTime: string;
   image: string;
-  category: 'Recettes' | 'Secrets du Chef' | 'Nutrition Sahel' | 'Événements';
+  category: 'Recettes' | 'Secrets du Chef' | 'Nutrition Sahel' | 'Événements' | 'Recettes Secrètes' | 'Événements & Traiteur' | 'Nutrition & Bien-être' | 'Coulisses Khady';
   likes: number;
+  commentsCount?: number;
+  featuredDishId?: string;
+  isPublished?: boolean;
+}
+
+export type BlogPost = BlogArticle;
+
+export interface ClientUser {
+  id: string;
+  name: string;
+  phone: string;
+  district: string;
+  points: number;
+  rank: 'Silver' | 'Gold' | 'Platinum';
+  totalOrders?: number;
+  totalSpent?: number;
+}
+
+export interface GalleryItem {
+  id: string;
+  title: string;
+  category: string;
+  image: string;
+  likes: number;
+  tag?: string;
+  description?: string;
+  dishId?: string;
 }
 
 export interface FaqItem {

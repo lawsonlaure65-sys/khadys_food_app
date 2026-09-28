@@ -155,32 +155,32 @@ const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ item, isOpen, onClo
           }`}
           onClick={e => e.stopPropagation()}
         >
-          <div className="relative h-80 w-full flex-shrink-0">
+          <div className="relative h-64 sm:h-80 w-full flex-shrink-0">
               <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent"></div>
               
-              <div className="absolute top-8 left-8 flex flex-wrap gap-2 max-w-[calc(100%-120px)]">
+              <div className="absolute top-4 sm:top-8 left-4 sm:left-8 flex flex-wrap gap-2 max-w-[calc(100%-90px)]">
                  {item.minPeople && (
-                   <div className="bg-brand-brown text-brand-gold px-4 py-2 rounded-full text-[11px] font-black flex items-center gap-1.5 shadow-2xl border border-brand-gold/30 backdrop-blur-md">
-                      <Users size={14} /> Dès {item.minPeople} convives
+                   <div className="bg-brand-brown text-brand-gold px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-[10px] sm:text-[11px] font-black flex items-center gap-1.5 shadow-2xl border border-brand-gold/30 backdrop-blur-md">
+                      <Users size={13} /> Dès {item.minPeople} convives
                    </div>
                  )}
 
                  {/* 3D AR Simulator Button */}
                  <button 
                    onClick={() => setIs3DOpen(true)}
-                   className="bg-brand-gold text-brand-brown px-4 py-2 rounded-full text-[11px] font-black flex items-center gap-1.5 shadow-2xl active:scale-95 transition-all border border-white"
+                   className="bg-brand-gold text-brand-brown px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-[10px] sm:text-[11px] font-black flex items-center gap-1.5 shadow-2xl active:scale-95 transition-all border border-white"
                  >
-                   <Sparkles size={14} /> Aperçu 3D
+                   <Sparkles size={13} /> Aperçu 3D
                  </button>
 
                  {/* Share Button Top Overlay */}
                  <button 
                    onClick={handleShare}
-                   className="bg-brand-orange hover:bg-orange-600 text-white px-4 py-2 rounded-full text-[11px] font-black flex items-center gap-1.5 shadow-2xl active:scale-95 transition-all border border-white"
+                   className="bg-brand-orange hover:bg-orange-600 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-[10px] sm:text-[11px] font-black flex items-center gap-1.5 shadow-2xl active:scale-95 transition-all border border-white"
                    title="Partager ce plat"
                  >
-                   {copied ? <Check size={14} className="text-white" /> : <Share2 size={14} />} 
+                   {copied ? <Check size={13} className="text-white" /> : <Share2 size={13} />} 
                    {copied ? 'Lien Copié !' : 'Partager'}
                  </button>
               </div>
@@ -188,24 +188,24 @@ const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ item, isOpen, onClo
               <button 
                 onClick={onClose} 
                 disabled={isFlying}
-                className="absolute top-8 right-8 bg-white/10 backdrop-blur-xl text-white p-3.5 rounded-3xl transition-all shadow-2xl border border-white/20 hover:bg-white/20 disabled:opacity-50"
+                className="absolute top-4 sm:top-8 right-4 sm:right-8 bg-white/10 backdrop-blur-xl text-white p-2.5 sm:p-3.5 rounded-2xl sm:rounded-3xl transition-all shadow-2xl border border-white/20 hover:bg-white/20 disabled:opacity-50"
               >
-                <X size={28} />
+                <X size={24} />
               </button>
               
-              <div className="absolute bottom-10 left-10 right-10">
-                 <h2 className="text-4xl font-black text-white leading-none italic uppercase tracking-tighter mb-4 drop-shadow-2xl">{item.name}</h2>
+              <div className="absolute bottom-12 left-5 right-5 sm:left-10 sm:right-10">
+                 <h2 className="text-xl sm:text-3xl font-black text-white leading-tight italic uppercase tracking-tight mb-2 drop-shadow-2xl line-clamp-2">{item.name}</h2>
                  <div className="flex items-center justify-between">
-                    <span className="text-3xl font-black text-brand-gold drop-shadow-2xl">{item.price.toLocaleString()} F CFA</span>
+                    <span className="text-xl sm:text-3xl font-black text-brand-gold drop-shadow-2xl">{item.price.toLocaleString('fr-FR')} F CFA</span>
                  </div>
               </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-8 sm:p-10 bg-white rounded-t-[4rem] -mt-10 relative z-10 no-scrollbar space-y-8">
-              <p className="text-gray-500 text-base leading-relaxed italic font-medium border-l-4 border-brand-orange/30 pl-6">"{item.description}"</p>
+          <div className="flex-1 overflow-y-auto p-5 sm:p-10 bg-white rounded-t-[3rem] sm:rounded-t-[4rem] -mt-8 relative z-10 no-scrollbar space-y-6">
+              <p className="text-gray-500 text-sm sm:text-base leading-relaxed italic font-medium border-l-4 border-brand-orange/30 pl-4 sm:pl-6">"{item.description}"</p>
 
               {/* Share & Recommend Box */}
-              <div className="bg-amber-500/10 border border-amber-500/20 p-5 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="bg-amber-500/10 border border-amber-500/20 p-4 sm:p-5 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-2xl bg-brand-orange text-white flex items-center justify-center shrink-0 shadow-md">
                     <Share2 size={20} />
@@ -240,72 +240,72 @@ const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ item, isOpen, onClo
                   const msg = encodeURIComponent(`Salam Khady's Food ! Je souhaite précommander : ${quantity}x ${item.name} (${item.price * quantity} F CFA).\nNotes : ${instructions || 'Standard'}`);
                   window.open(`https://wa.me/${RESTAURANT_INFO.whatsappClean}?text=${msg}`, '_blank');
                 }}
-                className="bg-emerald-950/90 text-white p-4 rounded-3xl border border-emerald-500/30 flex items-center justify-between cursor-pointer hover:bg-emerald-900 transition-all group shadow-sm"
+                className="bg-emerald-950/90 text-white p-4 rounded-3xl border border-emerald-500/30 flex items-center justify-between cursor-pointer hover:bg-emerald-900 transition-all group shadow-sm gap-2"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
                     <MessageSquare size={18} />
                   </div>
-                  <div>
-                    <span className="text-[8px] font-black uppercase text-emerald-300 tracking-wider">Service Rapide</span>
-                    <h5 className="text-[11px] font-black uppercase italic text-white">Précommande sur le WhatsApp du restaurant</h5>
+                  <div className="min-w-0">
+                    <span className="text-[8px] font-black uppercase text-emerald-300 tracking-wider block">Service Rapide</span>
+                    <h5 className="text-[11px] font-black uppercase italic text-white truncate">Commander sur WhatsApp</h5>
                     <p className="text-[9px] text-emerald-200/70 font-mono font-bold">{RESTAURANT_INFO.whatsapp}</p>
                   </div>
                 </div>
                 <span className="text-[9px] bg-emerald-500/20 text-emerald-300 group-hover:bg-emerald-500 group-hover:text-white px-3 py-1.5 rounded-xl font-black uppercase tracking-wider transition-all shrink-0">
-                  Précommander
+                  Commander
                 </span>
               </div>
 
               <div>
-                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-3 ml-4">
-                    <MessageSquare size={18} className="text-brand-orange" /> 
-                    Personnalisez votre commande
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2 ml-2">
+                    <MessageSquare size={16} className="text-brand-orange" /> 
+                    Note ou préférence piment / cuisson
                   </label>
                   <textarea 
-                    className="w-full bg-gray-50 border-2 border-transparent focus:border-brand-orange/30 rounded-[2.5rem] p-6 text-sm text-brand-brown font-bold resize-none shadow-inner outline-none transition-all placeholder:text-gray-300" 
-                    placeholder="Ex: Pas trop épicé, livraison pour 13h précise..." 
-                    rows={3} 
+                    className="w-full bg-gray-50 border-2 border-transparent focus:border-brand-orange/30 rounded-3xl p-4 sm:p-6 text-xs sm:text-sm text-brand-brown font-bold resize-none shadow-inner outline-none transition-all placeholder:text-gray-300" 
+                    placeholder="Ex: Peu pimenté, sans oignon, livraison pour 13h précise..." 
+                    rows={2} 
                     value={instructions} 
                     onChange={(e) => setInstructions(e.target.value)}
                   ></textarea>
               </div>
           </div>
 
-          <div className="p-8 border-t border-gray-100 bg-white shadow-[0_-20px_50px_rgba(0,0,0,0.05)] flex-shrink-0">
-              <div className="flex items-center gap-6">
-                  <div className="flex items-center gap-6 bg-gray-50 rounded-[2.5rem] px-6 py-4 border-2 border-gray-100 shadow-inner">
+          <div className="p-4 sm:p-8 border-t border-gray-100 bg-white shadow-[0_-20px_50px_rgba(0,0,0,0.05)] flex-shrink-0">
+              <div className="flex items-center gap-3 sm:gap-6">
+                  <div className="flex items-center gap-2.5 sm:gap-6 bg-gray-50 rounded-3xl sm:rounded-[2.5rem] px-3 py-2.5 sm:px-6 sm:py-4 border-2 border-gray-100 shadow-inner shrink-0">
                       <button 
                         onClick={() => setQuantity(Math.max(1, quantity - 1))} 
                         disabled={isFlying}
-                        className="w-12 h-12 flex items-center justify-center bg-white rounded-3xl shadow-lg text-brand-brown active:scale-90 transition-all disabled:opacity-50"
+                        className="w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center bg-white rounded-2xl sm:rounded-3xl shadow-md text-brand-brown active:scale-90 transition-all disabled:opacity-50"
                       >
-                        <Minus size={24} />
+                        <Minus size={18} />
                       </button>
-                      <span className="font-black text-3xl w-12 text-center text-brand-brown italic tracking-tighter">{quantity}</span>
+                      <span className="font-black text-xl sm:text-3xl w-7 sm:w-12 text-center text-brand-brown italic tracking-tighter">{quantity}</span>
                       <button 
                         onClick={() => setQuantity(quantity + 1)} 
                         disabled={isFlying}
-                        className="w-12 h-12 flex items-center justify-center bg-brand-brown text-white rounded-3xl shadow-lg active:scale-90 transition-all hover:bg-brand-orange disabled:opacity-50"
+                        className="w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center bg-brand-brown text-white rounded-2xl sm:rounded-3xl shadow-md active:scale-90 transition-all hover:bg-brand-orange disabled:opacity-50"
                       >
-                        <Plus size={24} />
+                        <Plus size={18} />
                       </button>
                   </div>
                   <button 
                     ref={addButtonRef}
                     onClick={handleAdd} 
                     disabled={isFlying}
-                    className="flex-1 bg-brand-orange text-white py-6 rounded-[3rem] font-black text-xl shadow-[0_20px_50px_rgba(255,111,0,0.3)] active:scale-95 transition-all flex flex-col items-center justify-center leading-none disabled:opacity-90 relative overflow-hidden"
+                    className="flex-1 min-w-0 bg-brand-orange text-white py-3.5 sm:py-6 px-3 rounded-3xl sm:rounded-[3rem] font-black text-sm sm:text-xl shadow-[0_20px_50px_rgba(255,111,0,0.3)] active:scale-95 transition-all flex flex-col items-center justify-center leading-none disabled:opacity-90 relative overflow-hidden"
                   >
                       {isFlying ? (
                         <div className="flex items-center gap-2 text-white">
-                          <Sparkles size={20} className="animate-spin text-brand-gold" />
-                          <span className="uppercase tracking-tighter italic text-base">Envol vers le panier...</span>
+                          <Sparkles size={16} className="animate-spin text-brand-gold shrink-0" />
+                          <span className="uppercase tracking-tight italic text-xs sm:text-base truncate">Ajout...</span>
                         </div>
                       ) : (
                         <>
-                          <span className="uppercase tracking-tighter italic">Ajouter</span>
-                          <span className="text-[10px] opacity-80 font-black mt-2 uppercase tracking-[0.4em] italic">{(item.price * quantity).toLocaleString()} F CFA</span>
+                          <span className="uppercase tracking-tight italic">Ajouter au panier</span>
+                          <span className="text-[10px] opacity-90 font-black mt-1.5 uppercase tracking-wider italic">{(item.price * quantity).toLocaleString('fr-FR')} F CFA</span>
                         </>
                       )}
                   </button>

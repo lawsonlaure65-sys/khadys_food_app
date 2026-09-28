@@ -148,8 +148,8 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
   }, [items, activeSection, selectedCategory, selectedTagFilter, searchQuery]);
 
   return (
-    <div className="animate-fade-in pt-6 pb-20">
-      <header className="px-6 mb-8">
+    <div className="animate-fade-in pt-6 pb-36 overflow-x-hidden">
+      <header className="px-4 sm:px-6 mb-8">
         {!navigator.onLine && (
           <div className="mb-4 bg-amber-500/10 border border-amber-500/30 text-amber-800 px-3.5 py-2 rounded-2xl text-[9px] font-black uppercase tracking-wider flex items-center justify-between shadow-sm">
             <span className="flex items-center gap-1.5"><WifiOff size={14} className="text-amber-600 animate-pulse" /> Mode Hors-ligne : Carte chargée via IndexedDB</span>
@@ -237,7 +237,7 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
               )}
            </div>
 
-           <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-6 px-6 pb-1">
+           <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 sm:-mx-6 px-4 sm:px-6 pb-1">
               {TAG_FILTERS.map(tag => {
                 const isSelected = selectedTagFilter === tag.id;
                 const count = tagCounts[tag.id];
@@ -274,7 +274,7 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
 
         {/* Catégories de la Carte */}
         {activeSection === 'CARTE' && (
-          <div className="flex gap-2.5 overflow-x-auto no-scrollbar -mx-6 px-6 pb-2">
+          <div className="flex gap-2.5 overflow-x-auto no-scrollbar -mx-4 sm:-mx-6 px-4 sm:px-6 pb-2">
              {CARTE_CATEGORIES.map(cat => {
                const isSelected = selectedCategory === cat;
                return (

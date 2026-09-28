@@ -1,10 +1,55 @@
 import { GoogleGenAI } from "@google/genai";
 import { MENU_ITEMS, BILLO_INFO, RESTAURANT_INFO } from "../constants";
+import { MenuItem, Order } from "../types";
 
 export interface ChatMessage {
   role: 'user' | 'model';
   parts: { text: string }[];
 }
+
+export interface RecommendationResult {
+  recommendations: {
+    dish: MenuItem;
+    similarityReason: string;
+    tag: string;
+  }[];
+  flavorProfile?: string;
+  isAiGenerated?: boolean;
+}
+
+export const getPersonalizedRecommendations = async (
+  orders: Order[],
+  items: MenuItem[]
+): Promise<RecommendationResult> => {
+  const eligibleItems = (items.length > 0 ? items : MENU_ITEMS).filter((it) => {
+    const n = (it.name || '').toLowerCase();
+    return (
+      it.isAvailable !== false &&
+      !n.includes('doukounou') &&
+      !n.includes('attiéké') &&
+      !n.includes('attieke') &&
+      it.id !== 'douk-royal' &&
+      it.id !== 'attieke-royal' &&
+      it.id !== 'af3'
+    );
+  });
+
+  const picked = eligibleItems.slice(0, 3);
+  return {
+    isAiGenerated: false,
+    flavorProfile: orders.length > 0 ? 'Saveurs sahéliennes & spécialités braisées' : 'Grands classiques de la maison Khady',
+    recommendations: picked.map((dish, idx) => ({
+      dish,
+      similarityReason:
+        idx === 0
+          ? 'Incontournable plébiscité pour sa générosité et ses épices maison.'
+          : idx === 1
+          ? 'Accord idéal avec nos boissons naturelles fraîches (Bissap, Bouye).'
+          : 'Préparé minute avec des produits frais sélectionnés chaque matin.',
+      tag: idx === 0 ? 'Coup de Cœur' : idx === 1 ? 'Sélection Chef' : 'Populaire',
+    })),
+  };
+};
 
 export const getSmartResponse = async (userMessage: string, history: ChatMessage[] = []): Promise<string> => {
   try {

@@ -49,33 +49,60 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
     return null;
   }
 
-  const rawDishesList: MenuDuJourDishItem[] = (menuDuJour.dishes && menuDuJour.dishes.length >= 3)
-    ? menuDuJour.dishes
-    : [
-        {
-          id: 'dish-1-spotlight',
-          type: 'PLAT_DU_JOUR',
-          dishName: menuDuJour.dishName || DEFAULT_MENU_DU_JOUR_DISHES[0].dishName,
-          badgeLabel: '🍲 Plat Cuisiné du Jour',
-          badgeColor: 'bg-brand-orange text-white',
-          tagline: menuDuJour.tagline || DEFAULT_MENU_DU_JOUR_DISHES[0].tagline,
-          description: menuDuJour.description || DEFAULT_MENU_DU_JOUR_DISHES[0].description,
-          accompaniments: menuDuJour.accompaniments || DEFAULT_MENU_DU_JOUR_DISHES[0].accompaniments,
-          price: menuDuJour.price || DEFAULT_MENU_DU_JOUR_DISHES[0].price,
-          promoPrice: menuDuJour.promoPrice || DEFAULT_MENU_DU_JOUR_DISHES[0].promoPrice,
-          dishImage: menuDuJour.dishImage || DEFAULT_MENU_DU_JOUR_DISHES[0].dishImage,
-          remainingStock: menuDuJour.remainingStock || 25,
-          isDailyPermanent: false,
-          isAvailable: true
-        },
-        DEFAULT_MENU_DU_JOUR_DISHES[1],
-        DEFAULT_MENU_DU_JOUR_DISHES[2]
-      ];
+  const isForbiddenDailyDish = (name?: string, id?: string) => {
+    const n = (name || '').toLowerCase();
+    const i = (id || '').toLowerCase();
+    return (
+      n.includes('doukounou') ||
+      n.includes('attiéké') ||
+      n.includes('attieke') ||
+      i === 'douk-royal' ||
+      i === 'attieke-royal' ||
+      i === 'af3'
+    );
+  };
 
-  const dishesList: MenuDuJourDishItem[] = rawDishesList.map((dish, idx) => ({
-    ...dish,
-    dishImage: resolveTrioDishImage(dish, idx, items)
-  }));
+  const rawPrimaryDish: MenuDuJourDishItem = (() => {
+    const candidate =
+      menuDuJour.dishes && menuDuJour.dishes.length > 0
+        ? menuDuJour.dishes.find(d => !isForbiddenDailyDish(d.dishName, d.id))
+        : null;
+
+    const fallbackName = !isForbiddenDailyDish(menuDuJour.dishName)
+      ? menuDuJour.dishName || DEFAULT_MENU_DU_JOUR_DISHES[0].dishName
+      : DEFAULT_MENU_DU_JOUR_DISHES[0].dishName;
+
+    if (candidate) {
+      return {
+        ...candidate,
+        dishImage: resolveTrioDishImage(candidate, 0, items)
+      };
+    }
+
+    const baseDish: MenuDuJourDishItem = {
+      id: 'dish-1-spotlight',
+      type: 'PLAT_DU_JOUR',
+      dishName: fallbackName,
+      badgeLabel: '🍲 Plat Cuisiné du Jour',
+      badgeColor: 'bg-brand-orange text-white',
+      tagline: menuDuJour.tagline || DEFAULT_MENU_DU_JOUR_DISHES[0].tagline,
+      description: menuDuJour.description || DEFAULT_MENU_DU_JOUR_DISHES[0].description,
+      accompaniments: menuDuJour.accompaniments || DEFAULT_MENU_DU_JOUR_DISHES[0].accompaniments,
+      price: menuDuJour.price || DEFAULT_MENU_DU_JOUR_DISHES[0].price,
+      promoPrice: menuDuJour.promoPrice || DEFAULT_MENU_DU_JOUR_DISHES[0].promoPrice,
+      dishImage: menuDuJour.dishImage || DEFAULT_MENU_DU_JOUR_DISHES[0].dishImage,
+      remainingStock: menuDuJour.remainingStock || 25,
+      isDailyPermanent: false,
+      isAvailable: true
+    };
+
+    return {
+      ...baseDish,
+      dishImage: resolveTrioDishImage(baseDish, 0, items)
+    };
+  })();
+
+  const dishesList: MenuDuJourDishItem[] = [rawPrimaryDish];
 
   const handleDishClick = (dish: MenuDuJourDishItem, index: number) => {
     playSound('pop');
@@ -115,15 +142,15 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
         <div className="absolute -top-24 -right-24 w-72 h-72 bg-brand-orange/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-brand-gold/15 rounded-full blur-3xl pointer-events-none" />
 
-        {/* En-tête du Menu du Jour */}
+        {/* En-tête du Plat du Jour */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 mb-5 border-b border-brand-gold/20 relative z-10">
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
               <span className="bg-brand-orange text-white text-[9px] font-black uppercase px-3 py-1 rounded-full shadow-lg flex items-center gap-1.5 animate-pulse">
-                <Sun size={12} className="animate-spin-slow" /> Menu du Jour
+                <Sun size={12} className="animate-spin-slow" /> Plat du Jour
               </span>
               <span className="bg-brand-gold/20 text-brand-gold text-[9px] font-black uppercase px-3 py-1 rounded-full border border-brand-gold/30 flex items-center gap-1">
-                👑 Le Trio Gourmand Quotidien
+                👑 Sélection Officielle du Jour
               </span>
               <span className="text-[10px] text-white/70 font-mono font-bold bg-white/5 px-2.5 py-0.5 rounded-lg border border-white/10">
                 {menuDuJour.targetDayLabel || (menuDuJour.publicationTiming === 'TONIGHT_FOR_TOMORROW' ? 'Demain Midi' : "Aujourd'hui Midi")}
@@ -131,21 +158,21 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
             </div>
 
             <h3 className="text-xl sm:text-2xl font-black italic uppercase text-white tracking-wide">
-              {menuDuJour.title || 'Notre Menu du Jour — 3 Plats d\'Exception'}
+              {rawPrimaryDish.dishName}
             </h3>
             <p className="text-xs text-white/75 font-medium max-w-xl">
-              {menuDuJour.tagline || 'Chaque jour, savourez notre plat cuisiné maison + nos deux incontournables Doukounou & Attiéké !'}
+              {rawPrimaryDish.tagline || 'Préparé frais chaque matin par la Cheffe Khady avec des ingrédients sélectionnés.'}
             </p>
           </div>
 
           <div className="flex items-center gap-2 self-start sm:self-auto bg-black/50 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-brand-gold/30 text-[10px] font-bold text-brand-gold">
             <Gift size={14} className="text-brand-orange animate-bounce" />
-            <span>3 Emplacements Cuisinés Frais</span>
+            <span>Cuisiné Frais du Jour</span>
           </div>
         </div>
 
-        {/* Grille des 3 Emplacements Distincts (Plat Cuisiné + Doukounou + Attiéké) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 relative z-10">
+        {/* Plat Cuisiné du Jour (1 seul plat publié par date, hors Attiéké/Doukounou) */}
+        <div className="grid grid-cols-1 gap-4 sm:gap-5 relative z-10">
           {dishesList.map((dish, index) => {
             const effectivePrice = dish.promoPrice || dish.price;
             const hasPromo = dish.promoPrice && dish.promoPrice < dish.price;

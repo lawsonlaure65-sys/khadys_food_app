@@ -623,7 +623,7 @@ const App: React.FC = () => {
     switch (currentPage) {
       case Page.HOME:
         return (
-          <div className="pb-40 animate-fade-in w-full max-w-2xl mx-auto">
+          <div className="pb-40 animate-fade-in w-full max-w-2xl mx-auto overflow-x-hidden">
             {/* Banner Mode Hors-ligne IndexedDB */}
             {isOffline && (
               <div className="bg-amber-500 text-brand-brown font-black px-4 py-2.5 text-[10px] uppercase tracking-widest text-center flex items-center justify-center gap-2 shadow-lg mb-2 rounded-2xl mx-4 animate-pulse border border-amber-600">
@@ -634,62 +634,62 @@ const App: React.FC = () => {
             )}
 
             {/* Header Elite avec Salutations Alternatives & Main Animée 👋🏾 */}
-            <header className={`sticky top-0 z-50 px-4 sm:px-6 py-4 flex justify-between items-center rounded-b-[2.5rem] shadow-lg mb-6 transition-all duration-300 ${
+            <header className={`sticky top-0 z-50 px-3.5 sm:px-6 py-3.5 sm:py-4 flex justify-between items-center gap-2 rounded-b-[2.5rem] shadow-lg mb-6 transition-all duration-300 ${
               isDarkMode ? 'bg-[#140C0A]/90 border-b border-brand-gold/20 backdrop-blur-xl text-white' : 'glass-card'
             }`}>
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <img src={LOGO_URL} alt="Logo" className="w-11 h-11 rounded-full border-2 border-brand-brown/10 shadow-md object-cover" />
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                <div className="relative shrink-0">
+                  <img src={LOGO_URL} alt="Logo" className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 border-brand-brown/10 shadow-md object-cover" />
+                  <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
                 </div>
-                <div className="flex flex-col">
+                <div className="flex flex-col min-w-0">
                   {/* Salutations rotatives avec main animée */}
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-base inline-block animate-wave origin-[70%_70%] select-none">
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm sm:text-base inline-block animate-wave origin-[70%_70%] select-none shrink-0">
                       👋🏾
                     </span>
-                    <span className="text-[10px] font-black text-brand-orange uppercase tracking-wider transition-all duration-300">
+                    <span className="text-[9px] sm:text-[10px] font-black text-brand-orange uppercase tracking-wider transition-all duration-300 truncate">
                       {greetings[greetingIndex]}
                     </span>
                   </div>
-                  <h1 className={`text-[12px] font-black italic uppercase tracking-tighter leading-none mt-0.5 ${isDarkMode ? 'text-brand-gold' : 'text-brand-brown'}`}>
+                  <h1 className={`text-[11px] sm:text-[12px] font-black italic uppercase tracking-tighter leading-none mt-0.5 truncate ${isDarkMode ? 'text-brand-gold' : 'text-brand-brown'}`}>
                     Khady's Food & Event
                   </h1>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                 {/* Voice Order Quick Button */}
                 <button 
                   onClick={() => { playSound('pop'); setShowVoiceModal(true); }}
-                  className="w-10 h-10 rounded-xl bg-brand-orange text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform relative"
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-brand-orange text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform relative"
                   title="Commande Vocale 🎙️"
                 >
-                  <Mic size={18} className="animate-pulse" />
+                  <Mic size={16} className="animate-pulse" />
                 </button>
 
                 {/* Push Notification Button */}
                 <button 
                   onClick={() => { playSound('pop'); setShowPushNotificationModal(true); }}
-                  className="w-10 h-10 rounded-xl bg-brand-gold text-brand-brown flex items-center justify-center shadow-lg active:scale-90 transition-transform relative"
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-brand-gold text-brand-brown flex items-center justify-center shadow-lg active:scale-90 transition-transform relative"
                   title="Notifications Push 🔔"
                 >
-                  <Bell size={18} className="animate-bounce" />
+                  <Bell size={16} className="animate-bounce" />
                 </button>
 
                 {/* Night Luxe Mode Toggle */}
                 <button 
                   onClick={toggleDarkMode}
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all ${
                     isDarkMode ? 'bg-white/10 text-brand-gold' : 'bg-brand-brown/5 text-brand-brown hover:bg-brand-brown/10'
                   }`}
                   title="Thème Nuit Or"
                 >
-                  {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+                  {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
                 </button>
 
-                <button onClick={() => { playSound('pop'); setCurrentPage(Page.COMPTE); }} className="w-10 h-10 bg-brand-brown text-brand-gold rounded-xl flex items-center justify-center shadow-lg active:scale-90 transition-transform">
-                  <UserIcon size={18}/>
+                <button onClick={() => { playSound('pop'); setCurrentPage(Page.COMPTE); }} className="w-9 h-9 sm:w-10 sm:h-10 bg-brand-brown text-brand-gold rounded-xl flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+                  <UserIcon size={16}/>
                 </button>
               </div>
             </header>
@@ -940,32 +940,38 @@ const App: React.FC = () => {
               </button>
             </div>
 
-            {/* Incontournables */}
+            {/* Spécialités & Classiques de la Carte */}
             <section className="mb-12">
               <div className="flex items-center justify-between mb-8 px-6 sm:px-8">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-brand-orange/10 rounded-xl text-brand-orange"><Heart size={18} fill="currentColor" /></div>
-                  <h3 className="text-sm font-black uppercase text-brand-brown tracking-[0.2em] italic">Incontournables</h3>
+                  <h3 className="text-sm font-black uppercase text-brand-brown tracking-[0.2em] italic">Classiques de la Carte</h3>
                 </div>
                 <button onClick={() => setCurrentPage(Page.MENU)} className="text-[9px] font-black text-brand-orange uppercase tracking-widest underline">Tout voir</button>
               </div>
               
               <div className="relative overflow-hidden w-full">
                 <div className="flex animate-infinite-scroll w-fit gap-6 sm:gap-8 px-6 flex-nowrap py-4">
-                  {[...items.slice(0, 10), ...items.slice(0, 10)].map((item, i) => (
-                    <div key={i} className="w-56 sm:w-60 flex-shrink-0 glass-card rounded-[3rem] p-5 shadow-2xl border border-white/20 flex flex-col cursor-pointer active:scale-95 transition-all group" onClick={() => { setSelectedItem(item); setIsItemModalOpen(true); playSound('pop'); }}>
-                      <div className="w-full h-40 overflow-hidden rounded-[2.2rem] mb-5 shadow-inner bg-gray-100">
-                        <img src={item.image} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-115" alt={item.name} />
-                      </div>
-                      <h4 className="text-[11px] font-black uppercase text-brand-brown italic mb-3 truncate">{item.name}</h4>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-black text-brand-orange px-4 py-1.5 bg-brand-orange/10 rounded-full">{item.price} F</span>
-                        <div className="flex gap-0.5">
-                          {[...Array(5)].map((_, i) => <Star key={i} size={10} fill={i < 4 ? "#FFD700" : "none"} className="text-brand-gold" />)}
+                  {(() => {
+                    const spotlightPool = items.filter(it => {
+                      const n = (it.name || '').toLowerCase();
+                      return !n.includes('doukounou') && !n.includes('attiéké') && !n.includes('attieke') && it.id !== 'douk-royal' && it.id !== 'attieke-royal' && it.id !== 'af3';
+                    }).slice(0, 10);
+                    return [...spotlightPool, ...spotlightPool].map((item, i) => (
+                      <div key={i} className="w-56 sm:w-60 flex-shrink-0 glass-card rounded-[3rem] p-5 shadow-2xl border border-white/20 flex flex-col cursor-pointer active:scale-95 transition-all group" onClick={() => { setSelectedItem(item); setIsItemModalOpen(true); playSound('pop'); }}>
+                        <div className="w-full h-40 overflow-hidden rounded-[2.2rem] mb-5 shadow-inner bg-gray-100">
+                          <img src={item.image} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-115" alt={item.name} />
+                        </div>
+                        <h4 className="text-[11px] font-black uppercase text-brand-brown italic mb-3 truncate">{item.name}</h4>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-black text-brand-orange px-4 py-1.5 bg-brand-orange/10 rounded-full">{item.price.toLocaleString('fr-FR')} F</span>
+                          <div className="flex gap-0.5">
+                            {[...Array(5)].map((_, idx) => <Star key={idx} size={10} fill={idx < 4 ? "#FFD700" : "none"} className="text-brand-gold" />)}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ));
+                  })()}
                 </div>
               </div>
             </section>
@@ -1140,7 +1146,7 @@ const App: React.FC = () => {
         </aside>
       )}
 
-      <div className="w-full h-full flex flex-col items-center">
+      <div className="w-full max-w-full overflow-x-hidden h-full flex flex-col items-center">
         {renderPage()}
       </div>
       

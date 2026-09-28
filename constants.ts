@@ -1159,6 +1159,25 @@ export const REWARDS = [
   { id: 'r4', name: 'Livraison Gratuite', cost: 2000, description: 'Frais de livraison offerts pour votre commande.' }
 ];
 
+export const PAYMENT_ACCOUNTS = {
+  mynitaAmana: {
+    number: '+227 80 79 97 23',
+    holder: "Khady's Food & Event",
+  },
+  zamany: {
+    number: '+227 80 79 97 23',
+    code: '#144#',
+  },
+  airtel: {
+    number: '+227 98 79 97 23',
+    code: '*436#',
+  },
+  moov: {
+    number: '+227 94 79 97 23',
+    code: '*155#',
+  },
+};
+
 export const REVIEWS: Review[] = [
   { 
     id: '1', 
