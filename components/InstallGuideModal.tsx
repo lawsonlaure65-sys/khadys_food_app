@@ -38,9 +38,7 @@ export const InstallGuideModal: React.FC<InstallGuideModalProps> = ({
         {/* Header */}
         <div className="flex justify-between items-center mb-6 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-brand-brown text-brand-gold rounded-2xl shadow-md">
-              <Download size={24} />
-            </div>
+            <img src="/logo.png" alt="Khady's Food" className="w-12 h-12 rounded-2xl border-2 border-brand-gold shadow-md object-cover bg-white shrink-0" />
             <div>
               <h3 className="text-xl font-black italic uppercase text-brand-brown leading-tight">
                 Installer l'Application

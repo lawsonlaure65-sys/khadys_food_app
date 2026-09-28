@@ -3,23 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Khady's Food">
+    <meta name="application-name" content="Khady's Food">
     <meta name="theme-color" content="#3E2723" />
     
     <title>KHADY'S FOOD & EVENT</title>
     <meta name="description" content="L'excellence de la gastronomie africaine à Niamey en un clic. Commandez vos plats préférés et services traiteur chez Khady's Food & Event." />
     <meta property="og:title" content="KHADY'S FOOD & EVENT — Niamey" />
     <meta property="og:description" content="L'excellence de la gastronomie africaine à Niamey en un clic." />
+    <meta property="og:image" content="/logo.png" />
     
     <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+    <link rel="shortcut icon" href="/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
     <!-- Auto-réparation du cache Chrome / Service Worker sur Vercel -->
     <script>
       (function () {
-        var CURRENT_SW_CACHE = 'khadys-food-v10-fast';
+        var CURRENT_SW_CACHE = 'khadys-food-v11-logo';
 
         // 0. Libérer immédiatement l'espace LocalStorage des clés dupliquées qui saturaient le quota 5 Mo mobile
         try {
