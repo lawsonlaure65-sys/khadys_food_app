@@ -25,6 +25,6 @@
     { "source": "/sw.js", "destination": "/sw.js" },
     { "source": "/manifest.json", "destination": "/manifest.json" },
     { "source": "/assets/:path*", "destination": "/assets/:path*" },
-    { "source": "/((?!assets/|sw\\.js|manifest\\.json|icon-.*|apple-touch-icon.*|logo\\..*|robots\\.txt).*)", "destination": "/index.html" }
+    { "source": "/((?!assets/|sw\\.js|manifest\\.json|favicon.*|icon-.*|apple-touch-icon.*|logo\\..*|robots\\.txt).*)", "destination": "/index.html" }
   ]
 }
