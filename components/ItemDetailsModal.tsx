@@ -233,28 +233,52 @@ const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ item, isOpen, onClo
                 </div>
               </div>
 
-              {/* Notification Précommande WhatsApp */}
-              <div 
-                onClick={() => {
-                  playSound('pop');
-                  const msg = encodeURIComponent(`Salam Khady's Food ! Je souhaite précommander : ${quantity}x ${item.name} (${item.price * quantity} F CFA).\nNotes : ${instructions || 'Standard'}`);
-                  window.open(`https://wa.me/${RESTAURANT_INFO.whatsappClean}?text=${msg}`, '_blank');
-                }}
-                className="bg-emerald-950/90 text-white p-4 rounded-3xl border border-emerald-500/30 flex items-center justify-between cursor-pointer hover:bg-emerald-900 transition-all group shadow-sm gap-2"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
-                    <MessageSquare size={18} />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-[8px] font-black uppercase text-emerald-300 tracking-wider block">Service Rapide</span>
-                    <h5 className="text-[11px] font-black uppercase italic text-white truncate">Commander sur WhatsApp</h5>
-                    <p className="text-[9px] text-emerald-200/70 font-mono font-bold">{RESTAURANT_INFO.whatsapp}</p>
+              {/* Notification Précommande WhatsApp & Liens Officiels */}
+              <div className="bg-emerald-950/95 text-white p-4 rounded-3xl border border-emerald-500/30 space-y-3 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
+                      <MessageSquare size={18} />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[8px] font-black uppercase text-emerald-300 tracking-wider block">Service Rapide & Vitrine Officielle</span>
+                      <h5 className="text-[11px] font-black uppercase italic text-white truncate">Khady’s Food & Event</h5>
+                      <p className="text-[9px] text-emerald-200/70 font-mono font-bold">{RESTAURANT_INFO.whatsapp}</p>
+                    </div>
                   </div>
                 </div>
-                <span className="text-[9px] bg-emerald-500/20 text-emerald-300 group-hover:bg-emerald-500 group-hover:text-white px-3 py-1.5 rounded-xl font-black uppercase tracking-wider transition-all shrink-0">
-                  Commander
-                </span>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <a
+                    href="https://khadysfood.vercel.app"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => playSound('pop')}
+                    className="flex-1 sm:flex-initial bg-brand-gold/20 hover:bg-brand-gold/30 text-brand-gold border border-brand-gold/40 px-3.5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-95"
+                  >
+                    <span>Site Khady’s Food ↗</span>
+                  </a>
+                  <a
+                    href={RESTAURANT_INFO.whatsappCatalogUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => playSound('pop')}
+                    className="flex-1 sm:flex-initial bg-brand-gold/20 hover:bg-brand-gold/30 text-brand-gold border border-brand-gold/40 px-3.5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-95"
+                  >
+                    <ShoppingBag size={12} />
+                    <span>Catalogue WhatsApp ↗</span>
+                  </a>
+                  <a
+                    href={RESTAURANT_INFO.whatsappOrderUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => playSound('pop')}
+                    className="flex-1 sm:flex-initial bg-emerald-500 hover:bg-emerald-400 text-white px-3.5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-95"
+                  >
+                    <MessageSquare size={12} />
+                    <span>Commander sur WhatsApp</span>
+                  </a>
+                </div>
               </div>
 
               <div>

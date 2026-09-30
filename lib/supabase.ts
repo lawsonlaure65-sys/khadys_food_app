@@ -708,7 +708,98 @@ export const db = {
   },
 
   savePlatDuJour: async (plat: PlatDuJourConfig): Promise<{ success: boolean; error?: string }> => {
-    return db.saveSetting('plat_du_jour', plat);
+    const primaryImage =
+      plat.dishImage ||
+      plat.dishes?.[0]?.dishImage ||
+      'https://images.unsplash.com/photo-1544025162-d76694265947?w=1000';
+    const primaryName = plat.dishName || plat.dishes?.[0]?.dishName || 'Plat du Jour';
+
+    const enrichedDishes = Array.isArray(plat.dishes)
+      ? plat.dishes.map((d, idx) => {
+          const img = idx === 0 ? primaryImage : (d.dishImage || primaryImage);
+          return {
+            ...d,
+            dishName: idx === 0 ? primaryName : d.dishName,
+            dishImage: img,
+            image: img,
+            imageUrl: img,
+            image_url: img,
+            photo: img
+          };
+        })
+      : [];
+
+    const enrichedPlat = {
+      ...plat,
+      dishName: primaryName,
+      name: primaryName,
+      dishImage: primaryImage,
+      image: primaryImage,
+      imageUrl: primaryImage,
+      image_url: primaryImage,
+      photo: primaryImage,
+      dishes: enrichedDishes
+    };
+
+    const res = await db.saveSetting('plat_du_jour', enrichedPlat);
+
+    // Also synchronize the Plat du Jour image & flag in menu_items and dishes tables for AllôResto
+    const client = getSupabaseClient();
+    if (client && primaryName) {
+      try {
+        // 1. Clear old is_plat_du_jour flags in menu_items
+        await client
+          .from('menu_items')
+          .update({ is_plat_du_jour: false })
+          .eq('is_plat_du_jour', true);
+
+        // 2. Find matching item in menu_items by name (case-insensitive) and update its image + is_plat_du_jour
+        const { data: existingRows } = await client
+          .from('menu_items')
+          .select('id, name')
+          .ilike('name', `%${primaryName.trim()}%`);
+
+        if (existingRows && existingRows.length > 0) {
+          const targetId = existingRows[0].id;
+          await client
+            .from('menu_items')
+            .update({
+              image: primaryImage,
+              is_plat_du_jour: true,
+              price: plat.price || 4000,
+              description: plat.description || ''
+            })
+            .eq('id', targetId);
+        }
+      } catch {}
+
+      try {
+        await client
+          .from('dishes')
+          .update({ is_plat_du_jour: false })
+          .eq('restaurant_id', 'khadys-food');
+
+        const { data: existingDishes } = await client
+          .from('dishes')
+          .select('id, name')
+          .eq('restaurant_id', 'khadys-food')
+          .ilike('name', `%${primaryName.trim()}%`);
+
+        if (existingDishes && existingDishes.length > 0) {
+          await client
+            .from('dishes')
+            .update({
+              image: primaryImage,
+              is_plat_du_jour: true,
+              price: plat.price || 4000,
+              description: plat.description || ''
+            })
+            .eq('id', existingDishes[0].id);
+        }
+      } catch {}
+    }
+
+    return res;
   },
 
   // --- PHOTO DE PROFIL ADMIN SYNC ---

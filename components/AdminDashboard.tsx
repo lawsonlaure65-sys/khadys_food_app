@@ -699,7 +699,51 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       localStorage.setItem('khadys_custom_user_dishes', JSON.stringify(customList));
     } catch (e) {}
 
-    // 3. Sauvegarde Cloud en arrière-plan sans bloquer
+    // 3. Si le plat modifié dans la CARTE correspond au Plat du Jour (ou l'un des 3 plats du Trio), synchroniser immédiatement le Plat du Jour (Local + Cloud Supabase)
+    try {
+      const currentPlat = getStoredPlatDuJour();
+      const itemNameLower = finalItem.name.toLowerCase().trim();
+      const platNameLower = (currentPlat.dishName || '').toLowerCase().trim();
+      const isMainPlatMatch =
+        Boolean(finalItem.isPlatDuJour) ||
+        (platNameLower && (itemNameLower === platNameLower || itemNameLower.includes(platNameLower) || platNameLower.includes(itemNameLower)));
+
+      const updatedDishes = (currentPlat.dishes || []).map((d, idx) => {
+        const dName = (d.dishName || '').toLowerCase().trim();
+        if (
+          (idx === 0 && isMainPlatMatch) ||
+          (dName && (itemNameLower === dName || itemNameLower.includes(dName) || dName.includes(itemNameLower)))
+        ) {
+          return {
+            ...d,
+            dishName: idx === 0 && isMainPlatMatch ? finalItem.name : d.dishName,
+            dishImage: finalItem.image,
+            price: finalItem.price,
+            description: finalItem.description || d.description
+          };
+        }
+        return d;
+      });
+
+      const didAnyTrioChange =
+        isMainPlatMatch ||
+        updatedDishes.some((d, idx) => d.dishImage !== currentPlat.dishes?.[idx]?.dishImage);
+
+      if (didAnyTrioChange) {
+        const nextPlat: PlatDuJourConfig = {
+          ...currentPlat,
+          dishes: updatedDishes,
+          dishName: isMainPlatMatch ? finalItem.name : currentPlat.dishName,
+          dishImage: isMainPlatMatch ? finalItem.image : (updatedDishes[0]?.dishImage || currentPlat.dishImage),
+          price: isMainPlatMatch ? finalItem.price : currentPlat.price,
+          description: isMainPlatMatch ? (finalItem.description || currentPlat.description) : currentPlat.description
+        };
+        setPlatDuJour(nextPlat);
+        saveStoredPlatDuJour(nextPlat, nextItemsList);
+      }
+    } catch (e) {}
+
+    // 4. Sauvegarde Cloud en arrière-plan sans bloquer
     if (isSupabaseConfigured) {
       db.saveMenuItem(finalItem).then(res => {
         if (!res.success) {
@@ -789,14 +833,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       case AdminView.DASHBOARD:
         return (
           <div className="space-y-6 animate-fade-in">
-            {/* PLAT DU JOUR LIVE CONTROL HERO CARD */}
-            <div className="bg-gradient-to-r from-amber-950/70 via-[#2E140D] to-[#1A0A06] p-5 sm:p-7 rounded-[2.5rem] border-2 border-brand-gold/40 shadow-2xl relative overflow-hidden">
+            {/* PLAT DU JOUR — FICHE OFFICIELLE UNIQUE & RÉSOLUTION DE CONFLIT DE PRIX */}
+            <div className="bg-gradient-to-r from-amber-950/70 via-[#2E140D] to-[#1A0A06] p-5 sm:p-7 rounded-[2.5rem] border-2 border-brand-gold/40 shadow-2xl relative overflow-hidden space-y-4">
                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
                   {/* Left: Dish Preview */}
                   <div className="flex items-center gap-4 sm:gap-5">
                      <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden shrink-0 border border-brand-gold/40 shadow-xl bg-black/40">
                         <img 
-                          src={platDuJour.dishImage || 'https://images.unsplash.com/photo-1544025162-d76694265947?w=1000'} 
+                          src={platDuJour.dishImage || 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1000'} 
                           alt={platDuJour.dishName} 
                           className="w-full h-full object-cover" 
                         />
@@ -807,29 +851,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                      </div>
 
-                     <div className="space-y-1">
+                     <div className="space-y-1.5">
                         <div className="flex flex-wrap items-center gap-2">
                            <span className="bg-brand-gold/20 text-brand-gold text-[8px] font-black uppercase px-2.5 py-0.5 rounded-full border border-brand-gold/30 flex items-center gap-1">
-                              <Sun size={10} className="text-brand-orange" /> Plat du Jour Actuel
+                              <Sun size={10} className="text-brand-orange" /> Fiche Officielle Unique — Plat du Jour
                            </span>
-                           <span className="text-[8px] font-bold text-white/50 bg-white/5 px-2 py-0.5 rounded-full">
-                              {platDuJour.targetDayLabel || (platDuJour.publicationTiming === 'TONIGHT_FOR_TOMORROW' ? 'Demain Midi' : "Aujourd'hui")}
+                           <span className="text-[8px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                              Source : Khady’s Food → Allôresto
                            </span>
                         </div>
                         <h4 className="text-base sm:text-xl font-black italic uppercase text-white leading-tight">
                            {platDuJour.dishName}
                         </h4>
-                        <div className="flex items-center gap-2.5 text-xs">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                            <span className="text-brand-orange font-black font-mono">
-                              {(platDuJour.promoPrice || platDuJour.price).toLocaleString('fr-FR')} F CFA
+                              Prix : {(platDuJour.promoPrice || platDuJour.price).toLocaleString('fr-FR')} F CFA
                            </span>
-                           {platDuJour.promoPrice && platDuJour.promoPrice < platDuJour.price && (
-                              <span className="text-white/40 line-through text-[10px] font-mono">
-                                 {platDuJour.price.toLocaleString('fr-FR')} F
+                           {platDuJour.promoPrice && platDuJour.promoPrice !== platDuJour.price && (
+                              <span className="text-amber-300/80 text-[10px] font-mono bg-amber-500/15 px-2 py-0.5 rounded-lg border border-amber-500/30">
+                                 Conflit : {platDuJour.promoPrice.toLocaleString('fr-FR')} F vs {platDuJour.price.toLocaleString('fr-FR')} F
                               </span>
                            )}
+                           <span className="text-white/70 text-[10px] font-bold">
+                              • Portions : {platDuJour.remainingStock || 25} parts
+                           </span>
                            <span className="text-white/50 text-[10px]">
-                              • {platDuJour.remainingStock || 25} parts
+                              • Date : {platDuJour.date} ({platDuJour.targetDayLabel || 'Menu publié'})
                            </span>
                         </div>
                      </div>
@@ -875,6 +922,59 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                      </button>
                   </div>
                </div>
+
+               {/* ALERTE DE CONFIRMATION DU PRIX UNIQUE OFFICIEL (3 600 FCFA vs 4 000 FCFA) */}
+               {platDuJour.promoPrice && platDuJour.promoPrice !== platDuJour.price && (
+                  <div className="bg-amber-500/15 border border-amber-400/40 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                     <div className="flex items-start sm:items-center gap-2.5">
+                        <AlertTriangle size={18} className="text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+                        <div className="text-[10px] sm:text-xs text-amber-100 font-bold">
+                           <span className="font-black uppercase text-amber-300 block">Conflit de prix détecté ({platDuJour.promoPrice.toLocaleString('fr-FR')} FCFA vs {platDuJour.price.toLocaleString('fr-FR')} FCFA) :</span>
+                           Choisissez l’unique prix officiel à conserver pour <strong>{platDuJour.dishName}</strong> sur Khady’s Food et Allôresto :
+                        </div>
+                     </div>
+                     <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        {[platDuJour.promoPrice, platDuJour.price].map((val) => (
+                           <button
+                              key={val}
+                              type="button"
+                              onClick={() => {
+                                 playSound('success');
+                                 const updatedDishes = (platDuJour.dishes || []).map((d, idx) =>
+                                    idx === 0 ? { ...d, price: val, promoPrice: val } : d
+                                 );
+                                 const unified: PlatDuJourConfig = {
+                                    ...platDuJour,
+                                    price: val,
+                                    promoPrice: val,
+                                    dishes: updatedDishes
+                                 };
+                                 setPlatDuJour(unified);
+                                 saveStoredPlatDuJour(unified, items);
+                                 // Unifier aussi le prix dans la CARTE pour ce plat
+                                 const platNameLower = (platDuJour.dishName || '').toLowerCase().trim();
+                                 const nextItems = items.map((it) => {
+                                    const n = it.name.toLowerCase().trim();
+                                    if (it.isPlatDuJour || (platNameLower && (n === platNameLower || n.includes(platNameLower) || platNameLower.includes(n)))) {
+                                       const updatedItem = { ...it, price: val, isPlatDuJour: true };
+                                       if (isSupabaseConfigured) db.saveMenuItem(updatedItem).catch(() => {});
+                                       return updatedItem;
+                                    }
+                                    return it;
+                                 });
+                                 setItems(nextItems);
+                                 saveMenuToIDB(nextItems).catch(() => {});
+                                 try { localStorage.setItem('khadys_menu_items', JSON.stringify(nextItems)); } catch {}
+                                 triggerShortcutFeedback('Prix Unique Confirmé !', `${val.toLocaleString('fr-FR')} F CFA appliqué partout.`);
+                              }}
+                              className="bg-amber-400 hover:bg-amber-300 text-brand-brown font-black text-[10px] uppercase px-3.5 py-2 rounded-xl shadow-md active:scale-95 transition-all"
+                           >
+                              Conserver {val.toLocaleString('fr-FR')} FCFA
+                           </button>
+                        ))}
+                     </div>
+                  </div>
+               )}
             </div>
 
             {/* Top Stat Cards */}

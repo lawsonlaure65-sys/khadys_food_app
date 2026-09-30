@@ -87,16 +87,16 @@ export const MENU_ITEMS: MenuItem[] = [
   },
   { 
     id: 'sp1', 
-    name: 'Tiep Rouge Royal au Capitaine (Plat Cuisiné du Jour)', 
+    name: 'Tiep Rouge Royal au Capitaine', 
     description: 'Le grand classique sénégalais au poisson capitaine braisé, riz rouge subtilement parfumé à la tomate et épices douces, chou blanc, carottes et manioc fondants.', 
     price: 5500, 
-    image: 'https://images.unsplash.com/photo-1627308595229-7830a5c91f9f?w=800', 
-    category: 'Menu du Jour', 
+    image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800', 
+    category: 'Spécialité Maison', 
     rating: 5, 
     isAvailable: true, 
     isSpicy: true, 
     isSpécialitéMaison: true, 
-    isPlatDuJour: true, 
+    isPlatDuJour: false, 
     isPromo: true 
   },
   {
@@ -673,14 +673,15 @@ export const MENU_ITEMS: MenuItem[] = [
   },
   { 
     id: 'dn2', 
-    name: 'Brochettes de Filet de Bœuf (Suya Box)', 
+    name: 'Brochettes de Filet de Bœuf (Suya)', 
     description: 'Tendres tranches de filet de bœuf marinées à l\'huile d\'arachide et aux épices Kankankan, grillées au feu de bois avec alloco.', 
     price: 4000, 
     image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800', 
-    category: 'Dîner', 
+    category: 'Menu du Jour', 
     rating: 4.9, 
     isAvailable: true, 
-    isSpicy: true 
+    isSpicy: true,
+    isPlatDuJour: true
   },
   { 
     id: 'dn3', 

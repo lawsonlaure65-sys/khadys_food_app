@@ -234,25 +234,46 @@ export const AdminMarketingCenter: React.FC<AdminMarketingCenterProps> = ({
   // Handle selecting ANY dish from the Restaurant's Menu as Plat du Jour
   const handleSelectMenuItemAsPlat = (item: MenuItem) => {
     playSound('pop');
-    const defaultPromoPrice = Math.round(item.price * 0.9 / 50) * 50; // Suggested 10% promo rounded
+    const defaultPromoPrice = item.price; // Keep the exact official price without inventing a second conflicting price
     const accompanimentsText = item.includes && item.includes.length > 0
       ? item.includes.join(', ')
       : 'Riz jasmin parfumé, bananes plantains alloco, piment vert maison';
     
+    const baseDishes = platDuJour.dishes && platDuJour.dishes.length >= 3
+      ? [...platDuJour.dishes]
+      : [...DEFAULT_MENU_DU_JOUR_DISHES];
+
+    baseDishes[0] = {
+      ...baseDishes[0],
+      dishName: item.name,
+      tagline: item.description || `Spécialité du Chef Khady`,
+      description: item.description,
+      accompaniments: accompanimentsText,
+      price: item.price,
+      promoPrice: defaultPromoPrice,
+      dishImage: item.image,
+      remainingStock: platDuJour.remainingStock || 25,
+      isAvailable: true
+    };
+
     const texts = generatePlatDuJourMarketingTexts({
+      ...platDuJour,
+      dishes: baseDishes,
       dishName: item.name,
       description: item.description,
       accompaniments: accompanimentsText,
       price: item.price,
       promoPrice: defaultPromoPrice,
+      dishImage: item.image,
       chefQuote: 'Cuisiné frais avec nos épices du Sahel et notre amour de la gastronomie.',
       date: platDuJour.date,
       targetDayLabel: platDuJour.targetDayLabel || 'Demain Midi',
-      remainingStock: platDuJour.remainingStock || 30
+      remainingStock: platDuJour.remainingStock || 25
     }, selectedPlatStyle);
 
     const updated: PlatDuJourConfig = {
       ...platDuJour,
+      dishes: baseDishes,
       dishName: item.name,
       tagline: item.description || `Spécialité du Chef Khady`,
       description: item.description,
@@ -271,14 +292,25 @@ export const AdminMarketingCenter: React.FC<AdminMarketingCenterProps> = ({
       isActive: true
     };
 
-    setPlatDuJour(updated);
-    saveStoredPlatDuJour(updated);
-    
-    // Also sync to items if available
-    if (onItemsChange && items) {
-      const updatedItems = items.map(i => i.id === item.id ? { ...i, isPlatDuJour: true } : { ...i, isPlatDuJour: false });
-      onItemsChange(updatedItems);
+    // Also sync to items if available and persist to localStorage & Supabase
+    let updatedItemsList = items;
+    if (items && items.length > 0) {
+      updatedItemsList = items.map(i =>
+        i.id === item.id ? { ...i, isPlatDuJour: true, image: item.image } : { ...i, isPlatDuJour: false }
+      );
+      if (onItemsChange) {
+        onItemsChange(updatedItemsList);
+      }
+      try {
+        localStorage.setItem('khadys_menu_items', JSON.stringify(updatedItemsList));
+      } catch {}
+      if (isSupabaseConfigured) {
+        db.saveMenuItem({ ...item, isPlatDuJour: true }).catch(() => {});
+      }
     }
+
+    setPlatDuJour(updated);
+    saveStoredPlatDuJour(updated, updatedItemsList);
 
     setPlatSaved(true);
     setTimeout(() => setPlatSaved(false), 2500);
@@ -291,7 +323,7 @@ export const AdminMarketingCenter: React.FC<AdminMarketingCenterProps> = ({
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64 = reader.result as string;
-        const compressed = await compressImage(base64, 800, 0.8);
+        const compressed = await compressImage(base64, 720, 0.72);
         const dishes = platDuJour.dishes && platDuJour.dishes.length >= 3 
           ? [...platDuJour.dishes] 
           : [...DEFAULT_MENU_DU_JOUR_DISHES];
@@ -300,13 +332,38 @@ export const AdminMarketingCenter: React.FC<AdminMarketingCenterProps> = ({
           dishes[selectedDishIndex] = { ...dishes[selectedDishIndex], dishImage: compressed };
         }
 
+        const targetDishName = (dishes[selectedDishIndex]?.dishName || platDuJour.dishName || '').toLowerCase().trim();
+        let updatedItemsList = items;
+
+        // Also update the matching dish in CARTE so both CARTE and PLAT DU JOUR share the exact same image
+        if (items && items.length > 0 && targetDishName) {
+          let matchedItem: MenuItem | null = null;
+          updatedItemsList = items.map(i => {
+            const iName = i.name.toLowerCase().trim();
+            if (iName === targetDishName || iName.includes(targetDishName) || targetDishName.includes(iName)) {
+              matchedItem = { ...i, image: compressed };
+              return matchedItem;
+            }
+            return i;
+          });
+          if (matchedItem) {
+            if (onItemsChange) onItemsChange(updatedItemsList);
+            try {
+              localStorage.setItem('khadys_menu_items', JSON.stringify(updatedItemsList));
+            } catch {}
+            if (isSupabaseConfigured) {
+              db.saveMenuItem(matchedItem).catch(() => {});
+            }
+          }
+        }
+
         const updated: PlatDuJourConfig = { 
           ...platDuJour, 
           dishImage: selectedDishIndex === 0 ? compressed : platDuJour.dishImage,
           dishes 
         };
         setPlatDuJour(updated);
-        saveStoredPlatDuJour(updated);
+        saveStoredPlatDuJour(updated, updatedItemsList);
         playSound('success');
       };
       reader.readAsDataURL(file);
@@ -316,12 +373,31 @@ export const AdminMarketingCenter: React.FC<AdminMarketingCenterProps> = ({
   // Handle Plat du Jour Presets Selection
   const handleSelectPresetPlat = (preset: typeof PLAT_DU_JOUR_PRESETS[0]) => {
     playSound('pop');
+    const baseDishes = platDuJour.dishes && platDuJour.dishes.length >= 3
+      ? [...platDuJour.dishes]
+      : [...DEFAULT_MENU_DU_JOUR_DISHES];
+
+    baseDishes[0] = {
+      ...baseDishes[0],
+      dishName: preset.name,
+      tagline: preset.tagline,
+      description: preset.description,
+      accompaniments: preset.accompaniments,
+      price: preset.price,
+      promoPrice: preset.promoPrice,
+      dishImage: preset.image,
+      isAvailable: true
+    };
+
     const texts = generatePlatDuJourMarketingTexts({
+      ...platDuJour,
+      dishes: baseDishes,
       dishName: preset.name,
       description: preset.description,
       accompaniments: preset.accompaniments,
       price: preset.price,
       promoPrice: preset.promoPrice,
+      dishImage: preset.image,
       chefQuote: preset.chefQuote,
       date: platDuJour.date,
       targetDayLabel: platDuJour.targetDayLabel || 'Demain Midi',
@@ -330,6 +406,7 @@ export const AdminMarketingCenter: React.FC<AdminMarketingCenterProps> = ({
 
     const updated: PlatDuJourConfig = {
       ...platDuJour,
+      dishes: baseDishes,
       dishName: preset.name,
       tagline: preset.tagline,
       description: preset.description,
@@ -348,7 +425,7 @@ export const AdminMarketingCenter: React.FC<AdminMarketingCenterProps> = ({
     };
 
     setPlatDuJour(updated);
-    saveStoredPlatDuJour(updated);
+    saveStoredPlatDuJour(updated, items);
     setPlatSaved(true);
     setTimeout(() => setPlatSaved(false), 2500);
   };

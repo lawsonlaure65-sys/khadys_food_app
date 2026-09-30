@@ -199,15 +199,15 @@ export const DEFAULT_MENU_DU_JOUR_DISHES: MenuDuJourDishItem[] = [
   {
     id: 'dish-plat-du-jour',
     type: 'PLAT_DU_JOUR',
-    dishName: 'Tiep Rouge Royal au Capitaine',
+    dishName: 'Brochettes de Filet de Bœuf (Suya)',
     badgeLabel: '🍲 Plat Cuisiné du Jour',
     badgeColor: 'bg-brand-orange text-white',
-    tagline: 'Mijoté du jour avec légumes frais et poisson braisé',
-    description: 'Riz rouge sénégalais parfumé, tranche de capitaine braisé, carottes glacées, manioc fondant, chou braisé et sauce pimentée maison.',
+    tagline: 'Tendres tranches de filet de bœuf marinées aux épices Kankankan et grillées au feu de bois',
+    description: 'Tendres tranches de filet de bœuf marinées à l\'huile d\'arachide et aux épices Kankankan, grillées au feu de bois avec poivrons frais, oignons doux et alloco.',
     accompaniments: 'Alloco doré croustillant + Piment vert maison',
-    price: 5500,
-    promoPrice: 4950,
-    dishImage: 'https://images.unsplash.com/photo-1627308595229-7830a5c91f9f?w=1000',
+    price: 4000,
+    promoPrice: 4000,
+    dishImage: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1000',
     remainingStock: 25,
     isDailyPermanent: false,
     isAvailable: true
@@ -691,20 +691,15 @@ export const resolveTrioDishImage = (
 
   // Slot 1: Le Fameux Doukounou
   if (slotIndex === 1 || dish?.type === 'DOUKOUNOU' || dishNameLower.includes('doukounou')) {
-    // Look in the restaurant's menu for Doukounou with a custom restaurant photo
     const doukCustom =
       allItems.find(i => i.id === 'douk-royal' && isCustomRestaurantImage(i.image)) ||
       allItems.find(i => i.name.toLowerCase().includes('fameux doukounou') && isCustomRestaurantImage(i.image)) ||
       allItems.find(i => i.name.toLowerCase().includes('doukounou') && isCustomRestaurantImage(i.image));
 
     if (doukCustom && doukCustom.image) {
-      // If dishImage is still an Unsplash stock image (or empty), use the restaurant's own registered Doukounou photo
-      if (!isCustomRestaurantImage(currentImg)) {
-        return doukCustom.image;
-      }
+      return doukCustom.image;
     }
     if (isCustomRestaurantImage(currentImg)) return currentImg;
-    if (doukCustom?.image) return doukCustom.image;
     return currentImg || DEFAULT_MENU_DU_JOUR_DISHES[1].dishImage;
   }
 
@@ -715,7 +710,6 @@ export const resolveTrioDishImage = (
     dishNameLower.includes('attiéké') ||
     dishNameLower.includes('attieke')
   ) {
-    // Look in the restaurant's menu for Attiéké with a custom restaurant photo
     const attiekeCustom =
       allItems.find(i => i.id === 'attieke-royal' && isCustomRestaurantImage(i.image)) ||
       allItems.find(i => i.id === 'af3' && isCustomRestaurantImage(i.image)) ||
@@ -726,22 +720,15 @@ export const resolveTrioDishImage = (
       );
 
     if (attiekeCustom && attiekeCustom.image) {
-      if (!isCustomRestaurantImage(currentImg)) {
-        return attiekeCustom.image;
-      }
+      return attiekeCustom.image;
     }
     if (isCustomRestaurantImage(currentImg)) return currentImg;
-    if (attiekeCustom?.image) return attiekeCustom.image;
     return currentImg || DEFAULT_MENU_DU_JOUR_DISHES[2].dishImage;
   }
 
-  // Slot 0: Plat Cuisiné du Jour
-  if (isCustomRestaurantImage(currentImg)) {
-    return currentImg;
-  }
-
+  // Slot 0: Plat Cuisiné du Jour — Always check CARTE (allItems) first for custom restaurant photo of this dish
   if (dishNameLower && allItems.length > 0) {
-    const exactOrPartialMatch =
+    const customMatchInCarte =
       allItems.find(
         i => i.name.toLowerCase().trim() === dishNameLower && isCustomRestaurantImage(i.image)
       ) ||
@@ -751,12 +738,34 @@ export const resolveTrioDishImage = (
             i.name.toLowerCase().trim().includes(dishNameLower)) &&
           isCustomRestaurantImage(i.image)
       );
-    if (exactOrPartialMatch && exactOrPartialMatch.image) {
-      return exactOrPartialMatch.image;
+    if (customMatchInCarte && customMatchInCarte.image) {
+      return customMatchInCarte.image;
     }
   }
 
-  return currentImg || DEFAULT_MENU_DU_JOUR_DISHES[0].dishImage;
+  if (isCustomRestaurantImage(currentImg)) {
+    return currentImg;
+  }
+
+  if (dishNameLower && allItems.length > 0) {
+    const anyMatchInCarte =
+      allItems.find(i => i.name.toLowerCase().trim() === dishNameLower && i.image) ||
+      allItems.find(
+        i =>
+          (dishNameLower.includes(i.name.toLowerCase().trim()) ||
+            i.name.toLowerCase().trim().includes(dishNameLower)) &&
+          i.image
+      );
+    if (anyMatchInCarte && anyMatchInCarte.image) {
+      return anyMatchInCarte.image;
+    }
+  }
+
+  if (currentImg && !currentImg.includes('photo-1627308595229-7830a5c91f9f')) {
+    return currentImg;
+  }
+
+  return DEFAULT_MENU_DU_JOUR_DISHES[0].dishImage;
 };
 
 // Synchronize all 3 Trio dishes in MenuDuJourConfig with the restaurant's own images from the menu
@@ -783,21 +792,67 @@ export const syncMenuDuJourWithMenuItems = (
           { ...DEFAULT_MENU_DU_JOUR_DISHES[2] }
         ];
 
-  const syncedDishes = baseDishes.map((d, idx) => ({
-    ...d,
-    dishImage: resolveTrioDishImage(
-      idx === 0 && !isCustomRestaurantImage(d.dishImage) && isCustomRestaurantImage(config.dishImage)
+  // Ensure baseDishes[0] reflects any top-level updates made to config (e.g. selecting a dish from CARTE)
+  if (config.dishName && baseDishes[0]) {
+    const isSuya =
+      config.dishName.toLowerCase().includes('suya') ||
+      config.dishName.toLowerCase().includes('brochettes de filet');
+    const unifiedPrice = isSuya ? 4000 : (config.price || baseDishes[0].price);
+    const unifiedPromoPrice = isSuya
+      ? 4000
+      : (config.promoPrice === 3600 && unifiedPrice === 4000 ? 4000 : (config.promoPrice ?? baseDishes[0].promoPrice));
+
+    baseDishes[0] = {
+      ...baseDishes[0],
+      dishName: config.dishName,
+      tagline: config.tagline || baseDishes[0].tagline,
+      description: config.description || baseDishes[0].description,
+      accompaniments: config.accompaniments || baseDishes[0].accompaniments,
+      price: unifiedPrice,
+      promoPrice: unifiedPromoPrice,
+      dishImage: config.dishImage || baseDishes[0].dishImage,
+      remainingStock: config.remainingStock ?? baseDishes[0].remainingStock
+    };
+  }
+
+  const syncedDishes = baseDishes.map((d, idx) => {
+    const resolvedImg = resolveTrioDishImage(
+      idx === 0 && isCustomRestaurantImage(config.dishImage)
         ? { ...d, dishImage: config.dishImage }
         : d,
       idx,
       menuItems
-    )
-  }));
+    );
+    return {
+      ...d,
+      dishImage: resolvedImg,
+      // Compatibility aliases for external readers (AllôResto, etc.)
+      image: resolvedImg,
+      imageUrl: resolvedImg,
+      image_url: resolvedImg
+    } as MenuDuJourDishItem;
+  });
+
+  const primaryImage = syncedDishes[0]?.dishImage || config.dishImage || DEFAULT_MENU_DU_JOUR_DISHES[0].dishImage;
 
   return {
     ...config,
     dishes: syncedDishes,
-    dishImage: syncedDishes[0]?.dishImage || config.dishImage
+    dishName: syncedDishes[0]?.dishName || config.dishName,
+    description: syncedDishes[0]?.description || config.description,
+    accompaniments: syncedDishes[0]?.accompaniments || config.accompaniments,
+    price: syncedDishes[0]?.price || config.price,
+    promoPrice: syncedDishes[0]?.promoPrice ?? config.promoPrice,
+    dishImage: primaryImage,
+    remainingStock: syncedDishes[0]?.remainingStock ?? config.remainingStock,
+    // Compatibility aliases so AllôResto always reads the exact image regardless of property name
+    ...({
+      image: primaryImage,
+      imageUrl: primaryImage,
+      image_url: primaryImage,
+      photo: primaryImage,
+      name: syncedDishes[0]?.dishName || config.dishName
+    } as any)
   };
 };
 
@@ -838,19 +893,59 @@ export const getStoredMenuDuJour = (): MenuDuJourConfig => {
           ];
         }
 
+        let rawDishName = parsed.dishName || dishes[0]?.dishName || DEFAULT_MENU_DU_JOUR_DISHES[0].dishName;
+        // Disable stale automatic Tiep Rouge Royal au Capitaine entry if it was the old default
+        if (
+          rawDishName.toLowerCase().includes('tiep rouge royal au capitaine') &&
+          !isCustomRestaurantImage(parsed.dishImage) &&
+          !isCustomRestaurantImage(dishes[0]?.dishImage)
+        ) {
+          rawDishName = DEFAULT_MENU_DU_JOUR_DISHES[0].dishName;
+          parsed.dishName = DEFAULT_MENU_DU_JOUR_DISHES[0].dishName;
+          parsed.description = DEFAULT_MENU_DU_JOUR_DISHES[0].description;
+          parsed.accompaniments = DEFAULT_MENU_DU_JOUR_DISHES[0].accompaniments;
+          parsed.price = DEFAULT_MENU_DU_JOUR_DISHES[0].price;
+          parsed.promoPrice = DEFAULT_MENU_DU_JOUR_DISHES[0].promoPrice;
+          parsed.dishImage = DEFAULT_MENU_DU_JOUR_DISHES[0].dishImage;
+          if (dishes[0]) {
+            dishes[0] = { ...DEFAULT_MENU_DU_JOUR_DISHES[0] };
+          }
+        }
+
+        const topDishName = rawDishName;
+        const topDishImage =
+          (isCustomRestaurantImage(parsed.dishImage) ? parsed.dishImage : '') ||
+          (isCustomRestaurantImage(dishes[0]?.dishImage) ? dishes[0]?.dishImage : '') ||
+          parsed.dishImage ||
+          dishes[0]?.dishImage ||
+          DEFAULT_MENU_DU_JOUR_DISHES[0].dishImage;
+
+        if (dishes[0]) {
+          dishes[0] = {
+            ...dishes[0],
+            dishName: topDishName,
+            description: parsed.description || dishes[0].description || DEFAULT_MENU_DU_JOUR_DISHES[0].description,
+            accompaniments: parsed.accompaniments || dishes[0].accompaniments || DEFAULT_MENU_DU_JOUR_DISHES[0].accompaniments,
+            price: parsed.price || dishes[0].price || DEFAULT_MENU_DU_JOUR_DISHES[0].price,
+            promoPrice: parsed.promoPrice ?? dishes[0].promoPrice ?? DEFAULT_MENU_DU_JOUR_DISHES[0].promoPrice,
+            dishImage: topDishImage,
+            remainingStock: parsed.remainingStock ?? dishes[0].remainingStock ?? DEFAULT_MENU_DU_JOUR_DISHES[0].remainingStock,
+          };
+        }
+
         const syncedRaw: MenuDuJourConfig = {
           ...INITIAL_MENU_DU_JOUR,
           ...parsed,
           posterLayout: parsed.posterLayout || 'TRIO_POSTER',
           title: parsed.title || 'Menu du Jour — Le Trio Gourmand',
           dishes,
-          dishName: dishes[0]?.dishName || parsed.dishName || DEFAULT_MENU_DU_JOUR_DISHES[0].dishName,
+          dishName: topDishName,
           description: dishes[0]?.description || parsed.description || DEFAULT_MENU_DU_JOUR_DISHES[0].description,
           accompaniments: dishes[0]?.accompaniments || parsed.accompaniments || DEFAULT_MENU_DU_JOUR_DISHES[0].accompaniments,
           price: dishes[0]?.price || parsed.price || DEFAULT_MENU_DU_JOUR_DISHES[0].price,
-          promoPrice: dishes[0]?.promoPrice || parsed.promoPrice || DEFAULT_MENU_DU_JOUR_DISHES[0].promoPrice,
-          dishImage: dishes[0]?.dishImage || parsed.dishImage || DEFAULT_MENU_DU_JOUR_DISHES[0].dishImage,
-          remainingStock: dishes[0]?.remainingStock || parsed.remainingStock || DEFAULT_MENU_DU_JOUR_DISHES[0].remainingStock,
+          promoPrice: dishes[0]?.promoPrice ?? parsed.promoPrice ?? DEFAULT_MENU_DU_JOUR_DISHES[0].promoPrice,
+          dishImage: topDishImage,
+          remainingStock: dishes[0]?.remainingStock ?? parsed.remainingStock ?? DEFAULT_MENU_DU_JOUR_DISHES[0].remainingStock,
         };
 
         const synced = syncMenuDuJourWithMenuItems(syncedRaw);

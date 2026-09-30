@@ -458,8 +458,20 @@ const App: React.FC = () => {
                 const map = new Map<string, MenuItem>();
                 // 1. Plats locaux existants conservés en priorité
                 prev.forEach(i => map.set(i.id, i));
-                // 2. Enrichissement depuis le Cloud
-                cloudMenu.forEach(i => map.set(i.id, i));
+                // 2. Enrichissement depuis le Cloud (sans JAMAIS écraser une photo personnalisée locale par une image stock Unsplash)
+                cloudMenu.forEach(cloudItem => {
+                  const localItem = map.get(cloudItem.id);
+                  if (
+                    localItem &&
+                    localItem.image &&
+                    !localItem.image.includes('unsplash.com') &&
+                    (!cloudItem.image || cloudItem.image.includes('unsplash.com'))
+                  ) {
+                    map.set(cloudItem.id, { ...cloudItem, image: localItem.image });
+                  } else {
+                    map.set(cloudItem.id, cloudItem);
+                  }
+                });
                 const merged = Array.from(map.values());
                 latestMergedMenu = merged;
                 saveMenuToIDB(merged);
@@ -475,14 +487,33 @@ const App: React.FC = () => {
 
           // B. Synchronisation du Plat du Jour Cloud + Photos Restaurant (Doukounou, Attiéké, Plat du Jour)
           try {
+            const localPlat = getStoredPlatDuJour();
             const cloudPlat = await db.fetchPlatDuJour();
-            const basePlat = cloudPlat && cloudPlat.dishName ? cloudPlat : getStoredPlatDuJour();
-            const syncedPlat = syncMenuDuJourWithMenuItems(basePlat, latestMergedMenu.length > 0 ? latestMergedMenu : undefined);
+            // Priorité au Plat du Jour local s'il possède déjà une photo personnalisée ou un plat modifié dans l'Admin
+            const basePlat =
+              localPlat && localPlat.dishImage && !localPlat.dishImage.includes('unsplash.com')
+                ? localPlat
+                : (cloudPlat && cloudPlat.dishName ? cloudPlat : localPlat);
+            const syncedPlat = syncMenuDuJourWithMenuItems(
+              basePlat,
+              latestMergedMenu.length > 0 ? latestMergedMenu : consolidatedLocalItems
+            );
             try {
               localStorage.setItem('khadys_plat_du_jour', JSON.stringify(syncedPlat));
             } catch (e) {}
             invalidateMarketingMemoryCache();
             window.dispatchEvent(new CustomEvent('khadys_plat_du_jour_updated', { detail: syncedPlat }));
+            // Pousser automatiquement l'image et le prix unique officiel (4 000 F CFA) synchronisés vers Supabase (app_settings + menu_items + dishes) pour AllôResto
+            if (
+              !cloudPlat ||
+              cloudPlat.dishImage !== syncedPlat.dishImage ||
+              cloudPlat.dishName !== syncedPlat.dishName ||
+              cloudPlat.price !== syncedPlat.price ||
+              cloudPlat.promoPrice !== syncedPlat.promoPrice ||
+              !(cloudPlat as any).image
+            ) {
+              db.savePlatDuJour(syncedPlat).catch(() => {});
+            }
           } catch (e) {}
 
           // C. Synchronisation de la Photo de Profil Admin Cloud
@@ -873,11 +904,11 @@ const App: React.FC = () => {
                 </div>
                 <div className="flex flex-wrap items-center gap-2 relative z-10 shrink-0">
                   <a
-                    href={RESTAURANT_INFO.websiteUrl}
+                    href="https://khadysfood.vercel.app"
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => playSound('pop')}
-                    className="flex-1 sm:flex-initial bg-brand-brown/80 hover:bg-brand-brown text-brand-gold border border-brand-gold/40 px-3.5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-95"
+                    className="flex-1 sm:flex-initial bg-brand-gold/20 hover:bg-brand-gold/30 text-brand-gold border border-brand-gold/40 px-3.5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-95"
                   >
                     <span>Site Khady’s Food ↗</span>
                   </a>
