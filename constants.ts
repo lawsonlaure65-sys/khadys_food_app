@@ -24,11 +24,13 @@ export const BILLO_INFO = {
 export const RESTAURANT_INFO = {
   name: "Khady's Food & Event",
   slogan: "L'excellence en un clic",
+  websiteUrl: "https://khadysfood.vercel.app",
   phones: ["+227 74 44 16 21", "+227 96 05 23 10", "+227 90 40 51 18"],
   whatsapp: "+227 74 44 16 21",
   whatsappClean: "22774441621",
+  whatsappOrderUrl: "https://wa.me/22774441621",
   whatsappDirectUrl: "https://wa.me/22774441621",
-  whatsappCatalogUrl: "https://wa.me/c/22774441621",
+  whatsappCatalogUrl: "https://wa.me/c/74441621",
   directLine: "+227 96 05 23 10",
   directLineClean: "22796052310",
   depositNumbers: {

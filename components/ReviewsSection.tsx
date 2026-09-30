@@ -28,6 +28,7 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ reviews, onAddReview })
       name: authorName.trim(),
       rating,
       comment: comment.trim(),
+      date: "Aujourd'hui",
       image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200'
     };
     onAddReview?.(newReview);

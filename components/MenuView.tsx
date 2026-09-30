@@ -306,14 +306,7 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
 
       {/* NOTIFICATION PRÉCOMMANDE WHATSAPP & CATALOGUE SÉPARÉ */}
       <div className="px-3.5 sm:px-6 mb-6 space-y-2 w-full min-w-0">
-        <div 
-          onClick={() => {
-            playSound('pop');
-            const url = `https://wa.me/${RESTAURANT_INFO.whatsappClean}?text=${encodeURIComponent("Salam Khady's Food ! Je souhaite précommander sur WhatsApp : ")}`;
-            window.open(url, '_blank');
-          }}
-          className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-[#12261A] text-white p-3.5 sm:p-4 rounded-3xl border border-emerald-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:border-emerald-400 active:scale-98 transition-all shadow-lg"
-        >
+        <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-[#12261A] text-white p-3.5 sm:p-4 rounded-3xl border border-emerald-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-emerald-400 transition-all shadow-lg">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
               <MessageSquare size={18} className="animate-pulse" />
@@ -326,19 +319,32 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
               </p>
             </div>
           </div>
-          <span className="bg-emerald-500 hover:bg-emerald-400 text-white text-[8px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-colors shrink-0 flex items-center justify-center gap-1 self-end sm:self-auto">
-            Commander <ArrowRight size={10} />
-          </span>
+          <a
+            href={RESTAURANT_INFO.whatsappOrderUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => playSound('pop')}
+            className="bg-emerald-500 hover:bg-emerald-400 text-white text-[8px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-colors shrink-0 flex items-center justify-center gap-1 self-end sm:self-auto"
+          >
+            Commander sur WhatsApp <ArrowRight size={10} />
+          </a>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-1 text-[8px] sm:text-[9px] text-brand-brown/70 font-bold">
-          <span>Ligne directe : <strong className="font-mono text-brand-brown">{RESTAURANT_INFO.whatsapp}</strong></span>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-1 text-[8px] sm:text-[9px] text-brand-brown/70 font-bold">
+          <a
+            href={RESTAURANT_INFO.websiteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-brand-brown hover:text-brand-orange underline font-black uppercase"
+          >
+            Site Khady’s Food ↗
+          </a>
           <a
             href={RESTAURANT_INFO.whatsappCatalogUrl}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="text-emerald-700 hover:text-emerald-600 underline font-black uppercase"
           >
-            Catalogue WhatsApp séparé →
+            Catalogue WhatsApp ↗
           </a>
         </div>
       </div>

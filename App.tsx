@@ -873,24 +873,33 @@ const App: React.FC = () => {
                 </div>
                 <div className="flex flex-wrap items-center gap-2 relative z-10 shrink-0">
                   <a
-                    href={`https://wa.me/${RESTAURANT_INFO.whatsappClean}?text=${encodeURIComponent("Salam Khady's Food ! Je souhaite faire une précommande pour aujourd'hui / un événement : ")}`}
+                    href={RESTAURANT_INFO.websiteUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => playSound('pop')}
-                    className="flex-1 sm:flex-initial bg-emerald-500 hover:bg-emerald-400 text-white px-3.5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-95"
+                    className="flex-1 sm:flex-initial bg-brand-brown/80 hover:bg-brand-brown text-brand-gold border border-brand-gold/40 px-3.5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-95"
                   >
-                    <MessageSquare size={12} />
-                    <span>Discuter</span>
+                    <span>Site Khady’s Food ↗</span>
                   </a>
                   <a
-                    href={RESTAURANT_INFO.whatsappCatalogUrl || "https://wa.me/c/22774441621"}
+                    href={RESTAURANT_INFO.whatsappCatalogUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => playSound('pop')}
                     className="flex-1 sm:flex-initial bg-brand-gold/20 hover:bg-brand-gold/30 text-brand-gold border border-brand-gold/40 px-3.5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-95"
                   >
                     <ShoppingBag size={12} />
-                    <span>Catalogue WhatsApp</span>
+                    <span>Catalogue WhatsApp ↗</span>
+                  </a>
+                  <a
+                    href={RESTAURANT_INFO.whatsappOrderUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => playSound('pop')}
+                    className="flex-1 sm:flex-initial bg-emerald-500 hover:bg-emerald-400 text-white px-3.5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-95"
+                  >
+                    <MessageSquare size={12} />
+                    <span>Commander sur WhatsApp</span>
                   </a>
                 </div>
               </div>

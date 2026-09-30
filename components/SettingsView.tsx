@@ -149,18 +149,46 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </header>
 
       {/* Restaurant Card */}
-      <div className="bg-gradient-to-r from-brand-brown to-[#2C1814] text-white p-6 rounded-[2.5rem] shadow-2xl border-2 border-brand-gold/30 flex items-center gap-5">
-        <img src={LOGO_URL} alt="Khady's Logo" className="w-20 h-20 rounded-2xl border-2 border-brand-gold shadow-md object-cover shrink-0" />
-        <div className="space-y-1">
-          <span className="bg-brand-orange text-white text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-widest inline-block">
-            {RESTAURANT_INFO.slogan}
-          </span>
-          <h3 className="text-2xl font-black italic uppercase text-brand-gold">
-            {RESTAURANT_INFO.name}
-          </h3>
-          <p className="text-xs text-white/70 font-medium flex items-center gap-1.5">
-            <MapPin size={14} className="text-brand-orange" /> {RESTAURANT_INFO.location}
-          </p>
+      <div className="bg-gradient-to-r from-brand-brown to-[#2C1814] text-white p-6 rounded-[2.5rem] shadow-2xl border-2 border-brand-gold/30 space-y-4">
+        <div className="flex items-center gap-5">
+          <img src={LOGO_URL} alt="Khady's Logo" className="w-20 h-20 rounded-2xl border-2 border-brand-gold shadow-md object-cover shrink-0" />
+          <div className="space-y-1">
+            <span className="bg-brand-orange text-white text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-widest inline-block">
+              {RESTAURANT_INFO.slogan}
+            </span>
+            <h3 className="text-2xl font-black italic uppercase text-brand-gold">
+              {RESTAURANT_INFO.name}
+            </h3>
+            <p className="text-xs text-white/70 font-medium flex items-center gap-1.5">
+              <MapPin size={14} className="text-brand-orange" /> {RESTAURANT_INFO.location}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 pt-2 border-t border-white/10">
+          <a
+            href={RESTAURANT_INFO.websiteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-brand-gold text-brand-brown px-3.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md"
+          >
+            <Globe size={12} /> Site Khady’s Food ↗
+          </a>
+          <a
+            href={RESTAURANT_INFO.whatsappCatalogUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white/10 hover:bg-white/20 text-brand-gold border border-brand-gold/30 px-3.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5"
+          >
+            Catalogue WhatsApp ↗
+          </a>
+          <a
+            href={RESTAURANT_INFO.whatsappOrderUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5"
+          >
+            <MessageSquare size={12} /> Commander sur WhatsApp
+          </a>
         </div>
       </div>
 
