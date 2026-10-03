@@ -510,6 +510,7 @@ const App: React.FC = () => {
               cloudPlat.dishName !== syncedPlat.dishName ||
               cloudPlat.price !== syncedPlat.price ||
               cloudPlat.promoPrice !== syncedPlat.promoPrice ||
+              cloudPlat.date !== syncedPlat.date ||
               !(cloudPlat as any).image
             ) {
               db.savePlatDuJour(syncedPlat).catch(() => {});

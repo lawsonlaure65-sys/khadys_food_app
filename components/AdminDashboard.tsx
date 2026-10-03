@@ -40,7 +40,9 @@ import {
   PlatDuJourConfig,
   getStoredPromoCodes,
   getStoredBanner,
-  getStoredFlashDeal
+  getStoredFlashDeal,
+  formatMenuDateFrench,
+  isMenuDateStale
 } from '../utils/marketing';
 
 interface AdminDashboardProps {
@@ -876,7 +878,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               • Portions : {platDuJour.remainingStock || 25} parts
                            </span>
                            <span className="text-white/50 text-[10px]">
-                              • Date : {platDuJour.date} ({platDuJour.targetDayLabel || 'Menu publié'})
+                              • Date : {(!platDuJour.date || isMenuDateStale(platDuJour.date, platDuJour.calendarDate)) ? formatMenuDateFrench() : platDuJour.date} ({platDuJour.targetDayLabel || 'Menu publié'})
                            </span>
                         </div>
                      </div>

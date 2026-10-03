@@ -22,7 +22,8 @@ import {
   shareToSocialPlatform,
   getMarketingTemplates, MARKETING_TEMPLATES, broadcastToWhatsApp,
   DEFAULT_MENU_DU_JOUR_DISHES, MenuDuJourDishItem,
-  syncMenuDuJourWithMenuItems, resolveTrioDishImage
+  syncMenuDuJourWithMenuItems, resolveTrioDishImage,
+  formatMenuDateFrench, getCalendarDateString, isMenuDateStale, getComputedTargetDayLabel
 } from '../utils/marketing';
 import { RESTAURANT_INFO } from '../constants';
 import { compressImage } from '../utils/imageCompressor';
@@ -1219,6 +1220,74 @@ Sois précis, concret, orienté chiffre d'affaires et rédigé avec professionna
                 </div>
 
                 <div className="space-y-3.5">
+                  {/* Date Officielle du Menu & Calendrier */}
+                  <div className="bg-black/30 p-3.5 rounded-2xl border border-white/10 space-y-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <label className="text-[10px] font-black uppercase text-brand-gold flex items-center gap-1.5">
+                        <Calendar size={13} className="text-brand-orange" /> Date Officielle du Menu
+                      </label>
+                      <span className="text-[10px] font-bold text-white bg-brand-orange/20 px-2.5 py-0.5 rounded-full border border-brand-orange/30">
+                        {(!platDuJour.date || isMenuDateStale(platDuJour.date, platDuJour.calendarDate)) ? formatMenuDateFrench() : platDuJour.date}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="date"
+                        value={platDuJour.calendarDate || getCalendarDateString()}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (!val) return;
+                          const d = new Date(val + 'T12:00:00');
+                          const formatted = formatMenuDateFrench(d);
+                          const targetDay = getComputedTargetDayLabel(platDuJour.publicationTiming, d);
+                          setPlatDuJour({
+                            ...platDuJour,
+                            calendarDate: val,
+                            date: formatted,
+                            targetDayLabel: targetDay
+                          });
+                        }}
+                        className="bg-black/50 border border-white/20 rounded-xl px-3 py-1.5 text-xs text-brand-gold font-bold focus:outline-none focus:border-brand-gold font-mono"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playSound('pop');
+                          const today = new Date();
+                          setPlatDuJour({
+                            ...platDuJour,
+                            calendarDate: getCalendarDateString(today),
+                            date: formatMenuDateFrench(today),
+                            targetDayLabel: getComputedTargetDayLabel(platDuJour.publicationTiming, today)
+                          });
+                        }}
+                        className="bg-white/10 hover:bg-white/20 text-white text-[9px] font-black uppercase px-3 py-2 rounded-xl transition-all border border-white/10"
+                      >
+                        ⚡ Aujourd'hui
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playSound('pop');
+                          const tomorrow = new Date();
+                          tomorrow.setDate(tomorrow.getDate() + 1);
+                          setPlatDuJour({
+                            ...platDuJour,
+                            calendarDate: getCalendarDateString(tomorrow),
+                            date: formatMenuDateFrench(tomorrow),
+                            targetDayLabel: getComputedTargetDayLabel(platDuJour.publicationTiming, tomorrow)
+                          });
+                        }}
+                        className="bg-white/10 hover:bg-white/20 text-white text-[9px] font-black uppercase px-3 py-2 rounded-xl transition-all border border-white/10"
+                      >
+                        🌙 Demain
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Target Day and Timing Selector */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">

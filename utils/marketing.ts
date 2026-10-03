@@ -63,7 +63,8 @@ export interface MenuDuJourDishItem {
 export interface MenuDuJourConfig {
   id: string;
   date: string;
-  targetDayLabel?: string; // e.g., "Demain Midi", "Ce Midi", "Vendredi 14 Août"
+  calendarDate?: string; // YYYY-MM-DD for native calendar date picker binding
+  targetDayLabel?: string; // e.g., "Demain Midi", "Ce Midi", "Samedi 3 Octobre"
   publicationTiming: PublicationTiming; // Posté la veille au soir vs ce matin
   title: string;
   tagline: string;
@@ -93,6 +94,53 @@ export interface MenuDuJourConfig {
   marketingTextEveningStatusShort?: string; // Teaser court < 7 lignes spécial Statut Veille
   hashtags: string;
 }
+
+// Helper: Format a Date object into French string e.g. "Samedi 3 Octobre"
+export const formatMenuDateFrench = (d: Date = new Date()): string => {
+  const formatted = new Intl.DateTimeFormat('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long'
+  }).format(d);
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+};
+
+// Helper: Format a Date object into YYYY-MM-DD
+export const getCalendarDateString = (d: Date = new Date()): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Helper: Check if a stored date is stale (e.g. contains "août" or is from a previous calendar day)
+export const isMenuDateStale = (dateStr?: string, calendarDate?: string): boolean => {
+  if (!dateStr || dateStr.trim() === '') return true;
+  const lower = dateStr.toLowerCase();
+  if (lower.includes('août') || lower.includes('aout') || lower.includes('14 août')) {
+    return true;
+  }
+  if (calendarDate) {
+    const today = getCalendarDateString();
+    if (calendarDate < today) return true;
+  }
+  return false;
+};
+
+// Helper: Get computed targetDayLabel according to publicationTiming
+export const getComputedTargetDayLabel = (
+  publicationTiming: PublicationTiming = 'TONIGHT_FOR_TOMORROW',
+  baseDate: Date = new Date()
+): string => {
+  if (publicationTiming === 'TONIGHT_FOR_TOMORROW') {
+    const tomorrow = new Date(baseDate);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayName = new Intl.DateTimeFormat('fr-FR', { weekday: 'long' }).format(tomorrow);
+    return `Demain ${dayName.charAt(0).toUpperCase() + dayName.slice(1)} Midi`;
+  }
+  const dayName = new Intl.DateTimeFormat('fr-FR', { weekday: 'long' }).format(baseDate);
+  return `Aujourd'hui ${dayName.charAt(0).toUpperCase() + dayName.slice(1)} Midi`;
+};
 
 // Alias for backward compatibility
 export type PlatDuJourConfig = MenuDuJourConfig;
@@ -249,8 +297,9 @@ export const DEFAULT_MENU_DU_JOUR_DISHES: MenuDuJourDishItem[] = [
 // Default Initial Menu du Jour (Trio Quotidien)
 export const INITIAL_MENU_DU_JOUR: MenuDuJourConfig = {
   id: 'mdj-today',
-  date: new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()),
-  targetDayLabel: 'Demain Mercredi Midi',
+  date: formatMenuDateFrench(),
+  calendarDate: getCalendarDateString(),
+  targetDayLabel: getComputedTargetDayLabel('TONIGHT_FOR_TOMORROW'),
   publicationTiming: 'TONIGHT_FOR_TOMORROW',
   posterTheme: 'LUXURY_GOLD',
   posterFormat: 'SQUARE_POST',
@@ -933,9 +982,19 @@ export const getStoredMenuDuJour = (): MenuDuJourConfig => {
           };
         }
 
+        const dateNeedsRefresh = isMenuDateStale(parsed.date, parsed.calendarDate);
+        const resolvedDate = dateNeedsRefresh ? formatMenuDateFrench() : parsed.date;
+        const resolvedCalendarDate = dateNeedsRefresh ? getCalendarDateString() : (parsed.calendarDate || getCalendarDateString());
+        const resolvedTargetDay = (dateNeedsRefresh || !parsed.targetDayLabel || parsed.targetDayLabel.includes('août') || parsed.targetDayLabel.includes('aout'))
+          ? getComputedTargetDayLabel(parsed.publicationTiming || 'TONIGHT_FOR_TOMORROW')
+          : parsed.targetDayLabel;
+
         const syncedRaw: MenuDuJourConfig = {
           ...INITIAL_MENU_DU_JOUR,
           ...parsed,
+          date: resolvedDate,
+          calendarDate: resolvedCalendarDate,
+          targetDayLabel: resolvedTargetDay,
           posterLayout: parsed.posterLayout || 'TRIO_POSTER',
           title: parsed.title || 'Menu du Jour — Le Trio Gourmand',
           dishes,
@@ -950,14 +1009,20 @@ export const getStoredMenuDuJour = (): MenuDuJourConfig => {
 
         const synced = syncMenuDuJourWithMenuItems(syncedRaw);
 
-        // Regenerate texts if needed
+        // Regenerate texts if needed or if date was refreshed
         const texts = generateMenuDuJourMarketingTexts(synced, 'GOURMAND');
-        synced.marketingTextWhatsApp = synced.marketingTextWhatsApp || texts.whatsapp;
-        synced.marketingTextStatusShort = synced.marketingTextStatusShort || texts.statusShort;
-        synced.marketingTextGroups = synced.marketingTextGroups || texts.groups;
-        synced.marketingTextSocial = synced.marketingTextSocial || texts.social;
-        synced.marketingTextEveningTeaser = synced.marketingTextEveningTeaser || texts.eveningTeaser;
-        synced.marketingTextEveningStatusShort = synced.marketingTextEveningStatusShort || texts.eveningStatusShort;
+        synced.marketingTextWhatsApp = (!dateNeedsRefresh && synced.marketingTextWhatsApp) ? synced.marketingTextWhatsApp : texts.whatsapp;
+        synced.marketingTextStatusShort = (!dateNeedsRefresh && synced.marketingTextStatusShort) ? synced.marketingTextStatusShort : texts.statusShort;
+        synced.marketingTextGroups = (!dateNeedsRefresh && synced.marketingTextGroups) ? synced.marketingTextGroups : texts.groups;
+        synced.marketingTextSocial = (!dateNeedsRefresh && synced.marketingTextSocial) ? synced.marketingTextSocial : texts.social;
+        synced.marketingTextEveningTeaser = (!dateNeedsRefresh && synced.marketingTextEveningTeaser) ? synced.marketingTextEveningTeaser : texts.eveningTeaser;
+        synced.marketingTextEveningStatusShort = (!dateNeedsRefresh && synced.marketingTextEveningStatusShort) ? synced.marketingTextEveningStatusShort : texts.eveningStatusShort;
+
+        if (dateNeedsRefresh) {
+          try {
+            localStorage.setItem('khadys_plat_du_jour', JSON.stringify(synced));
+          } catch (e) {}
+        }
 
         _cachedMenuDuJour = synced;
         return synced;

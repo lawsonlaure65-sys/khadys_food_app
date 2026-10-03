@@ -4,13 +4,14 @@ import {
   Image as ImageIcon, Check, Copy, RefreshCw, Eye, Flame, 
   ChefHat, Award, Clock, Gift, ShoppingBag, ShieldCheck, 
   MessageSquare, Globe, ArrowRight, Palette, Layers, CheckCircle2,
-  Music, Facebook, Instagram, AlertCircle, Send, Info, Edit3, LayoutGrid
+  Music, Facebook, Instagram, AlertCircle, Send, Info, Edit3, LayoutGrid, Calendar
 } from 'lucide-react';
 import { 
   PlatDuJourConfig, PosterTheme, PosterFormat, PosterLayout, PublicationTiming, 
   DEFAULT_MENU_DU_JOUR_DISHES,
   shareToSocialPlatform, broadcastToWhatsApp, shareImageAndText,
-  generatePlatDuJourMarketingTexts, resolveTrioDishImage, isCustomRestaurantImage
+  generatePlatDuJourMarketingTexts, resolveTrioDishImage, isCustomRestaurantImage,
+  formatMenuDateFrench, getCalendarDateString, isMenuDateStale, getComputedTargetDayLabel
 } from '../utils/marketing';
 import { RESTAURANT_INFO } from '../constants';
 import { playSound } from '../utils/audio';
@@ -366,9 +367,13 @@ export const PlatDuJourPosterStudio: React.FC<PlatDuJourPosterStudioProps> = ({
       ctx.restore();
 
       // 4. Timing Ribbon Badge ("🌙 AU MENU DEMAIN MIDI" or "🍲 PLAT DU JOUR")
+      const effectiveDate = (!plat.date || isMenuDateStale(plat.date, plat.calendarDate))
+        ? formatMenuDateFrench()
+        : plat.date;
+
       const badgeText = isEvening 
         ? `🌙 AU MENU DEMAIN MIDI (${(plat.targetDayLabel || 'DEMAIN').toUpperCase()})`
-        : `🍲 AU MENU DU JOUR • ${(plat.date || 'AUJOURD\'HUI').toUpperCase()}`;
+        : `🍲 AU MENU DU JOUR • ${effectiveDate.toUpperCase()}`;
 
       const badgeWidth = Math.min(width * 0.68, isLandscape ? 700 : 580);
       const badgeHeight = isStory ? 46 : 40;
@@ -1410,6 +1415,74 @@ export const PlatDuJourPosterStudio: React.FC<PlatDuJourPosterStudioProps> = ({
                   </p>
                 </div>
               </button>
+            </div>
+
+            {/* Date & Calendrier Officiel du Menu */}
+            <div className="bg-black/30 p-4 rounded-2xl border border-white/10 space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <label className="text-[10px] font-black uppercase text-brand-gold flex items-center gap-1.5">
+                  <Calendar size={13} className="text-brand-orange" /> Date du Menu sur l'Affiche
+                </label>
+                <span className="text-[10px] font-bold text-white/90 bg-brand-orange/20 px-2.5 py-0.5 rounded-full border border-brand-orange/30">
+                  {(!plat.date || isMenuDateStale(plat.date, plat.calendarDate)) ? formatMenuDateFrench() : plat.date}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="date"
+                  value={plat.calendarDate || getCalendarDateString()}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    const d = new Date(val + 'T12:00:00');
+                    const formatted = formatMenuDateFrench(d);
+                    const targetDay = getComputedTargetDayLabel(plat.publicationTiming, d);
+                    onChangePlat({
+                      ...plat,
+                      calendarDate: val,
+                      date: formatted,
+                      targetDayLabel: targetDay
+                    });
+                  }}
+                  className="bg-black/60 border border-white/20 rounded-xl px-3 py-1.5 text-xs text-brand-gold font-bold focus:outline-none focus:border-brand-gold"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('pop');
+                    const today = new Date();
+                    onChangePlat({
+                      ...plat,
+                      calendarDate: getCalendarDateString(today),
+                      date: formatMenuDateFrench(today),
+                      targetDayLabel: getComputedTargetDayLabel(plat.publicationTiming, today)
+                    });
+                  }}
+                  className="bg-white/10 hover:bg-white/20 text-white text-[9px] font-black uppercase px-3 py-2 rounded-xl transition-all border border-white/10"
+                >
+                  ⚡ Aujourd'hui
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('pop');
+                    const tomorrow = new Date();
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    onChangePlat({
+                      ...plat,
+                      calendarDate: getCalendarDateString(tomorrow),
+                      date: formatMenuDateFrench(tomorrow),
+                      targetDayLabel: getComputedTargetDayLabel(plat.publicationTiming, tomorrow)
+                    });
+                  }}
+                  className="bg-white/10 hover:bg-white/20 text-white text-[9px] font-black uppercase px-3 py-2 rounded-xl transition-all border border-white/10"
+                >
+                  🌙 Demain
+                </button>
+              </div>
             </div>
 
             {/* Custom Day Target Label */}
