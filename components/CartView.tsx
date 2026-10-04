@@ -14,6 +14,7 @@ import {
   SharedCartMetadata
 } from '../utils/cartShare';
 import { ToastType } from './Toast';
+import { trackEvent } from '../utils/analytics';
 
 interface CartViewProps {
   cart: CartItem[];
@@ -228,6 +229,7 @@ export const CartView: React.FC<CartViewProps> = ({
     });
 
     openWhatsApp(RESTAURANT_INFO.whatsappClean, waMsg);
+    trackEvent('khadys_whatsapp_click', { action: 'cart_order_submit', itemsCount: cart.length, total });
     setCart([]);
   };
 

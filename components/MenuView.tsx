@@ -7,6 +7,7 @@ import { playSound } from '../utils/audio';
 import { getStoredPlatDuJour } from '../utils/marketing';
 import { RESTAURANT_INFO } from '../constants';
 import { MenuDuJourTrio } from './MenuDuJourTrio';
+import { trackEvent } from '../utils/analytics';
 
 interface MenuViewProps {
   items: MenuItem[];
@@ -323,7 +324,10 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
             href={RESTAURANT_INFO.whatsappOrderUrl}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => playSound('pop')}
+            onClick={() => {
+              playSound('pop');
+              trackEvent('khadys_whatsapp_click', { location: 'menu_header_order' });
+            }}
             className="bg-emerald-500 hover:bg-emerald-400 text-white text-[8px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-colors shrink-0 flex items-center justify-center gap-1 self-end sm:self-auto"
           >
             Commander sur WhatsApp <ArrowRight size={10} />
@@ -342,6 +346,9 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
             href={RESTAURANT_INFO.whatsappCatalogUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => {
+              trackEvent('khadys_catalogue_click', { location: 'menu_header' });
+            }}
             className="text-emerald-700 hover:text-emerald-600 underline font-black uppercase"
           >
             Catalogue WhatsApp ↗

@@ -48,6 +48,7 @@ import {
 
 import { getStoredBanner, AnnouncementBanner, getStoredPlatDuJour, syncMenuDuJourWithMenuItems, invalidateMarketingMemoryCache } from './utils/marketing';
 import { decodeSharedCartWithMeta, mergeCartItems, SharedCartMetadata } from './utils/cartShare';
+import { trackEvent } from './utils/analytics';
 
 const GREETINGS = ["SALAM 👋🏾", "BONJOUR 👋🏾", "BARKA 👋🏾", "FOFO 👋🏾", "VOTRE FESTIN ? 🥘"];
 
@@ -729,6 +730,7 @@ const App: React.FC = () => {
     setCart(prev => [...prev, cartItem]);
     showToast(`${quantity}x ${item.name} ajouté !`);
     playSound('pop');
+    trackEvent('khadys_add_to_cart', { category: item.category || 'menu', quantity });
     
     if (item.category === 'Plat Africain' || item.category === 'Spécialité Maison') {
       setIsUpsellOpen(true);
@@ -738,6 +740,7 @@ const App: React.FC = () => {
   const handleOrderPlace = async (order: Order) => {
     setOrders(prev => [order, ...prev]);
     setLastOrder(order);
+    trackEvent('khadys_order_click', { itemsCount: order.items?.length || 0, total: order.total || 0 });
     
     // Trigger Instant Audible & Visual Order Notification Alert
     setNotificationOrder(order);
