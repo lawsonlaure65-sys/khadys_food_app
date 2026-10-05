@@ -3,6 +3,7 @@ import { MessageSquare, Send, CheckCircle2, PhoneCall, Copy, ShieldCheck, Zap, B
 import { CartItem, UserProfile } from '../types';
 import { playSound } from '../utils/audio';
 import { RESTAURANT_INFO, BILLO_INFO } from '../constants';
+import { track } from '../utils/analytics';
 
 interface WhatsAppAutomationProps {
   cart: CartItem[];
@@ -40,6 +41,8 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationProps> = ({ cart
 
   const handleOpenRestaurantWhatsApp = () => {
     playSound('cash');
+    track('whatsapp_click', { source: 'automation_order' });
+    track('order_click', { source: 'automation_whatsapp', items_count: cart.length, total: totalCart });
     const text = encodeURIComponent(generateWhatsAppText());
     const url = `https://wa.me/${RESTAURANT_INFO.whatsappClean}?text=${text}`;
     window.open(url, '_blank');
@@ -47,6 +50,7 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationProps> = ({ cart
 
   const handleOpenBilloWhatsApp = () => {
     playSound('pop');
+    track('whatsapp_click', { source: 'billo_delivery' });
     let msg = `*Bonjour Billo Express ! Demande d'information livraison Khady's Food*\n\n`;
     msg += `*Quartier client :* ${district}\n`;
     msg += `*Téléphone client :* ${userProfile.phone || '+227'}\n`;
@@ -172,7 +176,10 @@ export const WhatsAppAutomationView: React.FC<WhatsAppAutomationProps> = ({ cart
             href={RESTAURANT_INFO.whatsappCatalogUrl}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => playSound('pop')}
+            onClick={() => {
+              playSound('pop');
+              track('catalogue_click', { source: 'automation_view' });
+            }}
             className="w-full bg-brand-gold/20 hover:bg-brand-gold/30 text-brand-gold border border-brand-gold/40 py-3.5 sm:py-4 px-3 rounded-2xl font-black uppercase italic shadow-md flex items-center justify-center gap-2 sm:gap-3 active:scale-95 transition-all text-[10px] sm:text-xs tracking-wider min-w-0"
           >
             <MessageSquare size={18} className="shrink-0" /> <span className="truncate">Ouvrir le Catalogue WhatsApp Officiel</span>

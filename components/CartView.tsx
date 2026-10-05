@@ -14,7 +14,7 @@ import {
   SharedCartMetadata
 } from '../utils/cartShare';
 import { ToastType } from './Toast';
-import { trackEvent } from '../utils/analytics';
+import { track, trackEvent } from '../utils/analytics';
 
 interface CartViewProps {
   cart: CartItem[];
@@ -229,6 +229,8 @@ export const CartView: React.FC<CartViewProps> = ({
     });
 
     openWhatsApp(RESTAURANT_INFO.whatsappClean, waMsg);
+    track('whatsapp_click', { source: 'cart_whatsapp_order', total });
+    track('order_click', { source: 'cart_whatsapp_order', items_count: cart.length, total });
     trackEvent('khadys_whatsapp_click', { action: 'cart_order_submit', itemsCount: cart.length, total });
     setCart([]);
   };
@@ -554,6 +556,7 @@ export const CartView: React.FC<CartViewProps> = ({
                 href={RESTAURANT_INFO.whatsappCatalogUrl}
                 target="_blank"
                 rel="noreferrer"
+                onClick={() => track('catalogue_click', { source: 'cart' })}
                 className="text-[9px] font-black uppercase tracking-wider bg-white/10 hover:bg-white/20 text-emerald-200 px-3 py-1.5 rounded-xl border border-white/15 flex items-center gap-1 transition-all"
               >
                 <ExternalLink size={11} /> Catalogue WhatsApp
@@ -984,6 +987,7 @@ export const CartView: React.FC<CartViewProps> = ({
                    href={RESTAURANT_INFO.whatsappCatalogUrl}
                    target="_blank"
                    rel="noreferrer"
+                   onClick={() => track('catalogue_click', { source: 'cart_footer' })}
                    className="text-emerald-300 hover:text-emerald-200 underline flex items-center gap-1 font-black uppercase"
                  >
                    <ExternalLink size={11} /> Catalogue WhatsApp séparé

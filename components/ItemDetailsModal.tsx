@@ -6,6 +6,7 @@ import { X, Plus, Minus, MessageSquare, Flame, Leaf, CheckCircle2, Clock, Shield
 import Dish3DModal from './Dish3DModal';
 import { playSound } from '../utils/audio';
 import { RESTAURANT_INFO } from '../constants';
+import { track } from '../utils/analytics';
 
 interface ItemDetailsModalProps {
   item: MenuItem | null;
@@ -45,6 +46,12 @@ const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ item, isOpen, onClo
     return () => clearTimeout(safetyTimer);
   }, [isFlying, flyingData]);
 
+  useEffect(() => {
+    if (isOpen && item && (item.isPlatDuJour || item.category === 'Menu du Jour')) {
+      track('daily_dish_view', { dish_name: item.name, price: item.price, source: 'modal' });
+    }
+  }, [isOpen, item?.id]);
+
   if (!isOpen || !item) return null;
 
   const handleFlightLanding = (data: FlyingItemData) => {
@@ -72,6 +79,7 @@ const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ item, isOpen, onClo
 
   const handleAdd = () => {
     if (isFlying) return;
+    track('order_click', { source: 'item_modal_add', dish_name: item.name, price: item.price, quantity });
 
     // Source coordinates: center of the Add to Cart button
     const btnRect = addButtonRef.current?.getBoundingClientRect();
@@ -262,7 +270,10 @@ const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ item, isOpen, onClo
                     href={RESTAURANT_INFO.whatsappCatalogUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={() => playSound('pop')}
+                    onClick={() => {
+                      playSound('pop');
+                      track('catalogue_click', { source: 'item_modal', dish_name: item.name });
+                    }}
                     className="flex-1 sm:flex-initial bg-brand-gold/20 hover:bg-brand-gold/30 text-brand-gold border border-brand-gold/40 px-3.5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-95"
                   >
                     <ShoppingBag size={12} />
@@ -272,7 +283,11 @@ const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ item, isOpen, onClo
                     href={RESTAURANT_INFO.whatsappOrderUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={() => playSound('pop')}
+                    onClick={() => {
+                      playSound('pop');
+                      track('whatsapp_click', { source: 'item_modal', dish_name: item.name });
+                      track('order_click', { source: 'item_modal_whatsapp', dish_name: item.name, price: item.price });
+                    }}
                     className="flex-1 sm:flex-initial bg-emerald-500 hover:bg-emerald-400 text-white px-3.5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-95"
                   >
                     <MessageSquare size={12} />

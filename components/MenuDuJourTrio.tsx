@@ -11,6 +11,7 @@ import {
 } from '../utils/marketing';
 import { RESTAURANT_INFO } from '../constants';
 import { playSound } from '../utils/audio';
+import { track } from '../utils/analytics';
 
 interface MenuDuJourTrioProps {
   items: MenuItem[];
@@ -99,6 +100,16 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
     };
   }, [menuDuJour, items]);
 
+  useEffect(() => {
+    if (menuDuJour && menuDuJour.isActive && rawPrimaryDish?.dishName) {
+      track('daily_dish_view', {
+        dish_name: rawPrimaryDish.dishName,
+        price: rawPrimaryDish.promoPrice || rawPrimaryDish.price,
+        source: isHomeView ? 'home_impression' : 'menu_impression'
+      });
+    }
+  }, [menuDuJour?.isActive, rawPrimaryDish?.dishName, isHomeView]);
+
   if (!menuDuJour || !menuDuJour.isActive) {
     return null;
   }
@@ -125,11 +136,18 @@ export const MenuDuJourTrio: React.FC<MenuDuJourTrioProps> = ({
     };
 
     onSelectItem(match);
+    track('daily_dish_view', { 
+      dish_name: dish.dishName, 
+      price: effectivePrice, 
+      source: isHomeView ? 'home_trio' : 'menu_trio' 
+    });
   };
 
   const handleWhatsAppOrder = (e: React.MouseEvent, dish: MenuDuJourDishItem) => {
     e.stopPropagation();
     playSound('pop');
+    track('whatsapp_click', { source: 'plat_du_jour', dish_name: dish.dishName });
+    track('order_click', { source: 'plat_du_jour_whatsapp', dish_name: dish.dishName, price: dish.promoPrice || dish.price });
     const priceText = (dish.promoPrice || dish.price).toLocaleString('fr-FR');
     const message = `Salam Khady's Food ! Je souhaite commander votre Menu du Jour : *${dish.dishName}* (${priceText} F CFA). Merci de me confirmer la disponibilité et le délai de livraison à Niamey !`;
     const url = `https://wa.me/${RESTAURANT_INFO.whatsappClean}?text=${encodeURIComponent(message)}`;

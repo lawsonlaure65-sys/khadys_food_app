@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Home, ScrollText, ShoppingBag, Image as ImageIcon, BookOpen, MessageSquare, UserRound, ClipboardList } from 'lucide-react';
 import { Page } from '../types';
 import { playSound } from '../utils/audio';
+import { track } from '../utils/analytics';
 
 interface NavbarProps {
   currentPage: Page;
@@ -62,7 +63,13 @@ const Navbar: React.FC<NavbarProps> = ({ currentPage, setPage, cartCount }) => {
               <button 
                 key={item.label}
                 id={isCart ? 'nav-cart-btn' : undefined}
-                onClick={() => { playSound('pop'); setPage(item.page); }} 
+                onClick={() => { 
+                  playSound('pop'); 
+                  if (item.page === Page.MENU) track('menu_view', { source: 'navbar' });
+                  if (item.page === Page.WHATSAPP) track('whatsapp_click', { source: 'navbar' });
+                  if (item.page === Page.CART) track('order_click', { source: 'navbar_cart' });
+                  setPage(item.page); 
+                }} 
                 className="relative flex flex-col items-center justify-center flex-1 min-w-0 h-full group"
                 title={item.label}
               >

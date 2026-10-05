@@ -7,7 +7,7 @@ import { playSound } from '../utils/audio';
 import { getStoredPlatDuJour } from '../utils/marketing';
 import { RESTAURANT_INFO } from '../constants';
 import { MenuDuJourTrio } from './MenuDuJourTrio';
-import { trackEvent } from '../utils/analytics';
+import { track, trackEvent } from '../utils/analytics';
 
 interface MenuViewProps {
   items: MenuItem[];
@@ -61,6 +61,19 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
       window.removeEventListener('storage', handlePlatUpdate);
     };
   }, []);
+
+  // Track menu_view when the carte is opened or section changes
+  React.useEffect(() => {
+    track('menu_view', { section: activeSection, category: selectedCategory });
+  }, [activeSection, selectedCategory]);
+
+  const handleSelectDish = (item: MenuItem) => {
+    playSound('pop');
+    if (item.isPlatDuJour || item.category === 'Menu du Jour') {
+      track('daily_dish_view', { dish_name: item.name, price: item.price, source: 'menu' });
+    }
+    onSelectItem(item);
+  };
 
   // Helper to determine if dish is one of the Incontournables (Attiéké or Doukounou)
   const isDishIncontournable = (item: MenuItem) => {
@@ -326,7 +339,8 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
             rel="noopener noreferrer"
             onClick={() => {
               playSound('pop');
-              trackEvent('khadys_whatsapp_click', { location: 'menu_header_order' });
+              track('whatsapp_click', { source: 'menu_header' });
+              track('order_click', { source: 'menu_header_whatsapp' });
             }}
             className="bg-emerald-500 hover:bg-emerald-400 text-white text-[8px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-colors shrink-0 flex items-center justify-center gap-1 self-end sm:self-auto"
           >
@@ -347,7 +361,7 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => {
-              trackEvent('khadys_catalogue_click', { location: 'menu_header' });
+              track('catalogue_click', { source: 'menu_header' });
             }}
             className="text-emerald-700 hover:text-emerald-600 underline font-black uppercase"
           >
@@ -396,7 +410,7 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
               return (
                 <div
                   key={`perm-${item.id}`}
-                  onClick={() => { playSound('pop'); onSelectItem(item); }}
+                  onClick={() => handleSelectDish(item)}
                   className="min-w-0 bg-gradient-to-b from-amber-50/80 to-white rounded-[1.7rem] sm:rounded-[2rem] p-2.5 sm:p-3.5 border-2 border-amber-500/40 shadow-sm hover:shadow-md cursor-pointer flex flex-col justify-between transition-all active:scale-95"
                 >
                   <div className="min-w-0">
@@ -461,7 +475,7 @@ const MenuView: React.FC<MenuViewProps> = ({ items, onSelectItem, activeSection,
                 }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.96 }}
-                onClick={() => { playSound('pop'); onSelectItem(item); }}
+                onClick={() => handleSelectDish(item)}
                 className={`min-w-0 bg-white rounded-[1.8rem] sm:rounded-[2.5rem] p-3 sm:p-4 shadow-sm relative group cursor-pointer h-full flex flex-col transition-all ${
                   isIncontournable 
                     ? 'border-2 border-amber-500/60 shadow-md ring-2 ring-amber-400/20 hover:border-amber-500 bg-gradient-to-b from-amber-500/[0.03] to-white' 

@@ -48,7 +48,7 @@ import {
 
 import { getStoredBanner, AnnouncementBanner, getStoredPlatDuJour, syncMenuDuJourWithMenuItems, invalidateMarketingMemoryCache } from './utils/marketing';
 import { decodeSharedCartWithMeta, mergeCartItems, SharedCartMetadata } from './utils/cartShare';
-import { trackEvent } from './utils/analytics';
+import { track, trackEvent } from './utils/analytics';
 
 const GREETINGS = ["SALAM 👋🏾", "BONJOUR 👋🏾", "BARKA 👋🏾", "FOFO 👋🏾", "VOTRE FESTIN ? 🥘"];
 
@@ -730,6 +730,7 @@ const App: React.FC = () => {
     setCart(prev => [...prev, cartItem]);
     showToast(`${quantity}x ${item.name} ajouté !`);
     playSound('pop');
+    track('order_click', { source: 'add_to_cart', dish_name: item.name, price: item.price, quantity });
     trackEvent('khadys_add_to_cart', { category: item.category || 'menu', quantity });
     
     if (item.category === 'Plat Africain' || item.category === 'Spécialité Maison') {
@@ -740,6 +741,7 @@ const App: React.FC = () => {
   const handleOrderPlace = async (order: Order) => {
     setOrders(prev => [order, ...prev]);
     setLastOrder(order);
+    track('order_click', { source: 'order_completed', total: order.total, items_count: order.items?.length || 0 });
     trackEvent('khadys_order_click', { itemsCount: order.items?.length || 0, total: order.total || 0 });
     
     // Trigger Instant Audible & Visual Order Notification Alert
@@ -873,7 +875,10 @@ const App: React.FC = () => {
             {/* Banner Hero avec défilement continu des plats enregistrés en zoom & dézoom */}
             <HeroBannerSlideshow
               items={items}
-              onOpenMenu={() => setCurrentPage(Page.MENU)}
+              onOpenMenu={() => {
+                track('menu_view', { source: 'hero_banner' });
+                setCurrentPage(Page.MENU);
+              }}
               onSelectDish={(dish) => {
                 setSelectedItem(dish);
                 setIsItemModalOpen(true);
@@ -920,7 +925,10 @@ const App: React.FC = () => {
                     href={RESTAURANT_INFO.whatsappCatalogUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={() => playSound('pop')}
+                    onClick={() => {
+                      playSound('pop');
+                      track('catalogue_click', { source: 'home_banner' });
+                    }}
                     className="flex-1 sm:flex-initial bg-brand-gold/20 hover:bg-brand-gold/30 text-brand-gold border border-brand-gold/40 px-3.5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-95"
                   >
                     <ShoppingBag size={12} />
@@ -930,7 +938,11 @@ const App: React.FC = () => {
                     href={RESTAURANT_INFO.whatsappOrderUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={() => playSound('pop')}
+                    onClick={() => {
+                      playSound('pop');
+                      track('whatsapp_click', { source: 'home_banner' });
+                      track('order_click', { source: 'home_banner_whatsapp' });
+                    }}
                     className="flex-1 sm:flex-initial bg-emerald-500 hover:bg-emerald-400 text-white px-3.5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-95"
                   >
                     <MessageSquare size={12} />
@@ -1111,16 +1123,37 @@ const App: React.FC = () => {
 
             {/* Menu Grid */}
             <div className="px-4 sm:px-6 grid grid-cols-1 sm:grid-cols-5 gap-3 mb-12">
-              <div className="sm:col-span-3 bg-[#1A0F0D] rounded-[2.5rem] p-8 shadow-2xl flex flex-col items-center justify-center relative overflow-hidden group active:scale-95 transition-all cursor-pointer border border-white/5 h-48 sm:h-auto" onClick={() => { setActiveMenuSection('CARTE'); setCurrentPage(Page.MENU); }}>
+              <div 
+                className="sm:col-span-3 bg-[#1A0F0D] rounded-[2.5rem] p-8 shadow-2xl flex flex-col items-center justify-center relative overflow-hidden group active:scale-95 transition-all cursor-pointer border border-white/5 h-48 sm:h-auto" 
+                onClick={() => { 
+                  track('menu_view', { source: 'home_carte_card' }); 
+                  setActiveMenuSection('CARTE'); 
+                  setCurrentPage(Page.MENU); 
+                }}
+              >
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
                 <div className="w-16 h-16 bg-brand-gold/10 rounded-2xl flex items-center justify-center text-brand-gold mb-3 relative z-10 border border-white/10"><Utensils size={32}/></div>
                 <span className="text-[11px] font-black uppercase text-brand-gold tracking-[0.4em] italic relative z-10">LA CARTE DU RESTAURANT</span>
               </div>
               <div className="sm:col-span-2 flex flex-row sm:flex-col gap-3">
-                <button onClick={() => { setActiveMenuSection('PACK'); setCurrentPage(Page.MENU); }} className="flex-1 bg-brand-gold text-brand-brown py-5 rounded-[1.8rem] font-black uppercase text-[9px] italic flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all border border-white/20">
+                <button 
+                  onClick={() => { 
+                    track('menu_view', { source: 'home_buffet_btn' }); 
+                    setActiveMenuSection('PACK'); 
+                    setCurrentPage(Page.MENU); 
+                  }} 
+                  className="flex-1 bg-brand-gold text-brand-brown py-5 rounded-[1.8rem] font-black uppercase text-[9px] italic flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all border border-white/20"
+                >
                    BUFFET PRO
                 </button>
-                <button onClick={() => { setActiveMenuSection('BOX'); setCurrentPage(Page.MENU); }} className="flex-1 bg-brand-orange text-white py-5 rounded-[1.8rem] font-black uppercase text-[9px] italic flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all border border-white/20">
+                <button 
+                  onClick={() => { 
+                    track('menu_view', { source: 'home_box_btn' }); 
+                    setActiveMenuSection('BOX'); 
+                    setCurrentPage(Page.MENU); 
+                  }} 
+                  className="flex-1 bg-brand-orange text-white py-5 rounded-[1.8rem] font-black uppercase text-[9px] italic flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all border border-white/20"
+                >
                    BOX SAUCES
                 </button>
               </div>
@@ -1136,7 +1169,15 @@ const App: React.FC = () => {
                   <div className="p-2 bg-brand-orange/10 rounded-xl text-brand-orange"><Heart size={18} fill="currentColor" /></div>
                   <h3 className="text-sm font-black uppercase text-brand-brown tracking-[0.2em] italic">Classiques de la Carte</h3>
                 </div>
-                <button onClick={() => setCurrentPage(Page.MENU)} className="text-[9px] font-black text-brand-orange uppercase tracking-widest underline">Tout voir</button>
+                <button 
+                  onClick={() => { 
+                    track('menu_view', { source: 'home_classiques_see_all' }); 
+                    setCurrentPage(Page.MENU); 
+                  }} 
+                  className="text-[9px] font-black text-brand-orange uppercase tracking-widest underline"
+                >
+                  Tout voir
+                </button>
               </div>
               
               <div className="relative overflow-hidden w-full">
